@@ -21,20 +21,24 @@ per user. Once paid, the builder is unlocked for that Clerk user forever.
 
 - `lib/fees.ts`: add `builder_unlock: 200000` paise. Amounts stay
   server-side-only; the client sends a purpose, never an amount.
-- New `purchases` table: `user_id, purpose, order_id, payment_id,
-  created_at`, unique `(user_id, purpose)` — one-time by construction, RLS
-  enabled with no policies (all access via API routes with the secret key).
-- `POST /api/create-order`: stamps `notes: { purpose, userId }` on the
-  Razorpay order.
+- New `purchases` table — a ledger of every verified payment: `user_id,
+  purpose, ref, order_id, payment_id (unique), amount, created_at`. Partial
+  unique indexes make `builder_unlock` one-time per user and `contact_owner`
+  one-time per (user, property). RLS enabled with no policies (all access
+  via API routes with the secret key).
+- `POST /api/create-order`: stamps `notes: { purpose, userId, ref }` on the
+  Razorpay order; `ref` is e.g. the property id for contact unlocks.
 - `POST /api/verify-payment`: after the HMAC check, fetches the order from
-  Razorpay and, when its notes say `builder_unlock`, inserts a purchases row
-  for the user recorded in the order notes. Duplicate inserts are ignored.
-  The client cannot fake an unlock — persistence happens only server-side
-  after signature verification.
-- `GET /api/purchases?purpose=X`: returns `{ unlocked }` for the current
-  Clerk user.
+  Razorpay and inserts a purchases row for the user recorded in the order
+  notes — every purpose, not just unlocks. Duplicate inserts (retries,
+  already-owned one-time purchases) are ignored. The client cannot fake an
+  unlock — persistence happens only server-side after signature verification.
+- `GET /api/purchases?purpose=X[&ref=Y]`: returns `{ unlocked }` for the
+  current Clerk user.
 
-## Unchanged
+## Persistence per fee
 
-The ₹100 listing and ₹20 contact-owner fees keep their stateless flow; no
-purchase row is written for them.
+- `builder_unlock` ₹2000 — one-time per user; gates `/designer`.
+- `contact_owner` ₹20 — one-time per (user, property); the detail panel
+  checks the ledger on open and skips the paywall if already paid.
+- `add_property` ₹100 — recorded for audit; still charged per listing.
