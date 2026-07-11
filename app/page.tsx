@@ -1,363 +1,202 @@
-"use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import type { Map as MapLibreMap } from "maplibre-gl";
-import type { Filters, Listing } from "@/lib/types";
-import { POIS, PRICE_DOMAIN } from "@/lib/listings";
+import Link from "next/link";
+import { Fraunces } from "next/font/google";
 import Navbar from "@/components/Navbar";
-import FilterSidebar from "@/components/FilterSidebar";
-import SearchBar from "@/components/SearchBar";
-import MapControls from "@/components/MapControls";
-import PropertyCarousel from "@/components/PropertyCarousel";
-import PropertyDetailPanel from "@/components/PropertyDetailPanel";
-import AddPropertyForm, {
-  type PropertyDraft,
-} from "@/components/AddPropertyForm";
-import { payFee } from "@/lib/checkout";
+import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
 
-const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+});
 
-const DEFAULT_FILTERS: Filters = {
-  kind: null,
-  price: PRICE_DOMAIN,
-  rooms: null,
-  areaFrom: 40,
-  areaTo: 60,
-  floorArea: null,
-};
+const PRODUCTS = [
+  {
+    name: "ArchIt Lite",
+    tagline: "A taste of the atelier",
+    body: "Explore a crafted 3D showcase home in your browser. No account, no cost — just walk in.",
+    badge: "Free",
+    badgeClass: "bg-lime text-plum",
+    cta: "Try it free",
+    href: "https://archit-lit.chaudharyankit.in/",
+    external: true,
+    Icon: HouseIcon,
+    lift: "lg:translate-y-8",
+  },
+  {
+    name: "ArchIt Find",
+    tagline: "Every home, on a living map",
+    body: "Fly over a 3D satellite city, browse real listings, list your own property and reach owners directly.",
+    badge: "₹100 listing · ₹20 contact",
+    badgeClass: "bg-magenta text-white",
+    cta: "Open the map",
+    href: "/find",
+    external: false,
+    Icon: SearchIcon,
+    lift: "",
+    featured: true,
+  },
+  {
+    name: "ArchIt 3D Builder",
+    tagline: "Your home, room by room",
+    body: "Design a complete house in 3D — floors, facades, windows, furniture — then save and refine every idea.",
+    badge: "Paid",
+    badgeClass: "bg-plum text-cream",
+    cta: "Start designing",
+    href: "/designer",
+    external: false,
+    Icon: ApartmentsIcon,
+    lift: "lg:translate-y-8",
+  },
+];
 
-type AddStage = "idle" | "picking" | "form";
-
-export default function Home() {
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [is3D, setIs3D] = useState(true);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [addStage, setAddStage] = useState<AddStage>("idle");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftCoords, setDraftCoords] = useState<[number, number] | null>(null);
-  const [geoAddress, setGeoAddress] = useState("");
-  const [geoCity, setGeoCity] = useState("");
-  const [geocoding, setGeocoding] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const geocodeSeq = useRef(0);
-  const mapRef = useRef<MapLibreMap | null>(null);
-
-  useEffect(() => {
-    fetch("/api/properties")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Listing[]) => setListings(data))
-      .catch(() => {});
-  }, []);
-
-  const filtered = useMemo(
-    () =>
-      listings.filter((l) => {
-        if (filters.kind && l.kind !== filters.kind) return false;
-        if (l.price < filters.price[0] || l.price > filters.price[1]) return false;
-        if (filters.rooms !== null) {
-          if (filters.rooms === 5 ? l.rooms < 5 : l.rooms !== filters.rooms)
-            return false;
-        }
-        if (l.areaM < filters.areaFrom || l.areaM > filters.areaTo) return false;
-        if (filters.floorArea === "less5" && l.floors > 5) return false;
-        if (filters.floorArea === "6-10" && (l.floors < 6 || l.floors > 10))
-          return false;
-        if (filters.floorArea === "more10" && l.floors <= 10) return false;
-        return true;
-      }),
-    [filters, listings],
-  );
-
-  const selected = listings.find((l) => l.id === selectedId) ?? null;
-  const editing = listings.find((l) => l.id === editingId) ?? null;
-
-  const flyToListing = (id: string) => {
-    const l = listings.find((x) => x.id === id);
-    if (!l) return;
-    setSelectedId(id);
-    mapRef.current?.flyTo({ center: l.coords, zoom: 16.4, duration: 1600 });
-  };
-
-  const searchPlace = async (query: string): Promise<boolean> => {
-    const map = mapRef.current;
-    if (!map) return false;
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&limit=1`,
-      );
-      if (!res.ok) return false;
-      const results = (await res.json()) as Array<{
-        lat: string;
-        lon: string;
-        boundingbox: [string, string, string, string];
-      }>;
-      const hit = results[0];
-      if (!hit) return false;
-
-      // fit the result's bounding box, but keep the 3D perspective
-      const [s, n, w, e] = hit.boundingbox.map(Number);
-      const cam = map.cameraForBounds(
-        [
-          [w, s],
-          [e, n],
-        ],
-        { padding: 80 },
-      );
-      map.flyTo({
-        center: cam?.center ?? [Number(hit.lon), Number(hit.lat)],
-        zoom: Math.min(cam?.zoom ?? 13, 16),
-        pitch: is3D ? 58 : 0,
-        duration: 3000,
-        essential: true,
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const reverseGeocode = async (coords: [number, number]) => {
-    const seq = ++geocodeSeq.current;
-    setGeocoding(true);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${coords[1]}&lon=${coords[0]}&format=jsonv2&zoom=18`,
-      );
-      if (res.ok && seq === geocodeSeq.current) {
-        const j = (await res.json()) as {
-          display_name?: string;
-          address?: Record<string, string>;
-        };
-        const a = j.address ?? {};
-        const line = [a.house_number, a.road ?? a.neighbourhood, a.suburb]
-          .filter(Boolean)
-          .join(", ");
-        const cityName = a.city ?? a.town ?? a.village ?? a.county ?? "";
-        setGeoAddress(
-          line ||
-            (j.display_name ?? "").split(",").slice(0, 2).join(",").trim(),
-        );
-        setGeoCity([cityName, a.postcode].filter(Boolean).join(", "));
-      }
-    } catch {
-      // leave fields blank — user types the address
-    }
-    if (seq === geocodeSeq.current) setGeocoding(false);
-  };
-
-  const handleMapClick = (coords: [number, number]) => {
-    if (addStage === "idle") return;
-    setDraftCoords(coords);
-    setAddStage("form");
-    if (!editingId) {
-      setGeoAddress("");
-      setGeoCity("");
-      reverseGeocode(coords);
-    }
-  };
-
-  const cancelAdd = () => {
-    setAddStage("idle");
-    setEditingId(null);
-    setDraftCoords(null);
-  };
-
-  const openEdit = (l: Listing) => {
-    setSelectedId(null);
-    setEditingId(l.id);
-    setDraftCoords(l.coords);
-    setGeoAddress(l.address);
-    setGeoCity(l.city);
-    setAddStage("form");
-  };
-
-  const saveProperty = async (d: PropertyDraft, photoFile: File | null) => {
-    if (!draftCoords || saving) return;
-    setSaving(true);
-    try {
-      // listing fee applies to new properties only, never edits
-      if (!editing && !(await payFee("add_property", "Property listing fee"))) {
-        return;
-      }
-      let photo = editing?.photo;
-      if (photoFile) {
-        const fd = new FormData();
-        fd.append("file", photoFile);
-        const up = await fetch("/api/upload", { method: "POST", body: fd });
-        if (up.ok) photo = ((await up.json()) as { url: string }).url;
-      }
-
-      const body = {
-        buildingName: d.buildingName || undefined,
-        owner: d.owner || undefined,
-        address: d.address,
-        city: d.city,
-        price: d.price,
-        type: d.type,
-        kind: d.kind,
-        beds: d.beds,
-        baths: d.baths,
-        sqft: d.sqft,
-        rooms: Math.max(1, d.beds + 1),
-        areaM: d.areaM,
-        floors: d.floors,
-        coords: draftCoords,
-        photo,
-      };
-
-      const res = editing
-        ? await fetch(`/api/properties/${editing.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          })
-        : await fetch("/api/properties", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-      if (!res.ok) return;
-      const saved = (await res.json()) as Listing;
-
-      setListings((prev) =>
-        editing
-          ? prev.map((l) => (l.id === saved.id ? saved : l))
-          : [...prev, saved],
-      );
-      // widen filters so the saved property is never hidden by defaults
-      setFilters({
-        ...DEFAULT_FILTERS,
-        price: [
-          Math.min(PRICE_DOMAIN[0], d.price),
-          Math.max(PRICE_DOMAIN[1], d.price),
-        ],
-        areaFrom: Math.min(DEFAULT_FILTERS.areaFrom, d.areaM),
-        areaTo: Math.max(DEFAULT_FILTERS.areaTo, d.areaM),
-      });
-      cancelAdd();
-      setSelectedId(saved.id);
-      mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteProperty = async (id: string) => {
-    if (deleting) return;
-    if (!window.confirm("Delete this property? This cannot be undone.")) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/properties/${id}`, { method: "DELETE" });
-      if (res.ok || res.status === 404) {
-        setListings((prev) => prev.filter((l) => l.id !== id));
-        setSelectedId(null);
-      }
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const toggleDimension = () => {
-    const next = !is3D;
-    setIs3D(next);
-    mapRef.current?.easeTo({ pitch: next ? 58 : 0, duration: 900 });
-  };
-
+export default function Landing() {
   return (
-    <div className="flex h-full flex-col bg-cream">
+    <div
+      className={`${fraunces.variable} relative flex min-h-full flex-col overflow-hidden bg-cream`}
+    >
+      {/* atmosphere: soft blobs + grain */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-40 -top-48 h-[560px] w-[560px] rounded-full opacity-60 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(circle at 35% 35%, #e9d5e4 0%, #f3e8ef 45%, transparent 70%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-56 -left-40 h-[620px] w-[620px] rounded-full opacity-50 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(circle at 60% 40%, #e6ecc3 0%, #f0f2dd 45%, transparent 70%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.35] mix-blend-multiply"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.24 0 0 0 0 0.09 0 0 0 0 0.19 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
+
       <Navbar />
 
-      <main className="relative mx-3 mb-3 flex-1 overflow-hidden rounded-[22px] bg-cream-soft">
-        <Map3D
-          listings={filtered}
-          pois={POIS}
-          mapRef={mapRef}
-          onSelect={flyToListing}
-          onMapClick={handleMapClick}
-          pickMode={addStage === "picking"}
-          draftCoords={addStage === "form" ? draftCoords : null}
-        />
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-16">
+        {/* hero */}
+        <section className="pb-14 pt-16 text-center lg:pt-24">
+          <p className="mb-5 text-[12px] font-bold uppercase tracking-[0.28em] text-plum-soft">
+            The ArchIt suite
+          </p>
+          <h1
+            className="mx-auto max-w-3xl text-[44px] leading-[1.06] text-plum sm:text-[64px]"
+            style={{ fontFamily: "var(--font-fraunces)" }}
+          >
+            Dream it. <em className="text-magenta">Find</em> it.{" "}
+            <em className="text-plum">Build</em> it.
+          </h1>
+          <p className="mx-auto mt-6 max-w-xl text-[15px] font-medium leading-relaxed text-plum-soft">
+            One place for the whole journey home — wander a free 3D showcase,
+            hunt real listings on a living satellite map, then design your own
+            walls, floor by floor.
+          </p>
+        </section>
 
-        {/* overlay chrome */}
-        <div className="pointer-events-none absolute inset-0 z-10 p-3.5">
-          <div className="absolute bottom-3.5 left-3.5 top-3.5">
-            <FilterSidebar
-              filters={filters}
-              onChange={setFilters}
-              allListings={listings}
-            />
-          </div>
-
-          <div className="pointer-events-auto absolute right-3.5 top-3.5 flex items-center gap-2.5">
-            <button
-              onClick={() =>
-                addStage === "idle" ? setAddStage("picking") : cancelAdd()
-              }
-              className={`glass rounded-full px-4 py-2.5 text-[13px] font-bold transition-colors ${
-                addStage === "idle"
-                  ? "text-plum hover:bg-white/70"
-                  : "bg-plum/90! text-cream"
+        {/* product cards */}
+        <section className="grid gap-5 lg:grid-cols-3">
+          {PRODUCTS.map((p) => (
+            <article
+              key={p.name}
+              className={`group relative flex flex-col gap-4 rounded-[28px] p-7 transition-transform duration-300 hover:-translate-y-2 ${p.lift} ${
+                p.featured
+                  ? "bg-plum text-cream shadow-2xl"
+                  : "glass text-plum shadow-lg"
               }`}
             >
-              {addStage === "idle" ? "+ Add property" : "Cancel"}
-            </button>
-            <SearchBar onSearch={searchPlace} />
-          </div>
+              <div className="flex items-start justify-between">
+                <span
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                    p.featured ? "bg-white/15" : "bg-plum/8"
+                  }`}
+                >
+                  <p.Icon width={24} height={24} />
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1.5 text-[10.5px] font-bold ${p.badgeClass}`}
+                >
+                  {p.badge}
+                </span>
+              </div>
 
-          {addStage === "picking" && (
-            <div className="glass absolute left-1/2 top-3.5 -translate-x-1/2 rounded-full px-5 py-2.5 text-[13px] font-semibold text-plum">
-              Click a spot on the map to place the property
-            </div>
-          )}
+              <div>
+                <h2
+                  className="text-[26px] leading-tight"
+                  style={{ fontFamily: "var(--font-fraunces)" }}
+                >
+                  {p.name}
+                </h2>
+                <p
+                  className={`mt-0.5 text-[12.5px] font-semibold italic ${
+                    p.featured ? "text-cream/70" : "text-plum-soft"
+                  }`}
+                  style={{ fontFamily: "var(--font-fraunces)" }}
+                >
+                  {p.tagline}
+                </p>
+              </div>
 
-          {addStage === "form" && draftCoords && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
-              <AddPropertyForm
-                key={editingId ?? "new"}
-                coords={draftCoords}
-                editing={editing}
-                initialAddress={geoAddress}
-                initialCity={geoCity}
-                geocoding={geocoding}
-                saving={saving}
-                onSave={saveProperty}
-                onCancel={cancelAdd}
-              />
-            </div>
-          )}
+              <p
+                className={`flex-1 text-[13.5px] font-medium leading-relaxed ${
+                  p.featured ? "text-cream/85" : "text-plum-soft"
+                }`}
+              >
+                {p.body}
+              </p>
 
-          {addStage === "idle" && selected && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
-              <PropertyDetailPanel
-                listing={selected}
-                onClose={() => setSelectedId(null)}
-                onEdit={() => openEdit(selected)}
-                onDelete={() => deleteProperty(selected.id)}
-                deleting={deleting}
-              />
-            </div>
-          )}
+              {p.external ? (
+                <a
+                  href={p.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`rounded-full py-3 text-center text-[13.5px] font-bold transition-opacity hover:opacity-90 ${
+                    p.featured ? "bg-cream text-plum" : "bg-plum text-cream"
+                  }`}
+                >
+                  {p.cta} ↗
+                </a>
+              ) : (
+                <Link
+                  href={p.href}
+                  className={`rounded-full py-3 text-center text-[13.5px] font-bold transition-opacity hover:opacity-90 ${
+                    p.featured ? "bg-cream text-plum" : "bg-plum text-cream"
+                  }`}
+                >
+                  {p.cta} →
+                </Link>
+              )}
 
-          <div className="pointer-events-auto absolute right-3.5 top-[38%]">
-            <MapControls
-              is3D={is3D}
-              onZoomIn={() => mapRef.current?.zoomIn()}
-              onZoomOut={() => mapRef.current?.zoomOut()}
-              onToggleDimension={toggleDimension}
-            />
-          </div>
+              {!p.external && (
+                <p
+                  className={`-mt-2 text-center text-[10.5px] font-semibold ${
+                    p.featured ? "text-cream/60" : "text-plum-soft/70"
+                  }`}
+                >
+                  Sign in required
+                </p>
+              )}
+            </article>
+          ))}
+        </section>
 
-          <div className="absolute bottom-3.5 left-[268px] right-3.5">
-            <PropertyCarousel
-              listings={filtered}
-              onSelect={flyToListing}
-              hasAny={listings.length > 0}
-            />
-          </div>
-        </div>
+        {/* stack strip */}
+        <footer className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[11px] font-bold uppercase tracking-[0.2em] text-plum-soft/60">
+          <span>Secured by Clerk</span>
+          <span aria-hidden>·</span>
+          <span>Data on Supabase</span>
+          <span aria-hidden>·</span>
+          <span>Payments by Razorpay</span>
+        </footer>
       </main>
     </div>
   );

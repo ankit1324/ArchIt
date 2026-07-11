@@ -76,7 +76,7 @@ export async function payFee(
       amount: order.amount,
       currency: order.currency,
       order_id: order.orderId,
-      name: "HAVN",
+      name: "ArchIt Find",
       description,
       theme: { color: "#4a2b4f" },
       modal: { ondismiss: () => resolve(false) },

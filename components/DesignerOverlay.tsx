@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { DesignStateV3 } from "@/lib/types";
+import type { DesignMeta, DesignStateV3 } from "@/lib/types";
 import type { Neighbor } from "@/lib/design";
 
 interface DesignerOverlayProps {
   plot: { w: number; d: number };
   neighbors: Neighbor[];
+  /** floors to pre-create in the builder; new designs only */
+  floors?: number;
+  facing?: DesignMeta["facing"];
   /** present when reopening a saved design */
   existingDesign?: DesignStateV3;
   onSave: (design: DesignStateV3, snapshotDataUrl: string) => void;
@@ -24,13 +27,31 @@ type BuilderMessage =
 export default function DesignerOverlay({
   plot,
   neighbors,
+  floors,
+  facing,
   existingDesign,
   onSave,
   onClose,
 }: DesignerOverlayProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const propsRef = useRef({ plot, neighbors, existingDesign, onSave, onClose });
-  propsRef.current = { plot, neighbors, existingDesign, onSave, onClose };
+  const propsRef = useRef({
+    plot,
+    neighbors,
+    floors,
+    facing,
+    existingDesign,
+    onSave,
+    onClose,
+  });
+  propsRef.current = {
+    plot,
+    neighbors,
+    floors,
+    facing,
+    existingDesign,
+    onSave,
+    onClose,
+  };
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -51,6 +72,8 @@ export default function DesignerOverlay({
             payload: {
               plot: p.plot,
               neighbors: p.neighbors,
+              floors: p.floors,
+              facing: p.facing,
               design: p.existingDesign,
             },
           },

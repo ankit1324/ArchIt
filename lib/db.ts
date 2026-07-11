@@ -1,5 +1,12 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Listing, ListingType, PropertyKind } from "./types";
+import type {
+  Design,
+  DesignMeta,
+  DesignStateV3,
+  Listing,
+  ListingType,
+  PropertyKind,
+} from "./types";
 
 // one client per server process, survives dev HMR reloads
 const globalForDb = globalThis as unknown as { __supabase?: SupabaseClient };
@@ -52,6 +59,44 @@ export function listingToRow(l: Omit<Listing, "id">): Omit<PropertyRow, "id"> {
     lng: l.coords[0],
     lat: l.coords[1],
     photo: l.photo ?? null,
+  };
+}
+
+export interface DesignRow {
+  id: string;
+  name: string;
+  plot_lng: number;
+  plot_lat: number;
+  plot_w: number;
+  plot_d: number;
+  design: DesignStateV3;
+  snapshot: string | null;
+  meta: DesignMeta | null;
+}
+
+export function designToRow(d: Omit<Design, "id">): Omit<DesignRow, "id"> {
+  return {
+    name: d.name,
+    plot_lng: d.plotCenter[0],
+    plot_lat: d.plotCenter[1],
+    plot_w: d.plotW,
+    plot_d: d.plotD,
+    design: d.design,
+    snapshot: d.snapshot ?? null,
+    meta: d.meta ?? null,
+  };
+}
+
+export function rowToDesign(r: DesignRow): Design {
+  return {
+    id: r.id,
+    name: r.name,
+    plotCenter: [r.plot_lng, r.plot_lat],
+    plotW: r.plot_w,
+    plotD: r.plot_d,
+    design: r.design,
+    snapshot: r.snapshot ?? undefined,
+    meta: r.meta ?? undefined,
   };
 }
 

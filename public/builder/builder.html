@@ -721,8 +721,22 @@ scene.add(blocksRoot);
 /* plot outline + neighbor context boxes injected by the parent map (embed mode) */
 const contextRoot = new THREE.Group();
 scene.add(contextRoot);
-function setContext(plot, neighbors){
+function setContext(plot, neighbors, facing){
   contextRoot.clear();
+  if(plot && plot.w > 0 && plot.d > 0 && facing){
+    // compass hint just outside the facing edge; builder -z = north
+    const off = {N:[0,-(plot.d/2+2.5)], S:[0,plot.d/2+2.5], E:[plot.w/2+2.5,0], W:[-(plot.w/2+2.5),0]}[facing];
+    if(off){
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d');
+      g.fillStyle = '#e5476f'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '700 64px system-ui'; g.fillText(facing, 64, 46);
+      g.font = '600 26px system-ui'; g.fillText('facing', 64, 98);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false}));
+      spr.scale.set(3.5, 3.5, 1); spr.position.set(off[0], 1.6, off[1]);
+      contextRoot.add(spr);
+    }
+  }
   if(plot && plot.w > 0 && plot.d > 0){
     const hw = plot.w/2, hd = plot.d/2;
     const outline = new THREE.LineLoop(
@@ -2863,7 +2877,11 @@ resize();
       if(m?.type !== 'archit:init') return;
       const p = m.payload || {};
       if(p.design?.v === 3 && p.design.state){ state = p.design.state; linkFloor(); }
-      setContext(p.plot, p.neighbors);
+      else if(p.floors > 1){
+        // pre-create the floors chosen in the setup dialog (new designs only)
+        while(state.floors.length < Math.min(p.floors, 3)) state.floors.push({blocks:[]});
+      }
+      setContext(p.plot, p.neighbors, p.facing);
       undoStack = []; redoStack = []; sel = null; dirty = false;
       renderAll();
     });

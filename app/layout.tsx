@@ -10,7 +10,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "HAVN — Real Estate 3D Map",
+  title: "ArchIt Find — Real Estate 3D Map",
   description:
     "Find homes on a living 3D map of Chandigarh — buy, rent, explore neighborhoods in three dimensions.",
 };

@@ -3,15 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import type { Design, DesignStateV3 } from "@/lib/types";
+import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay from "@/components/DesignerOverlay";
 import { CloseIcon } from "@/components/icons";
 
 interface Setup {
   name: string;
-  w: number; // plot width, meters
+  w: number; // plot width, meters (converted if entered in ft)
   d: number; // plot depth, meters
+  unit: "m" | "ft";
+  floors: number; // 1–3, pre-created in the builder for new designs
+  facing?: DesignMeta["facing"];
+  budget?: number; // ₹
+  notes?: string;
 }
+
+const FT_PER_M = 3.28084;
+const toM = (v: number, unit: "m" | "ft") => (unit === "ft" ? v / FT_PER_M : v);
 
 const field =
   "flex items-baseline gap-1.5 rounded-full bg-white/55 px-3.5 py-2 text-[13px]";
@@ -27,18 +35,53 @@ function SetupDialog({
   onBack: () => void;
 }) {
   const [name, setName] = useState("My home");
+  const [unit, setUnit] = useState<"m" | "ft">("m");
   const [w, setW] = useState("20");
   const [d, setD] = useState("15");
+  const [floors, setFloors] = useState(1);
+  const [facing, setFacing] = useState<DesignMeta["facing"]>();
+  const [budget, setBudget] = useState("");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
-  const wN = Number(w) || 0;
-  const dN = Number(d) || 0;
+  const wM = toM(Number(w) || 0, unit);
+  const dM = toM(Number(d) || 0, unit);
+
+  const switchUnit = (u: "m" | "ft") => {
+    if (u === unit) return;
+    const conv = (v: string) => {
+      const n = Number(v);
+      if (!n) return v;
+      return String(
+        Math.round((u === "ft" ? n * FT_PER_M : n / FT_PER_M) * 10) / 10,
+      );
+    };
+    setW(conv(w));
+    setD(conv(d));
+    setUnit(u);
+  };
 
   const start = () => {
     if (!name.trim()) return setError("Give the project a name");
-    if (wN < 6 || dN < 6) return setError("Plot sides must be at least 6 m");
-    if (wN > 120 || dN > 120) return setError("Plot sides max 120 m");
-    onStart({ name: name.trim(), w: wN, d: dN });
+    if (wM < 6 || dM < 6)
+      return setError(
+        unit === "ft"
+          ? "Plot sides must be at least 20 ft"
+          : "Plot sides must be at least 6 m",
+      );
+    if (wM > 120 || dM > 120)
+      return setError(unit === "ft" ? "Plot sides max 394 ft" : "Plot sides max 120 m");
+    const budgetN = Number(budget);
+    onStart({
+      name: name.trim(),
+      w: Math.round(wM * 100) / 100,
+      d: Math.round(dM * 100) / 100,
+      unit,
+      floors,
+      facing,
+      budget: budgetN > 0 ? budgetN : undefined,
+      notes: notes.trim() || undefined,
+    });
   };
 
   return (
@@ -57,25 +100,42 @@ function SetupDialog({
           />
         </label>
 
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[12px] font-semibold text-plum-soft">
+            Plot size in
+          </span>
+          <div className="flex gap-1">
+            {(["m", "ft"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => switchUnit(u)}
+                className={`rounded-full px-3 py-1 text-[12px] font-bold transition-colors ${
+                  unit === u
+                    ? "bg-plum text-cream"
+                    : "bg-white/55 text-plum hover:bg-white/85"
+                }`}
+              >
+                {u === "m" ? "meters" : "feet"}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-1.5">
           <label className={field}>
-            <span className={fieldLabel}>Width m</span>
+            <span className={fieldLabel}>Width {unit}</span>
             <input
               className={fieldInput}
               type="number"
-              min={6}
-              max={120}
               value={w}
               onChange={(e) => setW(e.target.value)}
             />
           </label>
           <label className={field}>
-            <span className={fieldLabel}>Depth m</span>
+            <span className={fieldLabel}>Depth {unit}</span>
             <input
               className={fieldInput}
               type="number"
-              min={6}
-              max={120}
               value={d}
               onChange={(e) => setD(e.target.value)}
             />
@@ -85,10 +145,78 @@ function SetupDialog({
         <p className="px-1 text-[12px] font-medium text-plum-soft">
           Plot area:{" "}
           <span className="font-bold text-plum">
-            {wN > 0 && dN > 0 ? `${Math.round(wN * dN)} m²` : "—"}
+            {wM > 0 && dM > 0
+              ? `${Math.round(wM * dM)} m²${
+                  unit === "ft"
+                    ? ` (${Math.round(wM * dM * FT_PER_M * FT_PER_M)} ft²)`
+                    : ""
+                }`
+              : "—"}
           </span>{" "}
           — shown as an outline in the builder.
         </p>
+
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[12px] font-semibold text-plum-soft">Floors</span>
+          <div className="flex gap-1">
+            {[1, 2, 3].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFloors(f)}
+                className={`w-9 rounded-full py-1 text-[12px] font-bold transition-colors ${
+                  floors === f
+                    ? "bg-plum text-cream"
+                    : "bg-white/55 text-plum hover:bg-white/85"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[12px] font-semibold text-plum-soft">
+            Plot facing
+          </span>
+          <div className="flex gap-1">
+            {(["N", "E", "S", "W"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFacing(facing === f ? undefined : f)}
+                className={`w-9 rounded-full py-1 text-[12px] font-bold transition-colors ${
+                  facing === f
+                    ? "bg-plum text-cream"
+                    : "bg-white/55 text-plum hover:bg-white/85"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className={field}>
+          <span className={fieldLabel}>Budget ₹</span>
+          <input
+            className={fieldInput}
+            type="number"
+            value={budget}
+            onChange={(e) => setBudget(e.target.value)}
+            placeholder="optional"
+          />
+        </label>
+
+        <label className={`${field} !rounded-2xl`}>
+          <span className={fieldLabel}>Notes</span>
+          <textarea
+            className={`${fieldInput} resize-none`}
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="optional"
+          />
+        </label>
 
         {error && (
           <p className="text-[12px] font-semibold text-coral">{error}</p>
@@ -152,6 +280,14 @@ export default function DesignerPage() {
         plotD: setup?.d ?? current?.plotD ?? 30,
         design: designState,
         snapshot: snapshotUrl,
+        meta: setup
+          ? {
+              unit: setup.unit,
+              facing: setup.facing,
+              budget: setup.budget,
+              notes: setup.notes,
+            }
+          : current?.meta,
       };
       const res = current
         ? await fetch(`/api/designs/${current.id}`, {
@@ -184,7 +320,16 @@ export default function DesignerPage() {
 
   const openDesign = (d: Design) => {
     setCurrentId(d.id);
-    setSetup({ name: d.name, w: d.plotW, d: d.plotD });
+    setSetup({
+      name: d.name,
+      w: d.plotW,
+      d: d.plotD,
+      unit: d.meta?.unit ?? "m",
+      floors: d.design.state.floors?.length ?? 1,
+      facing: d.meta?.facing,
+      budget: d.meta?.budget,
+      notes: d.meta?.notes,
+    });
     setSession((s) => s + 1);
   };
 
@@ -209,6 +354,8 @@ export default function DesignerPage() {
           key={`${currentId ?? "new"}-${session}`}
           plot={{ w: setup.w, d: setup.d }}
           neighbors={[]}
+          floors={setup.floors}
+          facing={setup.facing}
           existingDesign={current?.design}
           onSave={saveDesign}
           onClose={() => router.push("/")}
@@ -277,8 +424,15 @@ export default function DesignerPage() {
                           />
                         )}
                       </span>
-                      <span className="truncate text-[12px] font-semibold text-plum">
-                        {d.name}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12px] font-semibold text-plum">
+                          {d.name}
+                        </span>
+                        {d.meta?.budget ? (
+                          <span className="block text-[10.5px] font-medium text-plum-soft">
+                            ₹{d.meta.budget.toLocaleString("en-IN")}
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                     <button

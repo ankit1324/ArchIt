@@ -2,26 +2,31 @@ import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
 import { LogoMark } from "./icons";
 
-const LINKS = ["New Homes", "Buy", "Rent", "Favorites"];
+const LINKS: Array<{ label: string; href: string }> = [
+  { label: "Home", href: "/" },
+  { label: "Find", href: "/find" },
+  { label: "Designer", href: "/designer" },
+  { label: "ArchIt Lite", href: "https://archit-lit.chaudharyankit.in/" },
+];
 
 export default function Navbar() {
   return (
     <header className="relative z-20 flex h-16 shrink-0 items-center justify-between bg-cream px-6">
-      <a href="#" className="flex items-center gap-2 text-plum">
+      <a href="/" className="flex items-center gap-2 text-plum">
         <LogoMark width={30} height={30} />
-        <span className="text-xl font-extrabold tracking-wide">HAVN</span>
+        <span className="text-xl font-extrabold tracking-wide">ArchIt</span>
       </a>
 
       <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 md:flex">
         {LINKS.map((l, i) => (
           <a
-            key={l}
-            href="#"
+            key={l.label}
+            href={l.href}
             className={`text-[13.5px] font-semibold transition-colors hover:text-plum ${
               i === 0 ? "text-plum" : "text-plum-soft"
             }`}
           >
-            {l}
+            {l.label}
           </a>
         ))}
       </nav>
