@@ -50,17 +50,20 @@ function loadScript(): Promise<boolean> {
 /**
  * Charge a fixed platform fee. Resolves true only after the payment
  * signature has been verified server-side; false on cancel or failure.
+ * `ref` ties the purchase to a thing (e.g. property id for contact unlocks)
+ * so it persists in the ledger.
  */
 export async function payFee(
   purpose: FeePurpose,
   description: string,
+  ref?: string,
 ): Promise<boolean> {
   if (!(await loadScript())) return false;
 
   const res = await fetch("/api/create-order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ purpose }),
+    body: JSON.stringify({ purpose, ref }),
   });
   if (!res.ok) return false;
   const order = (await res.json()) as {

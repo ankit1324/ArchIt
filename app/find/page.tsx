@@ -15,6 +15,7 @@ import AddPropertyForm, {
   type PropertyDraft,
 } from "@/components/AddPropertyForm";
 import { payFee } from "@/lib/checkout";
+import { celebrate } from "@/components/Celebration";
 
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
@@ -240,6 +241,9 @@ export default function Home() {
       cancelAdd();
       setSelectedId(saved.id);
       mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
+      celebrate(
+        editing ? "Listing updated!" : "Listing added — it\u2019s live on the map!",
+      );
     } finally {
       setSaving(false);
     }

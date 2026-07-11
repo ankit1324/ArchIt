@@ -1,4 +1,5 @@
 import {ClerkProvider} from "@clerk/nextjs";
+import CelebrationLayer from "@/components/Celebration";
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className="h-full">
         <ClerkProvider>
           {children}
+          <CelebrationLayer />
         </ClerkProvider>
       </body>
     </html>

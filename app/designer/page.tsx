@@ -6,6 +6,9 @@ import Image from "next/image";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay from "@/components/DesignerOverlay";
 import { CloseIcon } from "@/components/icons";
+import { payFee } from "@/lib/checkout";
+import { celebrate } from "@/components/Celebration";
+import { feeLabel } from "@/lib/fees";
 
 interface Setup {
   name: string;
@@ -250,14 +253,36 @@ export default function DesignerPage() {
   const [setup, setSetup] = useState<Setup | null>(null);
   const [session, setSession] = useState(0); // bump to remount the builder
   const [listOpen, setListOpen] = useState(true);
+  const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
+  const [paying, setPaying] = useState(false);
   const savingRef = useRef(false);
 
   useEffect(() => {
+    fetch("/api/purchases?purpose=builder_unlock")
+      .then((r) => (r.ok ? r.json() : { unlocked: false }))
+      .then((d: { unlocked?: boolean }) => setUnlocked(!!d.unlocked))
+      .catch(() => setUnlocked(false));
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked) return;
     fetch("/api/designs")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Design[]) => setDesigns(data))
       .catch(() => {});
-  }, []);
+  }, [unlocked]);
+
+  const buyUnlock = async () => {
+    setPaying(true);
+    try {
+      if (await payFee("builder_unlock", "ArchIt Builder — one-time unlock")) {
+        setUnlocked(true);
+        celebrate("Builder unlocked — yours forever!");
+      }
+    } finally {
+      setPaying(false);
+    }
+  };
 
   const current = designs.find((d) => d.id === currentId) ?? null;
 
@@ -311,6 +336,7 @@ export default function DesignerPage() {
           : [...prev, saved],
       );
       setCurrentId(saved.id);
+      celebrate(current ? "Design saved!" : "Design created!");
     } catch {
       window.alert("Could not save the design — try again.");
     } finally {
@@ -346,6 +372,37 @@ export default function DesignerPage() {
       if (id === currentId) newDesign();
     }
   };
+
+  if (unlocked !== true) {
+    return (
+      <div className="flex h-full items-center justify-center bg-cream">
+        {unlocked === false && (
+          <section className="glass flex w-[340px] flex-col gap-3 rounded-3xl p-5 text-center">
+            <h2 className="text-[16px] font-bold text-plum">ArchIt Builder</h2>
+            <p className="text-[13px] font-medium text-plum-soft">
+              Design homes in 3D — rooms, floors, finishes — and save unlimited
+              projects. One-time unlock, yours forever.
+            </p>
+            <button
+              onClick={buyUnlock}
+              disabled={paying}
+              className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {paying
+                ? "Opening checkout…"
+                : `Unlock builder — ${feeLabel("builder_unlock")} one-time`}
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-full py-1.5 text-[12px] font-semibold text-plum-soft transition-colors hover:text-plum"
+            >
+              ← Back to map
+            </button>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="h-full bg-cream">

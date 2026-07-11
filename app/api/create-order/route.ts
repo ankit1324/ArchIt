@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import { auth } from "@clerk/nextjs/server";
 import { FEES, type FeePurpose } from "@/lib/fees";
 
 const razorpay = new Razorpay({
@@ -7,17 +8,23 @@ const razorpay = new Razorpay({
 });
 
 export async function POST(request: Request) {
-  const { purpose } = (await request.json()) as { purpose?: FeePurpose };
+  const { purpose, ref } = (await request.json()) as {
+    purpose?: FeePurpose;
+    ref?: string;
+  };
   if (!purpose || !(purpose in FEES)) {
     return Response.json({ error: "unknown purpose" }, { status: 400 });
   }
 
   const amount = FEES[purpose]; // paise, fixed server-side (min 100 enforced by fee table)
+  const { userId } = await auth();
   try {
     const order = await razorpay.orders.create({
       amount,
       currency: "INR",
       receipt: `${purpose}_${Date.now()}`,
+      // verify-payment reads these back to record the purchase
+      notes: { purpose, userId: userId ?? "", ref: ref ?? "" },
     });
     return Response.json({
       orderId: order.id,

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { payFee } from "@/lib/checkout";
+import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
 import { CloseIcon } from "./icons";
 
@@ -35,17 +36,32 @@ export default function PropertyDetailPanel({
   deleting = false,
 }: PropertyDetailPanelProps) {
   const sale = listing.type === "sale";
-  // owner contact is paywalled; unlock is per-listing and per-session
+  // owner contact is paywalled; a paid unlock persists per listing in the
+  // purchases ledger, so it survives reloads and sessions
   const [unlockedId, setUnlockedId] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const ownerUnlocked = unlockedId === listing.id;
+
+  useEffect(() => {
+    let stale = false;
+    fetch(`/api/purchases?purpose=contact_owner&ref=${listing.id}`)
+      .then((r) => (r.ok ? r.json() : { unlocked: false }))
+      .then((d: { unlocked?: boolean }) => {
+        if (!stale && d.unlocked) setUnlockedId(listing.id);
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, [listing.id]);
 
   const unlockOwner = async () => {
     if (unlocking) return;
     setUnlocking(true);
     try {
-      if (await payFee("contact_owner", "Contact owner fee")) {
+      if (await payFee("contact_owner", "Contact owner fee", listing.id)) {
         setUnlockedId(listing.id);
+        celebrate("Owner contact unlocked!");
       }
     } finally {
       setUnlocking(false);

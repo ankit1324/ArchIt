@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Manrope } from "next/font/google";
-import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import SuiteDashboard from "@/components/SuiteDashboard";
 
 const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
@@ -213,7 +215,13 @@ const BuildArt = () => (
   </svg>
 );
 
-export default function Landing() {
+export default async function Home() {
+  // signed out: editorial marketing landing; signed in: suite dashboard
+  const { userId } = await auth();
+  return userId ? <SuiteDashboard /> : <MarketingLanding />;
+}
+
+function MarketingLanding() {
   return (
     <div className={`${manrope.className} ld`}>
       <style>{css}</style>
@@ -232,20 +240,12 @@ export default function Landing() {
             <Link className="quiet" href="/find">
               Find
             </Link>
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button className="quiet">Sign in</button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="cta-pill">Get started</button>
-              </SignUpButton>
-            </Show>
-            <Show when="signed-in">
-              <Link className="cta-pill" href="/designer">
-                Start designing
-              </Link>
-              <UserButton />
-            </Show>
+            <SignInButton mode="modal">
+              <button className="quiet">Sign in</button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="cta-pill">Get started</button>
+            </SignUpButton>
           </div>
         </header>
 
