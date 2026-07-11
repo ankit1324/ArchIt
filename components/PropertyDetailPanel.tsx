@@ -1,8 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
+import { payFee } from "@/lib/checkout";
+import { feeLabel } from "@/lib/fees";
 import { CloseIcon } from "./icons";
 
 interface PropertyDetailPanelProps {
@@ -32,6 +35,22 @@ export default function PropertyDetailPanel({
   deleting = false,
 }: PropertyDetailPanelProps) {
   const sale = listing.type === "sale";
+  // owner contact is paywalled; unlock is per-listing and per-session
+  const [unlockedId, setUnlockedId] = useState<string | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
+  const ownerUnlocked = unlockedId === listing.id;
+
+  const unlockOwner = async () => {
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      if (await payFee("contact_owner", "Contact owner fee")) {
+        setUnlockedId(listing.id);
+      }
+    } finally {
+      setUnlocking(false);
+    }
+  };
   return (
     <section className="glass no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-3xl p-4">
       <header className="flex items-start justify-between gap-2">
@@ -83,7 +102,9 @@ export default function PropertyDetailPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        {listing.owner && <Fact label="Owner" value={listing.owner} />}
+        {listing.owner && ownerUnlocked && (
+          <Fact label="Owner" value={listing.owner} />
+        )}
         <Fact label="Type" value={listing.kind} />
         <Fact label="Beds" value={String(listing.beds)} />
         <Fact label="Baths" value={String(listing.baths)} />
@@ -95,6 +116,18 @@ export default function PropertyDetailPanel({
           value={`${listing.coords[1].toFixed(4)}, ${listing.coords[0].toFixed(4)}`}
         />
       </div>
+
+      {listing.owner && !ownerUnlocked && (
+        <button
+          onClick={unlockOwner}
+          disabled={unlocking}
+          className="rounded-full bg-magenta py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {unlocking
+            ? "Opening payment…"
+            : `Contact owner · ${feeLabel("contact_owner")}`}
+        </button>
+      )}
 
       <div className="mt-1 flex gap-2">
         <button

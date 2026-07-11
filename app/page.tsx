@@ -14,6 +14,7 @@ import PropertyDetailPanel from "@/components/PropertyDetailPanel";
 import AddPropertyForm, {
   type PropertyDraft,
 } from "@/components/AddPropertyForm";
+import { payFee } from "@/lib/checkout";
 
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
@@ -177,6 +178,10 @@ export default function Home() {
     if (!draftCoords || saving) return;
     setSaving(true);
     try {
+      // listing fee applies to new properties only, never edits
+      if (!editing && !(await payFee("add_property", "Property listing fee"))) {
+        return;
+      }
       let photo = editing?.photo;
       if (photoFile) {
         const fd = new FormData();

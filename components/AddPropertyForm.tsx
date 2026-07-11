@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Listing, ListingType, PropertyKind } from "@/lib/types";
+import { feeLabel } from "@/lib/fees";
 import { CloseIcon } from "./icons";
 
 const KINDS: PropertyKind[] = [
@@ -178,7 +179,7 @@ export default function AddPropertyForm({
 
       <div className="flex items-center gap-1.5">
         <label className={`${field} flex-1`}>
-          <span className={fieldLabel}>$</span>
+          <span className={fieldLabel}>₹</span>
           <input
             className={fieldInput}
             type="number"
@@ -294,7 +295,11 @@ export default function AddPropertyForm({
         disabled={saving}
         className="mt-1 rounded-full bg-plum py-2.5 text-[13px] font-bold text-cream transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {saving ? "Saving…" : editing ? "Save changes" : "Save property"}
+        {saving
+          ? "Saving…"
+          : editing
+            ? "Save changes"
+            : `Pay ${feeLabel("add_property")} & save property`}
       </button>
     </section>
   );

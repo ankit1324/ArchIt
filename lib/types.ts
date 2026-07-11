@@ -44,6 +44,6 @@ export interface Filters {
 }
 
 export function formatPrice(l: Listing): string {
-  const n = `$${l.price.toLocaleString("en-US")}`;
+  const n = `₹${l.price.toLocaleString("en-IN")}`;
   return l.type === "rent" ? `${n}/mo` : n;
 }

@@ -17,9 +17,9 @@ export function priceToPos(price: number): number {
 }
 
 function compact(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString()},000`;
-  return `$${n}`;
+  if (n >= 1_000_000) return `₹${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
+  if (n >= 1_000) return `₹${Math.round(n / 1_000).toLocaleString()},000`;
+  return `₹${n}`;
 }
 
 interface PriceHistogramProps {
@@ -79,7 +79,7 @@ export default function PriceHistogram({
       </div>
 
       <div className="text-center text-[15px] font-bold text-plum">
-        {compact(lo)}-{compact(hi).replace("$", "")}
+        {compact(lo)}-{compact(hi).replace("₹", "")}
       </div>
 
       {/* dual-thumb slider */}
