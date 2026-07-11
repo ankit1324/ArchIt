@@ -1,26 +1,151 @@
+/* maplibre css first so tailwind utilities win specificity ties */
+@import "maplibre-gl/dist/maplibre-gl.css";
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-cream: #f5f1ea;
+  --color-cream-soft: #efe9df;
+  --color-plum: #3d1830;
+  --color-plum-soft: #6b4560;
+  --color-coral: #f0483e;
+  --color-lime: #e2ef6a;
+  --color-lime-deep: #ccdb2a;
+  --color-magenta: #e857c2;
+  --color-lavender: #b18cf0;
+  --font-sans: var(--font-jakarta);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-cream);
+  color: var(--color-plum);
+  font-family: var(--font-jakarta), sans-serif;
+}
+
+/* frosted glass panel */
+@utility glass {
+  background: rgb(245 241 234 / 0.62);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 8px 28px rgb(61 24 48 / 0.1);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---------- map markers (DOM elements created by maplibre) ---------- */
+
+.price-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 999px;
+  background: var(--color-coral);
+  color: #fff;
+  font-family: var(--font-jakarta), sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgb(240 72 62 / 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.price-marker:hover {
+  transform: scale(1.07);
+}
+.price-marker.no-thumb {
+  padding-left: 12px;
+}
+.price-marker .thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgb(255 255 255 / 0.8);
+}
+
+.poi-marker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-jakarta), sans-serif;
+  pointer-events: none;
+}
+.poi-marker .bubble {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  color: var(--color-plum);
+  box-shadow: 0 4px 12px rgb(61 24 48 / 0.18);
+}
+.poi-marker .poi-label {
+  max-width: 110px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 6px rgb(61 24 48 / 0.55);
+}
+
+/* dual range slider */
+.range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  pointer-events: none;
+}
+.range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 34px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-cream);
+  border: 1px solid rgb(61 24 48 / 0.12);
+  box-shadow: 0 2px 8px rgb(61 24 48 / 0.25);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 12px,
+    rgb(61 24 48 / 0.45) 12px 13.5px,
+    transparent 13.5px 15px,
+    rgb(61 24 48 / 0.45) 15px 16.5px,
+    transparent 16.5px 18px,
+    rgb(61 24 48 / 0.45) 18px 19.5px,
+    transparent 19.5px 34px
+  );
+  cursor: grab;
+}
+.range-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 34px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-cream);
+  border: 1px solid rgb(61 24 48 / 0.12);
+  box-shadow: 0 2px 8px rgb(61 24 48 / 0.25);
+  cursor: grab;
+}
+
+/* soften maplibre chrome */
+.maplibregl-ctrl-attrib {
+  background: rgb(245 241 234 / 0.6) !important;
+  border-radius: 8px 0 0 0;
+  font-size: 10px;
+}
+.maplibregl-canvas {
+  outline: none;
 }

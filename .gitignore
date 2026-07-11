@@ -1,41 +1,79 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
+# Dependencies
+node_modules/
+.pnp
 .pnp.*
+
+# Package manager caches
+.npm/
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
+!.yarn/sdks
 !.yarn/versions
+.pnpm-store/
 
-# testing
-/coverage
+# Build output
+.next/
+out/
+build/
+dist/
 
-# next.js
-/.next/
-/out/
+# Test and coverage output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
 
-# production
-/build
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
-# misc
-.DS_Store
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env*.example
 *.pem
+*.key
+*.cert
 
-# debug
+# Deployment
+.vercel/
+.netlify/
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+supabase/.env.keys
+supabase/.env.local
+supabase/.env.*.local
+
+# Local uploads and generated assets
+public/uploads/
+
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Editor and tool state
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.claude/
 
-# vercel
-.vercel
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# local reference assets
+reference.mp4
