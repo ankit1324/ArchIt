@@ -175,7 +175,11 @@ export default function Home() {
     setAddStage("form");
   };
 
-  const saveProperty = async (d: PropertyDraft, photoFile: File | null) => {
+  const saveProperty = async (
+    d: PropertyDraft,
+    photoFiles: File[],
+    keptPhotos: string[],
+  ) => {
     if (!draftCoords || saving) return;
     setSaving(true);
     try {
@@ -183,13 +187,19 @@ export default function Home() {
       if (!editing && !(await payFee("add_property", "Property listing fee"))) {
         return;
       }
-      let photo = editing?.photo;
-      if (photoFile) {
-        const fd = new FormData();
-        fd.append("file", photoFile);
-        const up = await fetch("/api/upload", { method: "POST", body: fd });
-        if (up.ok) photo = ((await up.json()) as { url: string }).url;
-      }
+
+      const uploadedPhotos = await Promise.all(
+        photoFiles.map(async (photoFile) => {
+          const fd = new FormData();
+          fd.append("file", photoFile);
+          const up = await fetch("/api/upload", { method: "POST", body: fd });
+          return up.ok ? ((await up.json()) as { url: string }).url : null;
+        }),
+      );
+      const photos = [
+        ...keptPhotos,
+        ...uploadedPhotos.filter((url) => url !== null),
+      ].slice(0, 5);
 
       const body = {
         buildingName: d.buildingName || undefined,
@@ -206,7 +216,8 @@ export default function Home() {
         areaM: d.areaM,
         floors: d.floors,
         coords: draftCoords,
-        photo,
+        photo: photos[0],
+        photos,
       };
 
       const res = editing
