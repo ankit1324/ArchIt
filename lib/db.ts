@@ -39,9 +39,15 @@ export interface PropertyRow {
   lng: number;
   lat: number;
   photo: string | null;
+  photos: string[] | null;
+  user_id: string | null;
 }
 
-export function listingToRow(l: Omit<Listing, "id">): Omit<PropertyRow, "id"> {
+// user_id deliberately excluded: routes stamp it from the Clerk session,
+// never from the client body
+export function listingToRow(
+  l: Omit<Listing, "id">,
+): Omit<PropertyRow, "id" | "user_id"> {
   return {
     building_name: l.buildingName ?? null,
     owner: l.owner ?? null,
@@ -58,7 +64,9 @@ export function listingToRow(l: Omit<Listing, "id">): Omit<PropertyRow, "id"> {
     floors: l.floors ?? 1,
     lng: l.coords[0],
     lat: l.coords[1],
-    photo: l.photo ?? null,
+    // photo mirrors photos[0] so older readers keep working
+    photo: l.photos?.[0] ?? l.photo ?? null,
+    photos: l.photos ?? (l.photo ? [l.photo] : []),
   };
 }
 
@@ -117,6 +125,8 @@ export function rowToListing(r: PropertyRow): Listing {
     areaM: r.area_m,
     floors: r.floors,
     coords: [r.lng, r.lat],
-    photo: r.photo ?? undefined,
+    photo: r.photos?.[0] ?? r.photo ?? undefined,
+    photos: r.photos?.length ? r.photos : r.photo ? [r.photo] : [],
+    userId: r.user_id ?? undefined,
   };
 }

@@ -1,6 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import crypto from "node:crypto";
+import { db } from "@/lib/db";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 const EXT_BY_MIME: Record<string, string> = {
@@ -25,9 +24,13 @@ export async function POST(request: Request) {
   }
 
   const name = `${crypto.randomUUID()}${ext}`;
-  const dir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, name), Buffer.from(await file.arrayBuffer()));
+  const { error } = await db.storage
+    .from("photos")
+    .upload(name, Buffer.from(await file.arrayBuffer()), {
+      contentType: file.type,
+    });
+  if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  return Response.json({ url: `/uploads/${name}` }, { status: 201 });
+  const { data } = db.storage.from("photos").getPublicUrl(name);
+  return Response.json({ url: data.publicUrl }, { status: 201 });
 }

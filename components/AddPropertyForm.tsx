@@ -38,7 +38,8 @@ interface AddPropertyFormProps {
   initialCity: string;
   geocoding: boolean;
   saving?: boolean;
-  onSave: (draft: PropertyDraft, photoFile: File | null) => void;
+  /** photoFiles: new uploads; keptPhotos: existing URLs the user kept (edit) */
+  onSave: (draft: PropertyDraft, photoFiles: File[], keptPhotos: string[]) => void;
   onCancel: () => void;
 }
 
@@ -70,7 +71,26 @@ export default function AddPropertyForm({
   const [sqft, setSqft] = useState(String(editing?.sqft ?? 1000));
   const [floors, setFloors] = useState(String(editing?.floors ?? 5));
   const [areaM, setAreaM] = useState(String(editing?.areaM ?? 50));
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [keptPhotos, setKeptPhotos] = useState<string[]>(
+    editing?.photos ?? (editing?.photo ? [editing.photo] : []),
+  );
+  const [previews, setPreviews] = useState<string[]>([]);
+  const photoCount = keptPhotos.length + photoFiles.length;
+
+  // object URLs for new-file thumbnails; revoked on change/unmount
+  useEffect(() => {
+    const urls = photoFiles.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [photoFiles]);
+
+  const addPhotos = (list: FileList | null) => {
+    if (!list) return;
+    setPhotoFiles((prev) =>
+      [...prev, ...Array.from(list)].slice(0, Math.max(0, 5 - keptPhotos.length)),
+    );
+  };
   const [error, setError] = useState("");
   const [addressDirty, setAddressDirty] = useState(!!editing);
 
@@ -102,7 +122,8 @@ export default function AddPropertyForm({
         floors: Math.max(1, Number(floors) || 1),
         areaM: Math.max(1, Number(areaM) || 1),
       },
-      photoFile,
+      photoFiles,
+      keptPhotos,
     );
   };
 
@@ -272,18 +293,55 @@ export default function AddPropertyForm({
       </div>
 
       <label className={field}>
-        <span className={fieldLabel}>Photo</span>
+        <span className={fieldLabel}>Photos</span>
         <input
           type="file"
+          multiple
           accept="image/jpeg,image/png,image/webp,image/avif"
-          onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-          className="w-full min-w-0 text-[11px] font-medium text-plum-soft file:mr-2 file:rounded-full file:border-0 file:bg-plum/10 file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-plum"
+          disabled={photoCount >= 5}
+          onChange={(e) => {
+            addPhotos(e.target.files);
+            e.target.value = "";
+          }}
+          className="w-full min-w-0 text-[11px] font-medium text-plum-soft file:mr-2 file:rounded-full file:border-0 file:bg-plum/10 file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-plum disabled:opacity-50"
         />
       </label>
-      {editing?.photo && !photoFile && (
-        <p className="text-[11px] font-medium text-plum-soft">
-          Keeping current photo — choose a file to replace.
-        </p>
+      <p className="px-1 text-[11px] font-medium text-plum-soft">
+        {photoCount}/5 photos{photoCount >= 5 ? " — limit reached" : ""}
+      </p>
+      {photoCount > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {keptPhotos.map((url) => (
+            <span key={url} className="relative h-14 w-16 overflow-hidden rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                aria-label="Remove photo"
+                onClick={() => setKeptPhotos((prev) => prev.filter((u) => u !== url))}
+                className="absolute right-0.5 top-0.5 rounded-full bg-plum/70 p-0.5 text-cream"
+              >
+                <CloseIcon width={9} height={9} />
+              </button>
+            </span>
+          ))}
+          {previews.map((url, i) => (
+            <span key={url} className="relative h-14 w-16 overflow-hidden rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                aria-label="Remove photo"
+                onClick={() =>
+                  setPhotoFiles((prev) => prev.filter((_, j) => j !== i))
+                }
+                className="absolute right-0.5 top-0.5 rounded-full bg-plum/70 p-0.5 text-cream"
+              >
+                <CloseIcon width={9} height={9} />
+              </button>
+            </span>
+          ))}
+        </div>
       )}
 
       {error && (

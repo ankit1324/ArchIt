@@ -24,6 +24,50 @@ interface Setup {
 const FT_PER_M = 3.28084;
 const toM = (v: number, unit: "m" | "ft") => (unit === "ft" ? v / FT_PER_M : v);
 
+/** blueprint-grid + colour-wash stage behind the designer's card screens */
+function Backdrop({
+  className,
+  children,
+}: {
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`${className} flex items-center justify-center overflow-hidden bg-cream`}
+    >
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(61,24,48,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(61,24,48,.05) 1px, transparent 1px)",
+          backgroundSize: "42px 42px",
+          maskImage:
+            "radial-gradient(ellipse 90% 80% at 50% 45%, black 55%, transparent 100%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute -left-28 top-[10%] h-80 w-80 rounded-full bg-lavender/40 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="absolute -right-24 bottom-[4%] h-96 w-96 rounded-full bg-lime/50 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="absolute -top-24 right-[18%] h-72 w-72 rounded-full bg-magenta/25 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="absolute bottom-[12%] left-[16%] h-56 w-56 rounded-full bg-coral/20 blur-3xl"
+      />
+      <div className="relative">{children}</div>
+    </div>
+  );
+}
+
 const field =
   "flex items-baseline gap-1.5 rounded-full bg-white/55 px-3.5 py-2 text-[13px]";
 const fieldLabel = "shrink-0 font-medium text-plum-soft";
@@ -88,9 +132,16 @@ function SetupDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-cream">
-      <section className="glass flex w-[340px] flex-col gap-3 rounded-3xl p-5">
-        <h2 className="text-[16px] font-bold text-plum">New home design</h2>
+    <Backdrop className="fixed inset-0 z-[70]">
+      <section className="glass flex w-[360px] flex-col gap-3 rounded-[28px] p-6 shadow-[0_30px_80px_-30px_rgba(61,24,48,.35)]">
+        <div>
+          <span className="text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-coral">
+            Project setup
+          </span>
+          <h2 className="mt-0.5 text-[20px] font-extrabold tracking-tight text-plum">
+            New home design
+          </h2>
+        </div>
 
         <label className={field}>
           <span className={fieldLabel}>Project</span>
@@ -227,7 +278,7 @@ function SetupDialog({
 
         <button
           onClick={start}
-          className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream transition-opacity hover:opacity-90"
+          className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream shadow-[0_12px_28px_-10px_rgba(61,24,48,.55)] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]"
         >
           Start designing
         </button>
@@ -238,7 +289,7 @@ function SetupDialog({
           ← Back to map
         </button>
       </section>
-    </div>
+    </Backdrop>
   );
 }
 
@@ -375,32 +426,59 @@ export default function DesignerPage() {
 
   if (unlocked !== true) {
     return (
-      <div className="flex h-full items-center justify-center bg-cream">
+      <Backdrop className="relative h-full">
         {unlocked === false && (
-          <section className="glass flex w-[340px] flex-col gap-3 rounded-3xl p-5 text-center">
-            <h2 className="text-[16px] font-bold text-plum">ArchIt Builder</h2>
-            <p className="text-[13px] font-medium text-plum-soft">
-              Design homes in 3D — rooms, floors, finishes — and save unlimited
-              projects. One-time unlock, yours forever.
-            </p>
+          <section className="glass flex w-[400px] flex-col gap-4 rounded-[28px] p-7 shadow-[0_30px_80px_-30px_rgba(61,24,48,.35)]">
+            <span className="text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-coral">
+              ArchIt Builder
+            </span>
+            <h2 className="text-[27px] font-extrabold leading-[1.12] tracking-tight text-plum">
+              Design your dream home in&nbsp;3D.
+            </h2>
+            <ul className="flex flex-col gap-2">
+              {(
+                [
+                  ["bg-lime-deep", "Drag-and-drop rooms, doors, windows & furniture"],
+                  ["bg-magenta", "Up to 3 floors, finishes & materials"],
+                  ["bg-lavender", "Plot outline, facing & real plot sizes"],
+                  ["bg-coral", "Unlimited saved projects with 3D snapshots"],
+                ] as const
+              ).map(([dot, t]) => (
+                <li
+                  key={t}
+                  className="flex items-start gap-2.5 text-[13px] font-semibold leading-snug text-plum"
+                >
+                  <span
+                    className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dot}`}
+                  />
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-baseline gap-2.5 rounded-2xl bg-white/60 px-4 py-3">
+              <span className="text-[30px] font-extrabold tracking-tight text-plum">
+                {feeLabel("builder_unlock")}
+              </span>
+              <span className="text-[12px] font-bold text-plum-soft">
+                one-time · yours forever
+              </span>
+            </div>
             <button
               onClick={buyUnlock}
               disabled={paying}
-              className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="rounded-full bg-plum py-3 text-[14px] font-bold text-cream shadow-[0_12px_28px_-10px_rgba(61,24,48,.55)] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
             >
-              {paying
-                ? "Opening checkout…"
-                : `Unlock builder — ${feeLabel("builder_unlock")} one-time`}
+              {paying ? "Opening checkout…" : "Unlock the builder"}
             </button>
             <button
               onClick={() => router.push("/")}
-              className="rounded-full py-1.5 text-[12px] font-semibold text-plum-soft transition-colors hover:text-plum"
+              className="rounded-full py-1 text-[12px] font-semibold text-plum-soft transition-colors hover:text-plum"
             >
               ← Back to map
             </button>
           </section>
         )}
-      </div>
+      </Backdrop>
     );
   }
 

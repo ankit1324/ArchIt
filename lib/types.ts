@@ -23,8 +23,13 @@ export interface Listing {
   areaM: number; // plot/unit area in meters, for the Area filter
   floors: number;
   coords: [number, number]; // [lng, lat]
+  /** first photo, kept in sync with photos[0] for older consumers */
   photo?: string;
+  /** up to 5 photos, Supabase Storage public URLs */
+  photos?: string[];
   kind: PropertyKind;
+  /** Clerk id of the lister; only they may edit/delete. Absent on legacy rows. */
+  userId?: string;
 }
 
 export interface Poi {

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { payFee } from "@/lib/checkout";
@@ -36,6 +37,9 @@ export default function PropertyDetailPanel({
   deleting = false,
 }: PropertyDetailPanelProps) {
   const sale = listing.type === "sale";
+  // only the lister manages a property; legacy rows (no userId) stay open
+  const { userId } = useAuth();
+  const canManage = !listing.userId || listing.userId === userId;
   // owner contact is paywalled; a paid unlock persists per listing in the
   // purchases ledger, so it survives reloads and sessions
   const [unlockedId, setUnlockedId] = useState<string | null>(null);
@@ -145,6 +149,7 @@ export default function PropertyDetailPanel({
         </button>
       )}
 
+      {canManage && (
       <div className="mt-1 flex gap-2">
         <button
           onClick={onEdit}
@@ -160,6 +165,7 @@ export default function PropertyDetailPanel({
           {deleting ? "Deleting…" : "Delete"}
         </button>
       </div>
+      )}
     </section>
   );
 }
