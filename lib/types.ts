@@ -30,6 +30,8 @@ export interface Listing {
   kind: PropertyKind;
   /** Clerk id of the lister; only they may edit/delete. Absent on legacy rows. */
   userId?: string;
+  /** true when the lister paid the ₹250 featured-listing fee */
+  featured?: boolean;
 }
 
 export interface Poi {

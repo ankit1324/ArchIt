@@ -48,7 +48,8 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
     features: listings.map((l) => ({
       type: "Feature",
       properties: {
-        color: PRISM_COLORS[l.type],
+        // Featured listings get a glowing amber prism; regular by sale/rent
+        color: l.featured ? "#f59e0b" : PRISM_COLORS[l.type],
         height: 30 + (l.floors ?? 5) * 3.2,
       },
       geometry: { type: "Polygon", coordinates: squareAround(l.coords, 46) },
@@ -59,13 +60,19 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
 function priceMarkerEl(l: Listing, withThumb: boolean): HTMLElement {
   const el = document.createElement("div");
   const showThumb = withThumb && !!l.photo;
-  el.className = `price-marker${showThumb ? "" : " no-thumb"}`;
+  el.className = `price-marker${showThumb ? "" : " no-thumb"}${l.featured ? " featured" : ""}`;
   if (showThumb && l.photo) {
     const img = document.createElement("img");
     img.className = "thumb";
     img.src = l.photo;
     img.alt = "";
     el.appendChild(img);
+  }
+  if (l.featured) {
+    const star = document.createElement("span");
+    star.className = "featured-star";
+    star.textContent = "⭐";
+    el.appendChild(star);
   }
   el.appendChild(document.createTextNode(formatPrice(l)));
   return el;

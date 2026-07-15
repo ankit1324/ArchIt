@@ -183,8 +183,8 @@ export default function Home() {
     if (!draftCoords || saving) return;
     setSaving(true);
     try {
-      // listing fee applies to new properties only, never edits
-      if (!editing && !(await payFee("add_property", "Property listing fee"))) {
+      // featured listings require a one-time ₹250 payment; plain listings are free
+      if (!editing && d.featured && !(await payFee("featured_property", "Featured listing boost"))) {
         return;
       }
 
@@ -196,6 +196,12 @@ export default function Home() {
           return up.ok ? ((await up.json()) as { url: string }).url : null;
         }),
       );
+      const failedUploads = uploadedPhotos.filter((url) => url === null).length;
+      if (failedUploads > 0) {
+        window.alert(
+          `${failedUploads} photo${failedUploads > 1 ? "s" : ""} failed to upload — saving the listing with the rest.`,
+        );
+      }
       const photos = [
         ...keptPhotos,
         ...uploadedPhotos.filter((url) => url !== null),
@@ -218,6 +224,7 @@ export default function Home() {
         coords: draftCoords,
         photo: photos[0],
         photos,
+        featured: d.featured,
       };
 
       const res = editing
@@ -231,7 +238,14 @@ export default function Home() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const msg = await res
+          .json()
+          .then((j: { error?: string }) => j.error)
+          .catch(() => null);
+        window.alert(`Could not save the listing${msg ? `: ${msg}` : ""}. Please try again.`);
+        return;
+      }
       const saved = (await res.json()) as Listing;
 
       setListings((prev) =>
@@ -329,7 +343,7 @@ export default function Home() {
           )}
 
           {addStage === "form" && draftCoords && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
+            <div className="absolute bottom-3.5 right-3.5 top-[68px] z-20 flex items-start">
               <AddPropertyForm
                 key={editingId ?? "new"}
                 coords={draftCoords}
@@ -345,7 +359,7 @@ export default function Home() {
           )}
 
           {addStage === "idle" && selected && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
+            <div className="absolute bottom-3.5 right-3.5 top-[68px] z-20 flex items-start">
               <PropertyDetailPanel
                 listing={selected}
                 onClose={() => setSelectedId(null)}

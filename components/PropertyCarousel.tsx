@@ -22,9 +22,13 @@ export default function PropertyCarousel({
     );
   }
   return (
-    <div className="no-scrollbar pointer-events-auto flex snap-x gap-3 overflow-x-auto pb-1">
+    /* strip itself must not eat clicks meant for the map/panels behind it —
+       only the cards are interactive */
+    <div className="no-scrollbar pointer-events-none flex snap-x gap-3 overflow-x-auto pb-1">
       {listings.map((l) => (
-        <PropertyCard key={l.id} listing={l} onClick={() => onSelect(l.id)} />
+        <div key={l.id} className="pointer-events-auto shrink-0 snap-start">
+          <PropertyCard listing={l} onClick={() => onSelect(l.id)} />
+        </div>
       ))}
     </div>
   );

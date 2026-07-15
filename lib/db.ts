@@ -41,6 +41,8 @@ export interface PropertyRow {
   photo: string | null;
   photos: string[] | null;
   user_id: string | null;
+  /** true when the lister paid the ₹250 featured-listing fee */
+  featured: boolean;
 }
 
 // user_id deliberately excluded: routes stamp it from the Clerk session,
@@ -67,6 +69,7 @@ export function listingToRow(
     // photo mirrors photos[0] so older readers keep working
     photo: l.photos?.[0] ?? l.photo ?? null,
     photos: l.photos ?? (l.photo ? [l.photo] : []),
+    featured: l.featured ?? false,
   };
 }
 
@@ -128,5 +131,6 @@ export function rowToListing(r: PropertyRow): Listing {
     photo: r.photos?.[0] ?? r.photo ?? undefined,
     photos: r.photos?.length ? r.photos : r.photo ? [r.photo] : [],
     userId: r.user_id ?? undefined,
+    featured: r.featured ?? false,
   };
 }

@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from "react";
 import type { Listing, ListingType, PropertyKind } from "@/lib/types";
-import { feeLabel } from "@/lib/fees";
 import { CloseIcon } from "./icons";
+
+// must match app/api/upload/route.ts (EXT_BY_MIME / MAX_BYTES)
+const SUPPORTED_PHOTO_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+]);
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
 const KINDS: PropertyKind[] = [
   "apartments",
@@ -27,6 +35,8 @@ export interface PropertyDraft {
   sqft: number;
   floors: number;
   areaM: number;
+  /** true when the user opted-in and paid the ₹250 featured-listing fee */
+  featured: boolean;
 }
 
 interface AddPropertyFormProps {
@@ -72,6 +82,7 @@ export default function AddPropertyForm({
   const [floors, setFloors] = useState(String(editing?.floors ?? 5));
   const [areaM, setAreaM] = useState(String(editing?.areaM ?? 50));
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [featured, setFeatured] = useState(editing?.featured ?? false);
   const [keptPhotos, setKeptPhotos] = useState<string[]>(
     editing?.photos ?? (editing?.photo ? [editing.photo] : []),
   );
@@ -87,8 +98,18 @@ export default function AddPropertyForm({
 
   const addPhotos = (list: FileList | null) => {
     if (!list) return;
+    const files = Array.from(list);
+    const supported = files.filter((f) => SUPPORTED_PHOTO_TYPES.has(f.type));
+    const sized = supported.filter((f) => f.size <= MAX_PHOTO_BYTES);
+    if (supported.length < files.length) {
+      setError("Some photos skipped — use JPG, PNG, WebP or AVIF (HEIC not supported)");
+    } else if (sized.length < supported.length) {
+      setError("Some photos skipped — each photo must be under 8 MB");
+    } else {
+      setError("");
+    }
     setPhotoFiles((prev) =>
-      [...prev, ...Array.from(list)].slice(0, Math.max(0, 5 - keptPhotos.length)),
+      [...prev, ...sized].slice(0, Math.max(0, 5 - keptPhotos.length)),
     );
   };
   const [error, setError] = useState("");
@@ -121,6 +142,7 @@ export default function AddPropertyForm({
         sqft: Math.max(0, Number(sqft) || 0),
         floors: Math.max(1, Number(floors) || 1),
         areaM: Math.max(1, Number(areaM) || 1),
+        featured,
       },
       photoFiles,
       keptPhotos,
@@ -293,11 +315,13 @@ export default function AddPropertyForm({
       </div>
 
       <label className={field}>
-        <span className={fieldLabel}>Photos</span>
+        <span className={fieldLabel}>
+          Photos <span className="font-normal opacity-60">(optional)</span>
+        </span>
         <input
           type="file"
           multiple
-          accept="image/jpeg,image/png,image/webp,image/avif"
+          accept="image/*"
           disabled={photoCount >= 5}
           onChange={(e) => {
             addPhotos(e.target.files);
@@ -307,7 +331,9 @@ export default function AddPropertyForm({
         />
       </label>
       <p className="px-1 text-[11px] font-medium text-plum-soft">
-        {photoCount}/5 photos{photoCount >= 5 ? " — limit reached" : ""}
+        {photoCount === 0
+          ? "0/5 photos — you can list without images"
+          : `${photoCount}/5 photos${photoCount >= 5 ? " — limit reached" : ""}`}
       </p>
       {photoCount > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -348,6 +374,29 @@ export default function AddPropertyForm({
         <p className="text-[12px] font-semibold text-coral">{error}</p>
       )}
 
+      {/* ── Featured listing upsell ── */}
+      <button
+        type="button"
+        onClick={() => setFeatured((v) => !v)}
+        className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
+          featured
+            ? "border-amber-400/60 bg-amber-50/80 text-amber-800"
+            : "border-plum/10 bg-white/40 text-plum-soft hover:bg-white/70"
+        }`}
+      >
+        <span className="text-[18px]">{featured ? "⭐" : "☆"}</span>
+        <span className="flex flex-col">
+          <span className="text-[12.5px] font-bold">
+            {featured ? "Featured listing — ₹250" : "Feature on map — ₹250"}
+          </span>
+          <span className="text-[11px] font-medium opacity-70">
+            {featured
+              ? "Your property gets a golden star on the 3D map"
+              : "Stand out with a glowing star marker on the map"}
+          </span>
+        </span>
+      </button>
+
       <button
         onClick={submit}
         disabled={saving}
@@ -357,7 +406,9 @@ export default function AddPropertyForm({
           ? "Saving…"
           : editing
             ? "Save changes"
-            : `Pay ${feeLabel("add_property")} & save property`}
+            : featured
+              ? "Pay ₹250 & save featured property"
+              : "Save property — free"}
       </button>
     </section>
   );

@@ -7,7 +7,6 @@ const isProtected = createRouteMatcher([
   "/designer(.*)",
   "/api/properties(.*)",
   "/api/designs(.*)",
-  "/api/upload(.*)",
   "/api/create-order(.*)",
   "/api/verify-payment(.*)",
   "/api/purchases(.*)",
