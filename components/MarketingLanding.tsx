@@ -713,7 +713,7 @@ export default function MarketingLanding() {
         </section>
       </div>
 
-      {/* ============ DEMO THEATER — full videos, sound on, controls ============ */}
+      {/* ============ DEMO THEATER — full videos, muted autoplay loops ============ */}
       <section className="theater" id="demos">
         <div className="sec-head" data-reveal>
           <div className="kicker">/ The demo reel /</div>
@@ -727,7 +727,7 @@ export default function MarketingLanding() {
         </div>
         <div className="reel-grid">
           <article className="reel wide" data-reveal>
-            <video controls preload="metadata" playsInline src="/demo/wireframe.mp4" poster="/demo/wireframe-poster.jpg" />
+            <video data-auto muted loop playsInline preload="metadata" src="/demo/wireframe.mp4" poster="/demo/wireframe-poster.jpg" />
             <div className="reel-info">
               <h3>
                 Wireframe becomes home
@@ -741,7 +741,7 @@ export default function MarketingLanding() {
             </div>
           </article>
           <article className="reel" data-reveal="2">
-            <video controls preload="metadata" playsInline src="/demo/suite.mp4" poster="/demo/suite-poster.jpg" />
+            <video data-auto muted loop playsInline preload="metadata" src="/demo/suite.mp4" poster="/demo/suite-poster.jpg" />
             <div className="reel-info">
               <h3>
                 The suite, assembled
@@ -755,7 +755,7 @@ export default function MarketingLanding() {
             </div>
           </article>
           <article className="reel" data-reveal="3">
-            <video controls preload="metadata" playsInline src="/demo/builder.mp4" poster="/demo/builder-poster.jpg" />
+            <video data-auto muted loop playsInline preload="metadata" src="/demo/builder.mp4" poster="/demo/builder-poster.jpg" />
             <div className="reel-info">
               <h3>
                 Inside the 3D Builder
@@ -769,7 +769,7 @@ export default function MarketingLanding() {
             </div>
           </article>
           <article className="reel wide" data-reveal>
-            <video controls preload="metadata" playsInline src="/demo/find.mp4" poster="/demo/find-poster.jpg" />
+            <video data-auto muted loop playsInline preload="metadata" src="/demo/find.mp4" poster="/demo/find-poster.jpg" />
             <div className="reel-info">
               <h3>
                 Inside ArchIt Find
