@@ -183,7 +183,7 @@ export default function Home() {
     if (!draftCoords || saving) return;
     setSaving(true);
     try {
-      // featured listings require a one-time ₹250 payment; plain listings are free
+      // featured listings require a one-time fee (lib/fees.ts); plain listings are free
       if (!editing && d.featured && !(await payFee("featured_property", "Featured listing boost"))) {
         return;
       }
@@ -342,34 +342,6 @@ export default function Home() {
             </div>
           )}
 
-          {addStage === "form" && draftCoords && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] z-20 flex items-start">
-              <AddPropertyForm
-                key={editingId ?? "new"}
-                coords={draftCoords}
-                editing={editing}
-                initialAddress={geoAddress}
-                initialCity={geoCity}
-                geocoding={geocoding}
-                saving={saving}
-                onSave={saveProperty}
-                onCancel={cancelAdd}
-              />
-            </div>
-          )}
-
-          {addStage === "idle" && selected && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] z-20 flex items-start">
-              <PropertyDetailPanel
-                listing={selected}
-                onClose={() => setSelectedId(null)}
-                onEdit={() => openEdit(selected)}
-                onDelete={() => deleteProperty(selected.id)}
-                deleting={deleting}
-              />
-            </div>
-          )}
-
           <div className="pointer-events-auto absolute right-3.5 top-[38%]">
             <MapControls
               is3D={is3D}
@@ -386,6 +358,36 @@ export default function Home() {
               hasAny={listings.length > 0}
             />
           </div>
+
+          {/* panels render last so they paint above the carousel strip and
+              map controls without needing a z-index scheme */}
+          {addStage === "form" && draftCoords && (
+            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
+              <AddPropertyForm
+                key={editingId ?? "new"}
+                coords={draftCoords}
+                editing={editing}
+                initialAddress={geoAddress}
+                initialCity={geoCity}
+                geocoding={geocoding}
+                saving={saving}
+                onSave={saveProperty}
+                onCancel={cancelAdd}
+              />
+            </div>
+          )}
+
+          {addStage === "idle" && selected && (
+            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
+              <PropertyDetailPanel
+                listing={selected}
+                onClose={() => setSelectedId(null)}
+                onEdit={() => openEdit(selected)}
+                onDelete={() => deleteProperty(selected.id)}
+                deleting={deleting}
+              />
+            </div>
+          )}
         </div>
       </main>
     </div>

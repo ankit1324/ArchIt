@@ -13,7 +13,7 @@ export default function PropertyCard({
   return (
     <button
       onClick={onClick}
-      className="group relative h-[196px] w-[236px] shrink-0 snap-start overflow-hidden rounded-2xl text-left shadow-lg transition-transform hover:-translate-y-1"
+      className="group pointer-events-auto relative h-[196px] w-[236px] shrink-0 snap-start overflow-hidden rounded-2xl text-left shadow-lg transition-transform hover:-translate-y-1"
     >
       {listing.photo ? (
         <Image
