@@ -74,6 +74,7 @@ export async function payFee(
   };
 
   return new Promise<boolean>((resolve) => {
+    let verificationStarted = false;
     const rzp = new window.Razorpay!({
       key: order.keyId,
       amount: order.amount,
@@ -82,14 +83,31 @@ export async function payFee(
       name: "ArchIt Find",
       description,
       theme: { color: "#4a2b4f" },
-      modal: { ondismiss: () => resolve(false) },
+      modal: {
+        ondismiss: () => {
+          if (!verificationStarted) resolve(false);
+        },
+      },
       handler: async (r) => {
-        const v = await fetch("/api/verify-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(r),
-        });
-        resolve(v.ok);
+        verificationStarted = true;
+        try {
+          const v = await fetch("/api/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(r),
+          });
+          if (!v.ok) {
+            window.alert(
+              "Payment could not be confirmed. If money was deducted, do not pay again—refresh the page or contact support.",
+            );
+          }
+          resolve(v.ok);
+        } catch {
+          window.alert(
+            "Payment could not be confirmed. If money was deducted, do not pay again—refresh the page or contact support.",
+          );
+          resolve(false);
+        }
       },
     });
     rzp.open();
