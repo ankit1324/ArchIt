@@ -1,8 +1,15 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
 import { recordPurchaseFromOrder } from "@/lib/purchases";
+import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  if (!checkRateLimit(ipKey(request, "verify-payment", userId), 10, 60_000)) {
+    return rateLimitedResponse();
+  }
+
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
     (await request.json()) as Record<string, string | undefined>;
 
@@ -10,7 +17,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "missing fields" }, { status: 400 });
   }
 
-  const expected = createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) {
+    console.error("RAZORPAY_KEY_SECRET unset");
+    return Response.json({ error: "payment not configured" }, { status: 500 });
+  }
+
+  const expected = createHmac("sha256", secret)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
@@ -26,7 +39,7 @@ export async function POST(request: Request) {
     const failure = await recordPurchaseFromOrder(
       razorpay_order_id,
       razorpay_payment_id,
-      (await auth()).userId,
+      userId,
     );
     if (failure) {
       return Response.json({ error: failure.error }, { status: failure.status });

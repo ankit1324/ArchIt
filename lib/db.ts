@@ -21,6 +21,13 @@ export const db =
   );
 globalForDb.__supabase = db;
 
+// columns safe to expose publicly; `owner` stays paywalled (#3) and
+// `user_id` never leaves the server unprompted
+export const PUBLIC_COLUMNS =
+  "id, building_name, address, city, price, type, kind, beds, baths, sqft, rooms, area_m, floors, lng, lat, photo, photos, user_id, featured";
+
+export type PublicPropertyRow = Omit<PropertyRow, "owner">;
+
 export interface PropertyRow {
   id: string;
   building_name: string | null;
@@ -75,6 +82,7 @@ export function listingToRow(
 
 export interface DesignRow {
   id: string;
+  user_id: string;
   name: string;
   plot_lng: number;
   plot_lat: number;
@@ -85,7 +93,9 @@ export interface DesignRow {
   meta: DesignMeta | null;
 }
 
-export function designToRow(d: Omit<Design, "id">): Omit<DesignRow, "id"> {
+// user_id deliberately excluded: routes stamp it from the Clerk session,
+// never from the client body (same rule as listings)
+export function designToRow(d: Omit<Design, "id">): Omit<DesignRow, "id" | "user_id"> {
   return {
     name: d.name,
     plot_lng: d.plotCenter[0],
@@ -111,11 +121,11 @@ export function rowToDesign(r: DesignRow): Design {
   };
 }
 
-export function rowToListing(r: PropertyRow): Listing {
+export function rowToListing(r: PublicPropertyRow): Listing {
   return {
     id: r.id,
     buildingName: r.building_name ?? undefined,
-    owner: r.owner ?? undefined,
+    owner: "owner" in r ? (r as PropertyRow).owner ?? undefined : undefined,
     address: r.address,
     city: r.city,
     price: Number(r.price),

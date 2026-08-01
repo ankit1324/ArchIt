@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { safeImageUrl } from "@/lib/url";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay from "@/components/DesignerOverlay";
 import { CloseIcon } from "@/components/icons";
@@ -549,9 +550,9 @@ export default function DesignerPage() {
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
                       <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-white/60">
-                        {d.snapshot && (
+                        {safeImageUrl(d.snapshot) && (
                           <Image
-                            src={d.snapshot}
+                            src={safeImageUrl(d.snapshot)!}
                             alt=""
                             fill
                             sizes="48px"

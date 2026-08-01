@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/types";
 import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
+import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 interface PropertyDetailPanelProps {
@@ -30,16 +31,25 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 export default function PropertyDetailPanel({
-  listing,
+  listing: propListing,
   onClose,
   onEdit,
   onDelete,
   deleting = false,
 }: PropertyDetailPanelProps) {
+  // reset fetched detail state per listing (adjust-state-during-render —
+  // avoids a setState-in-effect cascade)
+  const [listing, setListingRaw] = useState(propListing);
+  const setListing = setListingRaw;
+  const [prevId, setPrevId] = useState(propListing.id);
+  if (prevId !== propListing.id) {
+    setPrevId(propListing.id);
+    setListingRaw(propListing);
+  }
   const sale = listing.type === "sale";
-  // only the lister manages a property; legacy rows (no userId) stay open
+  // only the lister manages a property
   const { userId } = useAuth();
-  const canManage = !listing.userId || listing.userId === userId;
+  const canManage = !!userId && listing.userId === userId;
   // owner contact is paywalled; a paid unlock persists per listing in the
   // purchases ledger, so it survives reloads and sessions
   const [unlockedId, setUnlockedId] = useState<string | null>(null);
@@ -58,6 +68,25 @@ export default function PropertyDetailPanel({
       stale = true;
     };
   }, [listing.id]);
+
+  // the public list drops the paywalled `owner` field — refetch the gated
+  // detail route when the lister or a paying viewer opens this panel
+  useEffect(() => {
+    if (!userId) return;
+    let stale = false;
+    fetch(`/api/properties/${listing.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: Listing | null) => {
+        if (!stale && d) setListing(d);
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+    // ponytail: refetches only on unlock change; a manual refresh button is
+    // the upgrade when staleness matters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing.id, userId, ownerUnlocked]);
 
   const unlockOwner = async () => {
     if (unlocking) return;
@@ -92,10 +121,10 @@ export default function PropertyDetailPanel({
         </button>
       </header>
 
-      {listing.photo && (
+      {safeImageUrl(listing.photo) && (
         <div className="relative h-[140px] overflow-hidden rounded-2xl">
           <Image
-            src={listing.photo}
+            src={safeImageUrl(listing.photo)!}
             alt={listing.address}
             fill
             sizes="268px"

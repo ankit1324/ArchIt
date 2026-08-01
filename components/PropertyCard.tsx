@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
+import { safeImageUrl } from "@/lib/url";
 
 export default function PropertyCard({
   listing,
@@ -15,9 +16,9 @@ export default function PropertyCard({
       onClick={onClick}
       className="group pointer-events-auto relative h-[196px] w-[236px] shrink-0 snap-start overflow-hidden rounded-2xl text-left shadow-lg transition-transform hover:-translate-y-1"
     >
-      {listing.photo ? (
+      {safeImageUrl(listing.photo) ? (
         <Image
-          src={listing.photo}
+          src={safeImageUrl(listing.photo)!}
           alt={`${listing.address}, ${listing.city}`}
           fill
           sizes="236px"
@@ -56,7 +57,8 @@ export default function PropertyCard({
             `${listing.beds} Beds`,
             `${listing.baths} Baths`,
             `${listing.sqft.toLocaleString()} Sqft`,
-            ...(listing.owner ? [`Owner ${listing.owner}`] : []),
+            // owner is paywalled and never present in the public list
+            // ...(listing.owner ? [`Owner ${listing.owner}`] : []),
           ].map((t) => (
             <span
               key={t}

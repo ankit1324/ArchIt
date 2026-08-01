@@ -4,6 +4,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import maplibregl from "maplibre-gl";
 import type { Listing, Poi } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
+import { safeImageUrl } from "@/lib/url";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const CENTER: [number, number] = [76.7794, 30.741];
@@ -59,12 +60,13 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
 
 function priceMarkerEl(l: Listing, withThumb: boolean): HTMLElement {
   const el = document.createElement("div");
-  const showThumb = withThumb && !!l.photo;
+  const thumb = safeImageUrl(l.photo);
+  const showThumb = withThumb && !!thumb;
   el.className = `price-marker${showThumb ? "" : " no-thumb"}${l.featured ? " featured" : ""}`;
-  if (showThumb && l.photo) {
+  if (showThumb && thumb) {
     const img = document.createElement("img");
     img.className = "thumb";
-    img.src = l.photo;
+    img.src = thumb;
     img.alt = "";
     el.appendChild(img);
   }
@@ -83,7 +85,7 @@ function poiMarkerEl(p: Poi): HTMLElement {
   el.className = "poi-marker";
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.innerHTML = POI_SVGS[p.icon];
+  bubble.innerHTML = POI_SVGS[p.icon] ?? "";
   el.appendChild(bubble);
   if (p.label) {
     const label = document.createElement("div");

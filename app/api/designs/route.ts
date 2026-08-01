@@ -1,16 +1,27 @@
+import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
 import type { Design } from "@/lib/types";
 
+// Designs are private: every query is scoped to the signed-in user.
+
 export async function GET() {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
   const { data, error } = await db
     .from("designs")
     .select("*")
+    .eq("user_id", userId)
     .order("created_at");
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("GET /api/designs failed:", error.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
   return Response.json(data.map(rowToDesign));
 }
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
   const d = (await request.json()) as Omit<Design, "id">;
   if (
     !d.plotCenter ||
@@ -25,9 +36,12 @@ export async function POST(request: Request) {
   }
   const { data, error } = await db
     .from("designs")
-    .insert(designToRow({ ...d, name: d.name || "My home" }))
+    .insert({ ...designToRow({ ...d, name: d.name || "My home" }), user_id: userId })
     .select()
     .single();
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("POST /api/designs failed:", error.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
   return Response.json(rowToDesign(data), { status: 201 });
 }

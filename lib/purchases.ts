@@ -30,6 +30,11 @@ export async function recordPurchaseFromOrder(
   if (!notes.purpose || !userId) {
     return { error: "no user for purchase", status: 400 };
   }
+  // verify-payment: the paying session must match the order's owner so one
+  // user can't confirm another's order (ledger grief/confirm oracle)
+  if (fallbackUserId && notes.userId && notes.userId !== fallbackUserId) {
+    return { error: "order belongs to another user", status: 403 };
+  }
   const { error } = await retryTransientDb(() =>
     db.from("purchases").insert({
       user_id: userId,
@@ -44,7 +49,7 @@ export async function recordPurchaseFromOrder(
     const unavailable = error.message.includes("fetch failed");
     console.error("Purchase ledger insert failed:", error.message);
     return {
-      error: unavailable ? "purchase service unavailable" : error.message,
+      error: unavailable ? "purchase service unavailable" : "internal error",
       status: unavailable ? 503 : 500,
     };
   }

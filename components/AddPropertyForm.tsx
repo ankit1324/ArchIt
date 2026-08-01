@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Listing, ListingType, PropertyKind } from "@/lib/types";
 import { feeLabel } from "@/lib/fees";
 import { MAX_UPLOAD_BYTES, SUPPORTED_MIME_TYPES } from "@/lib/upload";
+import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 const KINDS: PropertyKind[] = [
@@ -63,7 +64,14 @@ export default function AddPropertyForm({
   onCancel,
 }: AddPropertyFormProps) {
   const [buildingName, setBuildingName] = useState(editing?.buildingName ?? "");
+  // owner is paywalled and absent from the public list, so preload the gated
+  // detail for the lister before the edit form renders
   const [owner, setOwner] = useState(editing?.owner ?? "");
+  const [prevEditId, setPrevEditId] = useState(editing?.id);
+  if (editing && prevEditId !== editing.id) {
+    setPrevEditId(editing.id);
+    setOwner(editing.owner ?? "");
+  }
   const [address, setAddress] = useState(editing?.address ?? initialAddress);
   const [city, setCity] = useState(editing?.city ?? initialCity);
   const [price, setPrice] = useState(editing ? String(editing.price) : "");
@@ -337,10 +345,12 @@ export default function AddPropertyForm({
       </p>
       {photoCount > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {keptPhotos.map((url) => (
+          {keptPhotos.map((url) => {
+            const safeUrl = safeImageUrl(url);
+            return safeUrl ? (
             <span key={url} className="relative h-14 w-16 overflow-hidden rounded-xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <img src={safeUrl} alt="" className="h-full w-full object-cover" />
               <button
                 type="button"
                 aria-label="Remove photo"
@@ -350,7 +360,8 @@ export default function AddPropertyForm({
                 <CloseIcon width={9} height={9} />
               </button>
             </span>
-          ))}
+            ) : null;
+          })}
           {previews.map((url, i) => (
             <span key={url} className="relative h-14 w-16 overflow-hidden rounded-xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -183,11 +183,6 @@ export default function Home() {
     if (!draftCoords || saving) return;
     setSaving(true);
     try {
-      // featured listings require a one-time fee (lib/fees.ts); plain listings are free
-      if (!editing && d.featured && !(await payFee("featured_property", "Featured listing boost"))) {
-        return;
-      }
-
       const uploadedPhotos = await Promise.all(
         photoFiles.map(async (photoFile) => {
           const fd = new FormData();
@@ -247,6 +242,24 @@ export default function Home() {
         return;
       }
       const saved = (await res.json()) as Listing;
+
+      // Featured boost is a paid add-on; the server only persists it after
+      // verifying a purchase tied to this listing's id (see properties/[id]).
+      if (!editing && d.featured && !saved.featured) {
+        const paid = await payFee(
+          "featured_property",
+          "Featured listing boost",
+          saved.id,
+        );
+        if (paid) {
+          const flip = await fetch(`/api/properties/${saved.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...saved, featured: true }),
+          });
+          if (flip.ok) Object.assign(saved, await flip.json());
+        }
+      }
 
       setListings((prev) =>
         editing

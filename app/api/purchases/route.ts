@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const unavailable = result.error.message.includes("fetch failed");
     console.error("Purchases lookup failed:", result.error.message);
     return Response.json(
-      { error: unavailable ? "purchase service unavailable" : result.error.message },
+      { error: unavailable ? "purchase service unavailable" : "internal error" },
       { status: unavailable ? 503 : 500 },
     );
   }

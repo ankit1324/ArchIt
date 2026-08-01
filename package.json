@@ -13,10 +13,15 @@
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
     "maplibre-gl": "^5.24.0",
-    "next": "16.2.10",
+    "next": "16.2.12",
     "razorpay": "^2.9.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sharp": "^0.35.0"
+  },
+  "overrides": {
+    "sharp": "^0.35.0",
+    "postcss": "^8.5.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

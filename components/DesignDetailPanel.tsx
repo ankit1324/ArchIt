@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type { Design } from "@/lib/types";
+import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 interface DesignDetailPanelProps {
@@ -61,10 +62,10 @@ export default function DesignDetailPanel({
         </button>
       </header>
 
-      {design.snapshot && (
+      {safeImageUrl(design.snapshot) && (
         <div className="relative h-[160px] overflow-hidden rounded-2xl bg-white/40">
           <Image
-            src={design.snapshot}
+            src={safeImageUrl(design.snapshot)!}
             alt={design.name}
             fill
             sizes="268px"
