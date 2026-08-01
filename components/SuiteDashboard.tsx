@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Fraunces } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
+import { feeLabel } from "@/lib/fees";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -27,7 +28,7 @@ const PRODUCTS = [
     name: "ArchIt Find",
     tagline: "Every home, on a living map",
     body: "Fly over a 3D satellite city, browse real listings, list your own property and reach owners directly.",
-    badge: "₹100 listing · ₹20 contact",
+    badge: `Free listing · ${feeLabel("contact_owner")} contact`,
     badgeClass: "bg-magenta text-white",
     cta: "Open the map",
     href: "/find",

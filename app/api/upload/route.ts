@@ -1,13 +1,6 @@
 import crypto from "node:crypto";
 import { db } from "@/lib/db";
-
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
-const EXT_BY_MIME: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-  "image/avif": ".avif",
-};
+import { EXT_BY_MIME, MAX_UPLOAD_BYTES } from "@/lib/upload";
 
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -19,7 +12,7 @@ export async function POST(request: Request) {
   if (!ext) {
     return Response.json({ error: "only jpeg/png/webp/avif images" }, { status: 415 });
   }
-  if (file.size > MAX_BYTES) {
+  if (file.size > MAX_UPLOAD_BYTES) {
     return Response.json({ error: "max 8 MB" }, { status: 413 });
   }
 

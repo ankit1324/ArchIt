@@ -1,17 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Listing, ListingType, PropertyKind } from "@/lib/types";
+import { feeLabel } from "@/lib/fees";
+import { MAX_UPLOAD_BYTES, SUPPORTED_MIME_TYPES } from "@/lib/upload";
 import { CloseIcon } from "./icons";
-
-// must match app/api/upload/route.ts (EXT_BY_MIME / MAX_BYTES)
-const SUPPORTED_PHOTO_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-]);
-const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
 const KINDS: PropertyKind[] = [
   "apartments",
@@ -35,7 +28,7 @@ export interface PropertyDraft {
   sqft: number;
   floors: number;
   areaM: number;
-  /** true when the user opted-in and paid the ₹250 featured-listing fee */
+  /** true when the user opted-in and paid the featured-listing fee */
   featured: boolean;
 }
 
@@ -86,25 +79,30 @@ export default function AddPropertyForm({
   const [keptPhotos, setKeptPhotos] = useState<string[]>(
     editing?.photos ?? (editing?.photo ? [editing.photo] : []),
   );
-  const [previews, setPreviews] = useState<string[]>([]);
   const photoCount = keptPhotos.length + photoFiles.length;
 
-  // object URLs for new-file thumbnails; revoked on change/unmount
-  useEffect(() => {
-    const urls = photoFiles.map((f) => URL.createObjectURL(f));
-    setPreviews(urls);
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [photoFiles]);
+  // object URLs for new-file thumbnails, derived from the files; stale ones
+  // revoked whenever the list changes (and on unmount)
+  const previews = useMemo(
+    () => photoFiles.map((f) => URL.createObjectURL(f)),
+    [photoFiles],
+  );
+  useEffect(
+    () => () => previews.forEach((u) => URL.revokeObjectURL(u)),
+    [previews],
+  );
 
   const addPhotos = (list: FileList | null) => {
     if (!list) return;
     const files = Array.from(list);
-    const supported = files.filter((f) => SUPPORTED_PHOTO_TYPES.has(f.type));
-    const sized = supported.filter((f) => f.size <= MAX_PHOTO_BYTES);
+    const supported = files.filter((f) => SUPPORTED_MIME_TYPES.has(f.type));
+    const sized = supported.filter((f) => f.size <= MAX_UPLOAD_BYTES);
     if (supported.length < files.length) {
       setError("Some photos skipped — use JPG, PNG, WebP or AVIF (HEIC not supported)");
     } else if (sized.length < supported.length) {
-      setError("Some photos skipped — each photo must be under 8 MB");
+      setError(
+        `Some photos skipped — each photo must be under ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`,
+      );
     } else {
       setError("");
     }
@@ -115,25 +113,21 @@ export default function AddPropertyForm({
   const [error, setError] = useState("");
   const [addressDirty, setAddressDirty] = useState(!!editing);
 
-  // adopt reverse-geocode results as they arrive, unless the user already typed
-  useEffect(() => {
-    if (!addressDirty) {
-      setAddress(initialAddress);
-      setCity(initialCity);
-    }
-  }, [initialAddress, initialCity, addressDirty]);
+  // show live reverse-geocode results until the user types, then their input wins
+  const shownAddress = addressDirty ? address : initialAddress;
+  const shownCity = addressDirty ? city : initialCity;
 
   const submit = () => {
     if (saving) return;
     const p = Number(price);
     if (!p || p <= 0) return setError("Enter a price");
-    if (!address.trim()) return setError("Enter an address");
+    if (!shownAddress.trim()) return setError("Enter an address");
     onSave(
       {
       buildingName: buildingName.trim(),
       owner: owner.trim(),
-      address: address.trim(),
-      city: city.trim(),
+      address: shownAddress.trim(),
+      city: shownCity.trim(),
       price: p,
       type,
       kind,
@@ -198,10 +192,13 @@ export default function AddPropertyForm({
         <span className={fieldLabel}>Address</span>
         <input
           className={fieldInput}
-          value={address}
+          value={shownAddress}
           onChange={(e) => {
             setAddress(e.target.value);
-            setAddressDirty(true);
+            if (!addressDirty) {
+              setCity(shownCity); // freeze the geocoded city too
+              setAddressDirty(true);
+            }
           }}
           placeholder="SCO 12, Sector 17"
         />
@@ -211,10 +208,13 @@ export default function AddPropertyForm({
         <span className={fieldLabel}>City</span>
         <input
           className={fieldInput}
-          value={city}
+          value={shownCity}
           onChange={(e) => {
             setCity(e.target.value);
-            setAddressDirty(true);
+            if (!addressDirty) {
+              setAddress(shownAddress); // freeze the geocoded address too
+              setAddressDirty(true);
+            }
           }}
           placeholder="Chandigarh"
         />
@@ -387,7 +387,9 @@ export default function AddPropertyForm({
         <span className="text-[18px]">{featured ? "⭐" : "☆"}</span>
         <span className="flex flex-col">
           <span className="text-[12.5px] font-bold">
-            {featured ? "Featured listing — ₹250" : "Feature on map — ₹250"}
+            {featured
+              ? `Featured listing — ${feeLabel("featured_property")}`
+              : `Feature on map — ${feeLabel("featured_property")}`}
           </span>
           <span className="text-[11px] font-medium opacity-70">
             {featured
@@ -407,7 +409,7 @@ export default function AddPropertyForm({
           : editing
             ? "Save changes"
             : featured
-              ? "Pay ₹250 & save featured property"
+              ? `Pay ${feeLabel("featured_property")} & save featured property`
               : "Save property — free"}
       </button>
     </section>
