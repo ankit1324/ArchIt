@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Fraunces, Manrope, IBM_Plex_Mono } from "next/font/google";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { feeLabel } from "@/lib/fees";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -109,6 +110,10 @@ const css = `
 .mx .cta.ghost{background:transparent;color:var(--fg);box-shadow:inset 0 0 0 1.5px var(--line2)}
 .mx .cta.ghost:hover{box-shadow:inset 0 0 0 1.5px var(--accent-deep), 0 10px 34px var(--glow)}
 .mx .cta.glow{background:var(--accent);color:var(--accent-fg)}
+
+/* mobile nav — rendered always, shown only ≤640px (see media query) */
+.mx .burger{display:none}
+.mx .m-menu{display:none}
 
 /* ---------- hero (scroll scrub: full-bleed film -> framed plate) ---------- */
 .mx .hero{height:250vh;margin-top:-84px}
@@ -321,10 +326,76 @@ const css = `
 @media(max-width:640px){
   .mx{--pad:20px}
   .mx header{height:70px}
+  .mx .hdr-right{gap:12px}
   .mx .quiet{display:none}
-  .mx .hero{height:210vh}
+  .mx .hdr-cta{display:none}
   .mx .plate-meta{display:none}
   .mx .island{margin:100px 10px 0;border-radius:30px;padding:70px 22px 60px}
+
+  /* freeze the page scroll behind an open menu */
+  .mx.mx-lock{overflow:hidden}
+
+  /* ---- burger ---- */
+  .mx .burger{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;
+    background:transparent;border:1.5px solid var(--line2);color:var(--fg);cursor:pointer;
+    transition:border-color .25s, transform .3s}
+  .mx .burger:active{transform:scale(.94)}
+  .mx .burger b{position:relative;display:block;width:18px;height:1.7px;background:var(--fg);border-radius:2px;
+    transition:background .2s}
+  .mx .burger b::before,.mx .burger b::after{content:"";position:absolute;left:0;width:18px;height:1.7px;
+    background:var(--fg);border-radius:2px;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+  .mx .burger b::before{top:-6px}
+  .mx .burger b::after{top:6px}
+  .mx .burger.open b{background:transparent}
+  .mx .burger.open b::before{transform:translateY(6px) rotate(45deg)}
+  .mx .burger.open b::after{transform:translateY(-6px) rotate(-45deg)}
+
+  /* ---- modal dropdown sheet ---- */
+  .mx .m-menu:not([open]){display:none}
+  .mx .m-menu{display:flex;flex-direction:column;gap:2px;position:fixed;
+    top:64px;left:12px;right:12px;width:auto;max-width:none;margin:0;padding:12px;border-radius:22px;
+    overflow:visible;
+    background:var(--panel);border:1px solid var(--line2);
+    box-shadow:0 26px 70px rgba(0,0,0,calc(var(--shadow-a)*1.1));
+    transform:translateY(-14px) scale(.97);opacity:0;transform-origin:top center;
+    transition:transform .34s cubic-bezier(.2,.8,.2,1), opacity .3s}
+  .mx .m-menu.open{transform:none;opacity:1;pointer-events:auto}
+  .mx .m-menu::backdrop{background:rgba(var(--bg-rgb),.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  .mx .m-menu .m-link{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:15px 16px;border-radius:14px;font-family:inherit;font-weight:600;font-size:16px;
+    color:var(--fg);text-decoration:none;background:none;border:none;width:100%;text-align:left;cursor:pointer;
+    transition:background .2s}
+  .mx .m-menu .m-link:active{background:rgba(var(--frame-rgb),.1)}
+  .mx .m-menu .m-link span{font-family:var(--f-mono),monospace;font-size:11px;letter-spacing:.14em;
+    color:var(--faint);text-transform:uppercase;font-weight:500}
+  .mx .m-menu .m-cta{margin-top:8px;justify-content:center;background:var(--btn-bg);color:var(--btn-fg);
+    border-radius:999px;font-weight:700;font-size:15px;padding:16px}
+
+  /* ---- hero: drop the scroll-scrub — static film + readable copy ---- */
+  .mx .hero{height:auto;margin-top:-70px}
+  .mx .hero-pin{position:static;height:auto;min-height:100svh}
+  .mx .hero-media{transform:none;border-radius:0;box-shadow:none}
+  .mx .hero-media .scrim{background:
+    linear-gradient(to top, rgba(var(--bg-rgb),.9) 4%, rgba(var(--bg-rgb),.35) 55%, rgba(var(--bg-rgb),.55) 100%)}
+  .mx .hero-copy{opacity:1;transform:none;justify-content:flex-end;padding:90px 22px 56px}
+  .mx .tick{display:none}
+  .mx .scroll-cue{display:none}
+  .mx h1{font-size:clamp(44px,13vw,64px)}
+  .mx .hero-sub{font-size:15px;margin-top:20px}
+  .mx .hero-ctas{margin-top:28px}
+  .mx .hero-ctas .cta{flex:1 1 auto}
+
+  /* light theme lets the suite film carry its own titles (as on desktop) —
+     keep the overlay text hidden, just anchor the CTAs a touch higher for phones */
+  .mx[data-theme="light"] .hero-copy{padding-bottom:48px}
+
+  /* ---- section polish ---- */
+  .mx .theater{padding:90px var(--pad) 20px}
+  .mx .sec-head{margin-bottom:40px}
+  .mx .reel-info{padding:18px 20px 20px}
+  .mx .reel-info h3{font-size:19px}
+  .mx .finale{padding:110px var(--pad) 50px}
+  .mx .foot{gap:14px;margin-top:90px}
 }
 
 /* ---------- reduced motion ---------- */
@@ -395,10 +466,35 @@ type Theme = "dark" | "light";
 export default function MarketingLanding() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<Theme>("light");
+  // hero video mounts only once the saved theme is known, so a returning
+  // dark-theme visitor never downloads the light film first
+  const [themeReady, setThemeReady] = useState(false);
+  // mobile-only nav sheet (burger is display:none above 640px)
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    if (menuOpen && !menu.open) menu.showModal();
+    if (!menuOpen && menu.open) menu.close();
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 640px)");
+    const closeOnDesktop = () => {
+      if (!mobile.matches) setMenuOpen(false);
+    };
+    mobile.addEventListener("change", closeOnDesktop);
+    return () => mobile.removeEventListener("change", closeOnDesktop);
+  }, []);
+
+  const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("mx-theme");
     if (saved === "light" || saved === "dark") setTheme(saved);
+    setThemeReady(true);
   }, []);
 
   // native hash scrolling gets canceled by video loads mid-flight; drive it ourselves
@@ -444,21 +540,33 @@ export default function MarketingLanding() {
 
     // scroll-scrubbed sections: 0 → 1 progress as the section passes through
     const scrubs = Array.from(root.querySelectorAll<HTMLElement>("[data-scrub]"));
+    // last written values — skips style writes for sections parked at 0/1
+    const last = scrubs.map(() => ({ p: "", v: "" }));
     let raf = 0;
     const onScroll = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const vh = root.clientHeight;
-        for (const sec of scrubs) {
-          const r = sec.getBoundingClientRect();
+        // read all rects before writing any styles — avoids forced reflows
+        const rects = scrubs.map((sec) => sec.getBoundingClientRect());
+        scrubs.forEach((sec, i) => {
+          const r = rects[i];
           const total = r.height - vh;
           // pin progress: 0 when the section sticks, 1 when it releases
           const p = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0;
           // entry progress: 0 → 1 while the section scrolls into the viewport
           const v = Math.min(1, Math.max(0, (vh - r.top) / vh));
-          sec.style.setProperty("--p", p.toFixed(4));
-          sec.style.setProperty("--v", v.toFixed(4));
-        }
+          const pv = p.toFixed(4);
+          const vv = v.toFixed(4);
+          if (last[i].p !== pv) {
+            last[i].p = pv;
+            sec.style.setProperty("--p", pv);
+          }
+          if (last[i].v !== vv) {
+            last[i].v = vv;
+            sec.style.setProperty("--v", vv);
+          }
+        });
       });
     };
     if (!reduced) {
@@ -466,14 +574,30 @@ export default function MarketingLanding() {
       onScroll();
     }
 
-    // reveal-on-enter
+    // reveal-on-enter (one-shot — stop watching once revealed)
     const revealIO = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
+      (entries) =>
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.classList.add("in");
+          revealIO.unobserve(e.target);
+        }),
       { root, threshold: 0.18 }
     );
     root.querySelectorAll("[data-reveal]").forEach((el) => revealIO.observe(el));
 
-    // autoplay loops only while on screen
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+      revealIO.disconnect();
+    };
+  }, []);
+
+  // autoplay loops only while on screen — separate effect so a theme toggle
+  // (which remounts the hero video) re-observes without rebuilding the rest
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !themeReady) return;
     const vidIO = new IntersectionObserver(
       (entries) =>
         entries.forEach((e) => {
@@ -484,14 +608,8 @@ export default function MarketingLanding() {
       { root, threshold: 0.2 }
     );
     root.querySelectorAll<HTMLVideoElement>("video[data-auto]").forEach((v) => vidIO.observe(v));
-
-    return () => {
-      root.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(raf);
-      revealIO.disconnect();
-      vidIO.disconnect();
-    };
-  }, [theme]); // re-observe after the themed hero video swaps
+    return () => vidIO.disconnect();
+  }, [theme, themeReady]);
 
   // dark: neon wireframe night film · light: cream suite assembly film
   const heroSrc = theme === "light" ? "/demo/suite.mp4" : "/demo/wireframe.mp4";
@@ -501,7 +619,7 @@ export default function MarketingLanding() {
     <div
       ref={rootRef}
       data-theme={theme}
-      className={`mx ${fraunces.variable} ${manrope.variable} ${plexMono.variable}`}
+      className={`mx ${menuOpen ? "mx-lock" : ""} ${fraunces.variable} ${manrope.variable} ${plexMono.variable}`}
     >
       <style>{css}</style>
       <div className="atmo" aria-hidden />
@@ -535,16 +653,86 @@ export default function MarketingLanding() {
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>
           <SignUpButton mode="modal">
-            <button className="cta">Get started</button>
+            <button className="cta hdr-cta">Get started</button>
           </SignUpButton>
+          <button
+            className={`burger ${menuOpen ? "open" : ""}`}
+            onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+          >
+            <b />
+          </button>
         </div>
       </header>
+
+      {/* ============ MOBILE NAV SHEET (only ≤640px) ============ */}
+      <dialog
+        ref={menuRef}
+        id="mobile-menu"
+        className={`m-menu ${menuOpen ? "open" : ""}`}
+        aria-label="Mobile navigation"
+        onCancel={(e) => {
+          e.preventDefault();
+          closeMenu();
+        }}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) closeMenu();
+        }}
+      >
+        <a
+          className="m-link"
+          href="https://archit-lit.chaudharyankit.in/"
+          target="_blank"
+          rel="noreferrer"
+          onClick={closeMenu}
+        >
+          ArchIt Lite <span>Free ↗</span>
+        </a>
+        <a
+          className="m-link"
+          href="#find-demo"
+          onClick={(e) => {
+            closeMenu();
+            scrollToId(e);
+          }}
+        >
+          Find <span>Map</span>
+        </a>
+        <a
+          className="m-link"
+          href="#demos"
+          onClick={(e) => {
+            closeMenu();
+            scrollToId(e);
+          }}
+        >
+          Demos <span>Reel</span>
+        </a>
+        <Link className="m-link" href="/designer" onClick={closeMenu}>
+          3D Builder <span>Paid</span>
+        </Link>
+        <SignInButton mode="modal">
+          <button className="m-link" onClick={closeMenu}>
+            Sign in <span>Account</span>
+          </button>
+        </SignInButton>
+        <SignUpButton mode="modal">
+          <button className="m-link m-cta" onClick={closeMenu}>
+            Get started free
+          </button>
+        </SignUpButton>
+      </dialog>
 
       {/* ============ HERO — film scrubs into a blueprint plate ============ */}
       <section className="hero" data-scrub>
         <div className="hero-pin">
           <div className="hero-media">
-            <video key={heroSrc} data-auto autoPlay muted loop playsInline preload="auto" src={heroSrc} poster={heroPoster} />
+            {themeReady && (
+              <video key={heroSrc} data-auto autoPlay muted loop playsInline preload="metadata" src={heroSrc} poster={heroPoster} />
+            )}
             <div className="scrim" />
             <span className="tick tl" />
             <span className="tick tr" />
@@ -630,7 +818,7 @@ export default function MarketingLanding() {
                   <span className="tc">tc 00:00:10:00</span>
                   <span className="fig">plate 03 — wireframe → home</span>
                 </div>
-                <video data-auto muted loop playsInline preload="metadata" src="/demo/wireframe.mp4" poster="/demo/wireframe-poster.jpg" />
+                <video data-auto muted loop playsInline preload="none" src="/demo/wireframe.mp4" poster="/demo/wireframe-poster.jpg" />
               </div>
               <div className="frame-caption">
                 <b>Concept film</b>
@@ -653,7 +841,7 @@ export default function MarketingLanding() {
                   <span className="dot" />
                   <span className="url">archit.suite/find — every home, on a living map</span>
                 </div>
-                <video data-auto muted loop playsInline preload="metadata" src="/demo/find.mp4" poster="/demo/find-poster.jpg" />
+                <video data-auto muted loop playsInline preload="none" src="/demo/find.mp4" poster="/demo/find-poster.jpg" />
               </div>
               <div className="frame-caption">
                 <b>ArchIt Find session</b>
@@ -702,7 +890,7 @@ export default function MarketingLanding() {
                   <span className="dot" />
                   <span className="url">archit.suite/designer — my house</span>
                 </div>
-                <video data-auto muted loop playsInline preload="metadata" src="/demo/builder.mp4" poster="/demo/builder-poster.jpg" />
+                <video data-auto muted loop playsInline preload="none" src="/demo/builder.mp4" poster="/demo/builder-poster.jpg" />
               </div>
               <div className="frame-caption">
                 <b>3D Builder session</b>
@@ -727,7 +915,7 @@ export default function MarketingLanding() {
         </div>
         <div className="reel-grid">
           <article className="reel wide" data-reveal>
-            <video data-auto muted loop playsInline preload="metadata" src="/demo/wireframe.mp4" poster="/demo/wireframe-poster.jpg" />
+            <video data-auto muted loop playsInline preload="none" src="/demo/wireframe.mp4" poster="/demo/wireframe-poster.jpg" />
             <div className="reel-info">
               <h3>
                 Wireframe becomes home
@@ -741,7 +929,7 @@ export default function MarketingLanding() {
             </div>
           </article>
           <article className="reel" data-reveal="2">
-            <video data-auto muted loop playsInline preload="metadata" src="/demo/suite.mp4" poster="/demo/suite-poster.jpg" />
+            <video data-auto muted loop playsInline preload="none" src="/demo/suite.mp4" poster="/demo/suite-poster.jpg" />
             <div className="reel-info">
               <h3>
                 The suite, assembled
@@ -755,7 +943,7 @@ export default function MarketingLanding() {
             </div>
           </article>
           <article className="reel" data-reveal="3">
-            <video data-auto muted loop playsInline preload="metadata" src="/demo/builder.mp4" poster="/demo/builder-poster.jpg" />
+            <video data-auto muted loop playsInline preload="none" src="/demo/builder.mp4" poster="/demo/builder-poster.jpg" />
             <div className="reel-info">
               <h3>
                 Inside the 3D Builder
@@ -769,7 +957,7 @@ export default function MarketingLanding() {
             </div>
           </article>
           <article className="reel wide" data-reveal>
-            <video data-auto muted loop playsInline preload="metadata" src="/demo/find.mp4" poster="/demo/find-poster.jpg" />
+            <video data-auto muted loop playsInline preload="none" src="/demo/find.mp4" poster="/demo/find-poster.jpg" />
             <div className="reel-info">
               <h3>
                 Inside ArchIt Find
@@ -815,7 +1003,7 @@ export default function MarketingLanding() {
           <article className="prod" data-reveal="2">
             <div className="prod-top">
               <FindArt />
-              <span className="badge">₹100 list · ₹20 contact</span>
+              <span className="badge">Free list · {feeLabel("contact_owner")} contact</span>
             </div>
             <h3>
               ArchIt Find<small>Buy · rent · sell</small>
