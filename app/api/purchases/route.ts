@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { FEES } from "@/lib/fees";
+import { retryTransientDb } from "@/lib/retry";
 
 /**
  * GET /api/purchases?purpose=builder_unlock[&ref=<id>] → { unlocked } for the
@@ -17,13 +18,23 @@ export async function GET(request: Request) {
     return Response.json({ error: "unknown purpose" }, { status: 400 });
   }
 
-  let q = db
-    .from("purchases")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("purpose", purpose);
-  if (ref) q = q.eq("ref", ref);
-  const { count, error } = await q;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ unlocked: (count ?? 0) > 0 });
+  const result = await retryTransientDb(async () => {
+    let query = db
+      .from("purchases")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("purpose", purpose)
+      .limit(1);
+    if (ref) query = query.eq("ref", ref);
+    return query.maybeSingle();
+  });
+  if (result.error) {
+    const unavailable = result.error.message.includes("fetch failed");
+    console.error("Purchases lookup failed:", result.error.message);
+    return Response.json(
+      { error: unavailable ? "purchase service unavailable" : result.error.message },
+      { status: unavailable ? 503 : 500 },
+    );
+  }
+  return Response.json({ unlocked: result.data !== null });
 }
