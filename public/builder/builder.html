@@ -2991,55 +2991,97 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && tutI>=0) endTut
 $('#helpB').addEventListener('click', startTutorial);
 
 /* ============================== templates ============================== */
-function tRoom(type, cx, cz, opts={}){
+function tRoom(profile, type, cx, cz, opts={}){
   const b = newRoom(type, cx, cz, 0);
   (opts.doors||[]).forEach(([wall,t,dt])=>b.doors.push({id:++state.seq.door, wall, t, type:dt||'int_hard', w:0.8, h:2.0, color:'blue'}));
   (opts.wins||[]).forEach(([wall,t])=>b.windows.push({id:++state.seq.win, wall, t}));
+  furnishRoom(b, profile);
   state.blocks.push(b);
   return b;
 }
+// Auto-furnish a template room so models read as lived-in homes/offices, not empty
+// shells. Room footprints are fixed per type (newRoom uses the catalog w/len), so
+// placements are tuned to those dims; clampFurn keeps every piece inside the walls.
+function furnishRoom(b, profile){
+  const office = profile === 'office';
+  const put = (key, lx, lz, rot=0)=>{
+    const f = {id:++state.seq.furn, key, lx, lz, rot};
+    if(clampFurn(b, f)) b.furniture.push(f);
+  };
+  switch(b.type){
+    case 'bedroom':
+      if(office){ put('desk',0,-1.06); put('chair',0,-0.3,2); put('plant',1.4,1.1); }
+      else { put('bed',-0.5,-0.36); put('nightstand',0.55,-1.2); put('wardrobe',0.4,1.06); put('plant',1.5,-1.1); }
+      break;
+    case 'hall':
+      if(office){ put('desk',-0.9,-0.4); put('chair',-0.9,0.4,2); put('desk',0.9,-0.4); put('chair',0.9,0.4,2); put('plant',2.0,-1.3); }
+      else {
+        put('sofa',-0.4,-1.21); put('coffee',-0.4,-0.2); put('tv',-0.4,1.46); put('plant',2.0,-1.3);
+        put('table',1.5,0.6); put('chair',1.5,-0.1,0); put('chair',1.5,1.3,2); put('chair',0.85,0.6,1); put('chair',2.15,0.6,3);
+      }
+      break;
+    case 'kitchen':
+      put('kunit',0,-0.76); put('fridge',1.01,0.71);
+      if(!office) put('kunit',-1.06,0,1);
+      break;
+    case 'bath':
+      put('toilet',-0.7,-0.435); put('basin',0.6,-0.56);
+      if(!office) put('shower',0.61,0.31);
+      break;
+    case 'hallway':
+      put('plant',-1.4,0.2); put('walllamp',1.5,0.3);
+      break;
+    case 'veranda':
+      put('coffee',0,0); put('chair',-0.7,0,1); put('chair',0.7,0,3); put('plant',1.4,-0.7);
+      break;
+    case 'balcony':
+      put('chair',0.5,0,3); put('plant',-1.1,0);
+      break;
+  }
+}
 const TEMPLATES = {};
-function addTemplate(key, name, cat, desc, rooms){
-  TEMPLATES[key] = {name, cat, desc, build(){ rooms.forEach(room=>tRoom(...room)); }};
+function addTemplate(key, name, cat, desc, rooms, profile){
+  const prof = profile || (cat === 'office' ? 'office' : 'home');
+  TEMPLATES[key] = {name, cat, desc, build(){ rooms.forEach(room=>tRoom(prof, ...room)); }};
 }
 const D = {front:{doors:[[2,.5,'ext_hard']]}, entry:{doors:[[0,.85,'ext_hard']]}, glass:{doors:[[0,.5,'ext_glass']]}, plain:{doors:[[0,.5]]}, side:{doors:[[3,.5]]}, win:{wins:[[1,.5]]}, back:{wins:[[2,.5]]}};
 const room = (type, cx, cz, opts={})=>[type, cx, cz, opts];
 
 // Indian houses (10)
-addTemplate('in_1bhk', '1BHK Compact Indian House', 'indian', 'Veranda, living room, kitchen, bedroom and bath', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bath',3.3,-2.7,D.plain)]);
-addTemplate('in_2bhk', '2BHK Indian Family Home', 'indian', 'Family hall, kitchen, two bedrooms and two baths', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bath',-3,-2.7,D.plain), room('bath',3.3,-2.7,D.plain)]);
-addTemplate('in_3bhk', '3BHK Modern Indian Home', 'indian', 'Living hall, kitchen, three bedrooms, bath and balcony', [room('veranda',0,3.6,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bath',3.3,-2.7,D.plain), room('bath',-3,-6.3,D.plain), room('balcony',0,-6.9,{doors:[[0,.5,'ext_glass']]})]);
-addTemplate('in_vastu', 'Vastu 2BHK Home', 'indian', 'Living, kitchen and bedrooms arranged in vastu zones', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bedroom',3.3,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
-addTemplate('in_villa', 'South Indian Courtyard Villa', 'indian', 'Front and rear verandas with three bedrooms', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bedroom',3.3,-3.6,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain), room('veranda',0,-6.9,{doors:[[0,.5,'ext_glass']]})]);
-addTemplate('in_kothi', 'North Indian Kothi (4BHK)', 'indian', 'Foyer, living, kitchen, four bedrooms and balconies', [room('veranda',0,3.6,D.front), room('hallway',0,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-2.5,0,{...D.plain,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-6.9,{...D.plain,...D.back}), room('bedroom',0,-6.9,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain), room('bath',-5.2,-3.6,D.side), room('balcony',0,3.6,{doors:[[2,.5,'ext_glass']]})]);
-addTemplate('in_row', 'Builder Floor / Row House', 'indian', 'Long home with porch, living, kitchen and two bedrooms', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',0,-3.6,{...D.plain,...D.back}), room('bedroom',0,-6.9,{...D.plain,...D.back}), room('bath',2.4,-6.9,D.side), room('bedroom',0,-10.5,{...D.plain,...D.back}), room('balcony',0,-13.8,{doors:[[0,.5,'ext_glass']]})]);
+addTemplate('in_1bhk', '1BHK Compact Indian House', 'indian', 'Veranda, living room, kitchen, bedroom and bath', [room('veranda',0,3.3,D.front), room('hall',0,0,{doors:[['0','0.85','ext_hard']]}), room('kitchen',-3.85,0,{...D.plain,...D.back}), room('bedroom',4.15,0,{...D.side,...D.win}), room('bath',3.3,-2.7,D.plain)]);
+addTemplate('in_2bhk', '2BHK Indian Family Home', 'indian', 'Family hall, kitchen, two bedrooms and two baths', [room('veranda',0,3.3,D.front), room('hall',0,0,{doors:[['0','0.85','ext_hard']]}), room('kitchen',-3.85,0,{...D.plain,...D.back}), room('bedroom',4.15,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bath',-3,-2.7,D.plain), room('bath',3.3,-2.7,D.plain)]);
+addTemplate('in_3bhk', '3BHK Modern Indian Home', 'indian', 'Living hall, kitchen, three bedrooms, bath and balcony', [room('veranda',0,3.6,D.front), room('hall',0,0,{doors:[['0','0.85','ext_hard']]}), room('kitchen',-3.85,0,{...D.plain,...D.back}), room('bedroom',4.15,0,{...D.side,...D.win}), room('bedroom',0.3,-3.6,{...D.plain,...D.back}), room('bedroom',-3.35,-3.6,{...D.plain,...D.back}), room('bath',3.35,-2.7,D.plain), room('bath',-3,-6.3,D.plain), room('balcony',0,-6.9,{doors:[[0,.5,'ext_glass']]})]);
+addTemplate('in_vastu', 'Vastu 2BHK Home', 'indian', 'Living, kitchen and bedrooms arranged in vastu zones', [room('veranda',0,3.3,D.front), room('hall',0.5,0,{...D.entry,...D.win}), room('kitchen',-3.5,0,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bedroom',3.3,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
+addTemplate('in_villa', 'South Indian Courtyard Villa', 'indian', 'Front and rear verandas with three bedrooms', [room('veranda',0,3.3,D.front), room('hall',0,0,{doors:[['0','0.85','ext_hard']]}), room('kitchen',-3.85,0,{...D.plain,...D.back}), room('bedroom',4.15,0,{...D.side,...D.win}), room('bedroom',3.3,-3.6,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain), room('veranda',0,-6.9,{doors:[[0,.5,'ext_glass']]})]);
+addTemplate('in_kothi', 'North Indian Kothi (4BHK)', 'indian', 'Foyer, living, kitchen, four bedrooms and balconies', [room('veranda',0,4.6,D.front), room('hallway',0.15,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-4.1,0,{doors:[['0','0.5']]}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',3.7,0.5,{...D.side,...D.win}), room('bedroom',2.2,-4.4,{doors:[['0','0.5']]}), room('bedroom',-3.1,-6.9,{...D.plain,...D.back}), room('bedroom',0.6,-7.4,{...D.plain,...D.back}), room('bath',2.2,-1.9,D.plain), room('bath',-5.2,-3.6,D.side), room('balcony',0,2.6,{doors:[[2,.5,'ext_glass']]})]);
+addTemplate('in_row', 'Builder Floor / Row House', 'indian', 'Long home with porch, living, kitchen and two bedrooms', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',0,-3.6,{...D.plain,...D.back}), room('bedroom',-0.35,-6.9,{...D.plain,...D.back}), room('bath',2.75,-6.9,D.side), room('bedroom',0,-10.5,{...D.plain,...D.back}), room('balcony',0,-13.8,{doors:[[0,.5,'ext_glass']]})]);
 addTemplate('in_village', '1KTH Village House', 'indian', 'Front veranda, large hall, kitchen and bathroom', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,wins:[[1,.5],[3,.5]]}), room('kitchen',-2.7,-3.6,{...D.plain,...D.back}), room('bath',1.8,-3.6,D.plain)]);
-addTemplate('in_courtyard', 'Traditional Courtyard House', 'indian', 'Perimeter rooms around a central family hall', [room('veranda',0,3.6,D.front), room('hall',0,0,{...D.entry,...D.win}), room('bedroom',-3.3,0,{...D.plain,...D.win}), room('bedroom',3.3,0,{...D.side,...D.win}), room('kitchen',-3.3,-3.6,{...D.plain,...D.back}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bedroom',-3.3,-7.2,{...D.plain,...D.back}), room('bath',3.3,-3.6,D.plain), room('bath',0,-6.3,D.plain)]);
-addTemplate('in_bungalow', 'Luxury 5BHK Indian Villa', 'indian', 'Grand hall, kitchen, five bedrooms, baths and balconies', [room('veranda',0,3.6,D.front), room('hallway',0,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-2.5,0,{...D.plain,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-6.9,{...D.plain,...D.back}), room('bedroom',0,-6.9,{...D.plain,...D.back}), room('bedroom',2.2,-9.3,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain), room('bath',-5.2,-3.6,D.side), room('bath',-5.2,-6.9,D.side), room('balcony',-2.5,3.6,{doors:[[2,.5,'ext_glass']]}), room('balcony',2.2,3.6,{doors:[[2,.5,'ext_glass']]})]);
+addTemplate('in_courtyard', 'Traditional Courtyard House', 'indian', 'Perimeter rooms around a central family hall', [room('veranda',0,3.6,D.front), room('hall',0,0,{doors:[['0','0.85','ext_hard']]}), room('bedroom',-4.15,0,{doors:[['0','0.5']]}), room('bedroom',4.15,0,{...D.side,...D.win}), room('kitchen',-3.3,-3.6,{...D.plain,...D.back}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bedroom',-3.3,-7.2,{...D.plain,...D.back}), room('bath',3.3,-3.6,D.plain), room('bath',0,-6.3,D.plain)]);
+addTemplate('in_bungalow', 'Luxury 5BHK Indian Villa', 'indian', 'Grand hall, kitchen, five bedrooms, baths and balconies', [room('veranda',-0.15,3.6,D.front), room('hallway',0.15,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-4.1,0,{doors:[['0','0.5']]}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',3.7,0.65,{...D.side,...D.win}), room('bedroom',2.2,-4.15,{doors:[['0','0.5']]}), room('bedroom',-2.75,-6.9,{...D.plain,...D.back}), room('bedroom',0.85,-7.15,{doors:[['0','0.5']]}), room('bedroom',2.2,-10.15,{...D.plain,...D.back}), room('bath',2.2,-1.7,D.plain), room('bath',-5.2,-3.6,D.side), room('bath',-5.8,-6.9,D.side), room('balcony',-3.4,3.6,{doors:[[2,.5,'ext_glass']]}), room('balcony',3.25,3.6,{doors:[[2,.5,'ext_glass']]})]);
 
 // Offices and commercial spaces (12)
-addTemplate('off_startup', 'Startup Open-Plan Office', 'office', 'Reception, open desk bays, meeting room, pantry and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('hall',2.2,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain)]);
-addTemplate('off_exec', 'Corporate Executive Suite', 'office', 'Reception, boardroom, executive cabins, pantry and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.win}), room('hall',0,-3.6,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-3.6,{...D.plain,...D.back}), room('kitchen',-5.2,0,D.side), room('bath',4,0,D.side)]);
-addTemplate('off_tech', 'Tech Agency Agile Hub', 'office', 'Two agile work bays, huddle room, coffee bar and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('hall',2.2,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
-addTemplate('off_cowork', 'Co-Working Space', 'office', 'Reception, hot desks, private booths, café and meeting room', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('hall',2.2,0,{...D.side,...D.win}), room('kitchen',0,-3.6,D.plain), room('bedroom',-2.5,-3.6,D.plain), room('bedroom',2.2,-3.6,D.plain), room('bath',2.2,-6.3,D.plain)]);
-addTemplate('off_studio', 'Design & Creative Studio', 'office', 'Gallery entry, drafting bay, client pitch room and library', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('bedroom',2.2,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
-addTemplate('off_clinic', 'Medical / Clinic Suite', 'office', 'Waiting room, reception, three consultation rooms and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
-addTemplate('off_law', 'Law Firm & Partners Office', 'office', 'Reception, conference room, library and four partner cabins', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',0,-3.6,D.plain), room('bath',4,0,D.side)]);
-addTemplate('off_finance', 'Financial & Accounting Firm', 'office', 'Client lounge, accountant work bay, archive and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
-addTemplate('off_retail', 'Retail Showroom & Back Office', 'office', 'Showroom, counter, back office, inventory room and washroom', [room('hall',0,0,{...D.glass,...D.win}), room('hallway',0,-4.2,D.plain), room('bedroom',-2.2,-4.2,{...D.plain,...D.back}), room('bath',2.2,-4.2,D.side)]);
-addTemplate('off_bpo', 'Call Center / BPO Floor', 'office', 'Large agent bays, manager cabin, cafeteria and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('hall',2.2,0,{...D.side,wins:[[1,.5],[2,.5]]}), room('kitchen',0,-3.6,D.plain), room('bedroom',-2.5,-3.6,D.plain), room('bath',2.2,-3.6,D.plain)]);
-addTemplate('off_realestate', 'Real Estate Sales Suite', 'office', 'Model foyer, presentation lounge, closing rooms and pantry', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,D.plain), room('kitchen',-2.5,-3.6,D.plain), room('bath',0,-3.6,D.plain)]);
-addTemplate('off_satellite', 'Satellite Hub Workspace', 'office', 'Coffee lounge, four private offices and shared meeting room', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,D.plain), room('bedroom',-2.5,-3.6,D.plain), room('bedroom',-5.2,-3.6,D.plain), room('bath',0,-3.6,D.plain)]);
+addTemplate('off_startup', 'Startup Open-Plan Office', 'office', 'Reception, open desk bays, meeting room, pantry and washroom', [room('hallway',-0.1,0,D.glass), room('hall',-4.3,0,{...D.plain,...D.back}), room('hall',4.1,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_exec', 'Corporate Executive Suite', 'office', 'Reception, boardroom, executive cabins, pantry and washroom', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{doors:[['0','0.5']]}), room('hall',-0.1,-3.6,{...D.plain,...D.back}), room('bedroom',3.75,0,{doors:[['3','0.5']]}), room('bedroom',4.1,-3.6,{...D.plain,...D.back}), room('bedroom',-4.3,-3.6,{...D.plain,...D.back}), room('kitchen',-8,0,D.side), room('bath',6.7,0,D.side)]);
+addTemplate('off_tech', 'Tech Agency Agile Hub', 'office', 'Two agile work bays, huddle room, coffee bar and washroom', [room('hallway',-0.1,0,D.glass), room('hall',-4.3,0,{...D.plain,...D.back}), room('hall',4.1,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('kitchen',-3.25,-3.6,D.plain), room('bath',2.95,-2.7,D.plain)]);
+addTemplate('off_cowork', 'Co-Working Space', 'office', 'Reception, hot desks, private booths, café and meeting room', [room('hallway',-0.1,0,D.glass), room('hall',-4.3,0,{...D.plain,...D.back}), room('hall',4.1,0,{...D.side,...D.win}), room('kitchen',-0.15,-3.6,D.plain), room('bedroom',-3.4,-3.6,D.plain), room('bedroom',3.25,-3.6,D.plain), room('bath',2.2,-6.3,D.plain)]);
+addTemplate('off_studio', 'Design & Creative Studio', 'office', 'Gallery entry, drafting bay, client pitch room and library', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('bedroom',3.7,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_clinic', 'Medical / Clinic Suite', 'office', 'Waiting room, reception, three consultation rooms and washroom', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,...D.back}), room('bedroom',3.7,0,{...D.side,...D.win}), room('bedroom',2.9,-3.6,{...D.plain,...D.back}), room('bedroom',-3.1,-3.6,{...D.plain,...D.back}), room('bath',-0.1,-3.6,D.plain)]);
+addTemplate('off_law', 'Law Firm & Partners Office', 'office', 'Reception, conference room, library and four partner cabins', [room('hallway',-0.6,0,D.glass), room('hall',-4.8,0,{...D.plain,...D.back}), room('bedroom',3.05,0,{doors:[['3','0.5']]}), room('bedroom',3.5,-3.6,{...D.plain,...D.back}), room('bedroom',-3.7,-3.6,{...D.plain,...D.back}), room('bedroom',-0.1,-3.6,D.plain), room('bath',6.05,0,D.side)]);
+addTemplate('off_finance', 'Financial & Accounting Firm', 'office', 'Client lounge, accountant work bay, archive and washroom', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,...D.back}), room('bedroom',3.7,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_retail', 'Retail Showroom & Back Office', 'office', 'Showroom, counter, back office, inventory room and washroom', [room('hall',0,0,{...D.glass,...D.win}), room('hallway',0.25,-4.2,D.plain), room('bedroom',-3.45,-4.2,{...D.plain,...D.back}), room('bath',3.2,-4.2,D.side)]);
+addTemplate('off_bpo', 'Call Center / BPO Floor', 'office', 'Large agent bays, manager cabin, cafeteria and washroom', [room('hallway',-0.1,0,D.glass), room('hall',-4.3,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('hall',4.1,0,{...D.side,wins:[[1,.5],[2,.5]]}), room('kitchen',0.1,-3.6,D.plain), room('bedroom',-3.2,-3.6,D.plain), room('bath',2.8,-3.6,D.plain)]);
+addTemplate('off_realestate', 'Real Estate Sales Suite', 'office', 'Model foyer, presentation lounge, closing rooms and pantry', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,...D.back}), room('bedroom',3.7,0,{...D.side,...D.win}), room('bedroom',2.85,-3.6,D.plain), room('kitchen',-2.95,-3.6,D.plain), room('bath',-0.2,-3.6,D.plain)]);
+addTemplate('off_satellite', 'Satellite Hub Workspace', 'office', 'Coffee lounge, four private offices and shared meeting room', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,...D.back}), room('bedroom',3.7,0,{...D.side,...D.win}), room('bedroom',3.3,-3.6,D.plain), room('bedroom',-2.75,-3.6,D.plain), room('bedroom',-6.35,-3.6,D.plain), room('bath',0.3,-3.6,D.plain)]);
 
 // Other layouts (8)
-addTemplate('oth_japandi', 'Japandi Minimalist Villa', 'other', 'Open veranda, minimalist living, kitchen and master suite', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bath',3.3,-2.7,D.plain)]);
+addTemplate('oth_japandi', 'Japandi Minimalist Villa', 'other', 'Open veranda, minimalist living, kitchen and master suite', [room('veranda',0,3.3,D.front), room('hall',0,0,{doors:[['0','0.85','ext_hard']]}), room('kitchen',-3.85,0,{...D.plain,...D.back}), room('bedroom',4.15,0,{...D.side,...D.win}), room('bath',3.3,-2.7,D.plain)]);
 addTemplate('oth_cabin', 'Nordic Timber Cabin', 'other', 'Deck, great room, kitchenette and compact bath', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,wins:[[1,.5],[3,.5]]}), room('kitchen',-2.7,-3,{...D.plain,...D.back}), room('bath',1.8,-2.7,D.plain)]);
-addTemplate('oth_loft', 'Contemporary Open Loft', 'other', 'Double-height style living, kitchen, bedroom and luxury bath', [room('hall',0,0,{...D.glass,wins:[[1,.5],[3,.5]]}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bath',-3,-3.6,D.plain)]);
-addTemplate('oth_wellness', 'Yoga & Wellness Studio', 'other', 'Reception lounge, practice hall, changing room and bath', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('bedroom',2.2,0,D.side), room('bath',2.2,-2.7,D.plain)]);
-addTemplate('oth_training', 'Education & Training Hub', 'other', 'Lecture hall, seminar rooms, administration office and bath', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
-addTemplate('oth_cafe', 'Boutique Cafe & Kitchen', 'other', 'Dining lounge, coffee bar, kitchen and guest washroom', [room('hall',0,0,{...D.glass,wins:[[1,.5],[3,.5]]}), room('kitchen',0,-3.6,{...D.plain,...D.back}), room('bath',2.4,-3.6,D.side)]);
+addTemplate('oth_loft', 'Contemporary Open Loft', 'other', 'Double-height style living, kitchen, bedroom and luxury bath', [room('hall',0.5,0,{doors:[['0','0.5','ext_glass']], wins:[[1,0.5]]}), room('kitchen',-3.5,0,{...D.plain,...D.back}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bath',-3,-3.6,D.plain)]);
+addTemplate('oth_wellness', 'Yoga & Wellness Studio', 'other', 'Reception lounge, practice hall, changing room and bath', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('bedroom',3.7,0,D.side), room('bath',2.2,-2.7,D.plain)], 'office');
+addTemplate('oth_training', 'Education & Training Hub', 'other', 'Lecture hall, seminar rooms, administration office and bath', [room('hallway',0.15,0,D.glass), room('hall',-4.1,0,{...D.plain,...D.back}), room('bedroom',3.7,0,{...D.side,...D.win}), room('bedroom',2.65,-3.6,{...D.plain,...D.back}), room('bath',-0.45,-3.6,D.plain)], 'office');
+addTemplate('oth_cafe', 'Boutique Cafe & Kitchen', 'other', 'Dining lounge, coffee bar, kitchen and guest washroom', [room('hall',0,0,{...D.glass,wins:[[1,.5],[3,.5]]}), room('kitchen',-0.2,-3.6,{...D.plain,...D.back}), room('bath',2.6,-3.6,D.side)]);
 addTemplate('oth_tiny', 'Micro Tiny House', 'other', 'Living/kitchen room, wet bath and front deck', [room('veranda',0,3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('bath',0,-3,D.plain)]);
-addTemplate('oth_townhouse', 'Multi-Level Townhouse', 'other', 'Living, kitchen, stairs, bedroom and bath starter layout', [room('hallway',0,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-2.5,0,{...D.plain,...D.back}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('stairs',0,-3.6,D.plain), room('bedroom',2.2,0,{...D.side,...D.win}), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('oth_townhouse', 'Multi-Level Townhouse', 'other', 'Living, kitchen, stairs, bedroom and bath starter layout', [room('hallway',0.15,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-4.1,0,{...D.plain,...D.back}), room('kitchen',-3,-3.6,{...D.plain,...D.back}), room('stairs',0,-3.6,D.plain), room('bedroom',3.7,0,{...D.side,...D.win}), room('bath',2.7,-2.7,D.plain)]);
 addTemplate('empty', 'Empty — single hall', 'other', 'Start from a single blank room', []);
 TEMPLATES.empty.build = ()=>state.blocks.push(firstRoom());
 

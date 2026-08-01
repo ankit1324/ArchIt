@@ -123,6 +123,10 @@ const css = `
   border-radius:calc(var(--p,0)*30px);
   box-shadow:0 0 0 1px rgba(var(--frame-rgb), calc(var(--p,0)*.35)), 0 30px 90px rgba(0,0,0, calc(var(--p,0)*var(--shadow-a))), 0 0 calc(var(--p,0)*90px) rgba(var(--glow-rgb), calc(var(--p,0)*.22))}
 .mx .hero-media video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* poster still over the film until it can loop smoothly — kills first-frame jank */
+.mx .hero-media .hero-still{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:1;transition:opacity .55s ease}
+.mx .hero-media .hero-still.hidden{opacity:0;pointer-events:none}
 .mx .hero-media .scrim{position:absolute;inset:0;
   background:
     radial-gradient(ellipse 120% 90% at 50% 45%, transparent 40%, rgba(var(--bg-rgb), calc(.72 - var(--p,0)*.4)) 100%),
@@ -469,6 +473,10 @@ export default function MarketingLanding() {
   // hero video mounts only once the saved theme is known, so a returning
   // dark-theme visitor never downloads the light film first
   const [themeReady, setThemeReady] = useState(false);
+  // hero holds a crisp poster still until the film is buffered enough to loop
+  // smoothly — first-frame decode jank plays out behind the still, so the
+  // reveal never looks like lag (most visible on the light-theme suite film)
+  const [heroReady, setHeroReady] = useState(false);
   // mobile-only nav sheet (burger is display:none above 640px)
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDialogElement>(null);
@@ -490,6 +498,9 @@ export default function MarketingLanding() {
   }, []);
 
   const closeMenu = () => setMenuOpen(false);
+
+  // toggling theme remounts the hero with a new film — show its still again
+  useEffect(() => setHeroReady(false), [theme]);
 
   useEffect(() => {
     const saved = localStorage.getItem("mx-theme");
@@ -731,7 +742,27 @@ export default function MarketingLanding() {
         <div className="hero-pin">
           <div className="hero-media">
             {themeReady && (
-              <video key={heroSrc} data-auto autoPlay muted loop playsInline preload="metadata" src={heroSrc} poster={heroPoster} />
+              <>
+                <video
+                  key={heroSrc}
+                  data-auto
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                  src={heroSrc}
+                  poster={heroPoster}
+                  onCanPlayThrough={() => setHeroReady(true)}
+                />
+                {/* still stays until the film can loop without buffering */}
+                <img
+                  className={`hero-still ${heroReady ? "hidden" : ""}`}
+                  src={heroPoster}
+                  alt=""
+                  aria-hidden
+                />
+              </>
             )}
             <div className="scrim" />
             <span className="tick tl" />
