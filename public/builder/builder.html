@@ -124,6 +124,22 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:14px}
 .sec.open .body{display:block}
 .f-label{font-size:12px;color:var(--ink2);font-weight:600;margin:12px 0 6px}
 .f-label:first-child{margin-top:4px}
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preset-btn{min-height:48px;padding:8px;border:1.5px solid var(--line);border-radius:10px;background:var(--panel);font-size:12px;font-weight:700;text-align:left}
+.preset-btn:hover{background:var(--canvas);border-color:var(--blue)}
+.preset-btn:focus-visible{outline:3px solid var(--blue-soft);border-color:var(--blue)}
+
+.tpl-modal{max-width:680px;width:92vw}
+.tpl-tabs{display:flex;gap:6px;margin:12px 0 16px;border-bottom:1px solid var(--line2);padding-bottom:10px}
+.tpl-tab{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:700;color:var(--ink2);background:none;border:1px solid transparent;transition:.15s}
+.tpl-tab:hover{color:var(--ink);background:var(--canvas)}
+.tpl-tab.active{color:var(--blue);background:var(--blue-soft);border-color:rgba(29,91,180,.2)}
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:360px;overflow-y:auto;padding-right:4px}
+.tpl-card{padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--panel);text-align:left;transition:.15s}
+.tpl-card:hover{border-color:var(--blue);background:var(--canvas)}
+.tpl-card .nm{font-size:13px;font-weight:700;color:var(--ink);display:block;margin-bottom:2px}
+.tpl-card .desc{font-size:11px;color:var(--ink2);line-height:1.35}
+.tpl-card.ghost{background:none;border-style:dashed}
 
 /* custom select */
 .sel{position:relative}
@@ -451,6 +467,8 @@ const C = {
     sand: {name:'Sand',  hex:'#e9dcbe'},
     clay: {name:'Clay',  hex:'#d9a08c'},
     terracotta:{name:'Terracotta', hex:'#c97b5d'},
+    brickred:{name:'Brick red', hex:'#96604e'},
+    darkbrick:{name:'Dark brick', hex:'#5c4740'},
     sage: {name:'Sage',  hex:'#cfd8c4'},
     olive:{name:'Olive', hex:'#a8ad8e'},
     sky:  {name:'Sky',   hex:'#c9d7e4'},
@@ -464,12 +482,21 @@ const C = {
     wood:{name:'Wood slats'},
     brick:{name:'Brick'},
     concrete:{name:'Concrete'},
+    fluted_wood:{name:'Fluted wood'},
+    stone_cladding:{name:'Stone cladding'},
+    metal_panel:{name:'Metal panels'},
+    stucco_matte:{name:'Matte stucco'},
   },
   roofStyle:{
     flat:{name:'Flat'},
     overhang:{name:'Flat + overhang'},
     parapet:{name:'Parapet'},
     gable:{name:'Low gable'},
+    gabled:{name:'Gabled + skylights'},
+    monoslope:{name:'Monoslope'},
+    butterfly:{name:'Butterfly'},
+    cantilever_flat:{name:'Cantilever flat'},
+    green_roof:{name:'Green roof'},
   },
   roofCol:{
     light:{name:'Light', hex:'#e9ebef'},
@@ -508,6 +535,7 @@ const C = {
     shower:   {name:'Shower',       w:0.9, d:0.9, h:2.2},
     bath:     {name:'Bathtub',      w:1.7, d:0.75,h:0.75},
     plant:    {name:'Plant',        w:0.45,d:0.45,h:1.2},
+    walllamp: {name:'Wall lamp',    w:0.16,d:0.16,h:2.4},
   },
   roomMin:1.2, roomMax:8,
   doors:{
@@ -522,6 +550,28 @@ const C = {
   },
   W:2.45, H:2.75,
 };
+
+const MODERN_PRESETS = {
+  japandi:{name:'Japandi Minimal', paint:'cream', facade:'sand', facadeMat:'fluted_wood', roofStyle:'cantilever_flat', roofCol:'charcoal'},
+  nordic:{name:'Nordic Timber', paint:'white', facade:'darkbrick', facadeMat:'fluted_wood', roofStyle:'monoslope', roofCol:'zinc'},
+  stone:{name:'Contemporary Stone', paint:'greige', facade:'ivory', facadeMat:'stone_cladding', roofStyle:'cantilever_flat', roofCol:'graphite'},
+  monolith:{name:'Modern Monolith', paint:'gray', facade:'graphite', facadeMat:'stucco_matte', roofStyle:'monoslope', roofCol:'black'},
+};
+function assertModernExteriorCatalog(){
+  Object.entries(MODERN_PRESETS).forEach(([key,preset])=>{
+    ['paint','facade','facadeMat','roofStyle','roofCol'].forEach(field=>{
+      if(!C[field][preset[field]]) throw new Error('Invalid '+field+' in preset '+key);
+    });
+  });
+  ['fluted_wood','stone_cladding','metal_panel','stucco_matte'].forEach(key=>{
+    if(!C.facadeMat[key]?.name) throw new Error('Missing facade material '+key);
+  });
+  ['monoslope','butterfly','cantilever_flat','green_roof'].forEach(key=>{
+    if(!C.roofStyle[key]?.name) throw new Error('Missing roof style '+key);
+  });
+  return true;
+}
+assertModernExteriorCatalog();
 
 /* ============================== state ============================== */
 let state = null, sel = null, ui = {
@@ -538,6 +588,13 @@ function freshState(){
   };
   s.floors = [{blocks:s.blocks}];   // state.blocks always aliases the active floor's array
   return s;
+}
+function ensureExteriorState(){
+  if(!C.paint[state.paint]) state.paint = 'white';
+  if(!C.facade[state.facade]) state.facade = 'white';
+  if(!C.facadeMat[state.facadeMat]) state.facadeMat = 'paint';
+  if(!C.roofStyle[state.roofStyle]) state.roofStyle = 'flat';
+  if(!C.roofCol[state.roofCol]) state.roofCol = 'light';
 }
 // after JSON round-trips (undo/restore/load) the alias breaks — re-link it
 function linkFloor(){
@@ -785,6 +842,7 @@ function tint(hex, k){        // mix hex toward white by k (0..1)
   return '#'+m(r)+m(g)+m(b);
 }
 const facadeTexCache = {};
+// ponytail: Procedural textures cap fidelity; add hosted PBR maps when asset loading is justified.
 function makeFacadeTexture(matKey, hex){          // 256px ≈ 1 m × 1 m
   const ck = matKey+hex;
   if(facadeTexCache[ck]) return facadeTexCache[ck];
@@ -797,11 +855,44 @@ function makeFacadeTexture(matKey, hex){          // 256px ≈ 1 m × 1 m
     for(let x=0; x<256; x+=32) g.fillRect(x,0,3,256);
     g.fillStyle = 'rgba(255,255,255,.05)';
     for(let x=16; x<256; x+=32) g.fillRect(x,0,8,256);
+  } else if(matKey==='fluted_wood'){
+    for(let x=0; x<256; x+=26){
+      g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x,0,4,256);
+      g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(x+5,0,2,256);
+      g.fillStyle = 'rgba(0,0,0,.035)'; g.fillRect(x+18,0,1,256);
+    }
   } else if(matKey==='brick'){                    // running bond, rows ~8 cm
     for(let y=0; y<256; y+=21){
       g.fillRect(0,y,256,2);
       const off = (y/21)%2 ? 32 : 0;
       for(let x=off; x<256; x+=64) g.fillRect(x,y,2,21);
+    }
+  } else if(matKey==='stone_cladding'){
+    for(let row=0,y=0; y<256; row++,y+=48){
+      g.fillStyle = 'rgba(0,0,0,.13)'; g.fillRect(0,y,256,2);
+      const off = row%2 ? -36 : 0;
+      for(let col=0,x=off; x<256; col++,x+=72){
+        g.fillStyle = 'rgba(0,0,0,.11)'; g.fillRect(x,y,2,48);
+        const shade = ((row*17 + col*31)%9)-4;
+        g.fillStyle = shade<0 ? 'rgba(0,0,0,'+(-shade/100)+')' : 'rgba(255,255,255,'+(shade/100)+')';
+        g.fillRect(x+2,y+2,70,44);
+        g.fillStyle = 'rgba(255,255,255,.045)'; g.fillRect(x+12,y+15+(col%3)*7,42,1);
+      }
+    }
+  } else if(matKey==='metal_panel'){
+    for(let x=0; x<256; x+=64){
+      g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(x,0,3,256);
+      g.fillStyle = 'rgba(255,255,255,.11)'; g.fillRect(x+3,0,2,256);
+      g.fillStyle = 'rgba(0,0,0,.025)'; g.fillRect(x+46,0,1,256);
+    }
+    g.fillStyle = 'rgba(0,0,0,.045)'; g.fillRect(0,128,256,2);
+  } else if(matKey==='stucco_matte'){
+    for(let y=4; y<256; y+=7) for(let x=4; x<256; x+=7){
+      const grain = (x*13 + y*29)%11;
+      if(grain<3){
+        g.fillStyle = grain===0 ? 'rgba(255,255,255,.045)' : 'rgba(0,0,0,.035)';
+        g.fillRect(x,y,grain===0?2:1,1);
+      }
     }
   } else if(matKey==='concrete'){                 // panel joints
     g.fillStyle = 'rgba(0,0,0,.08)';
@@ -861,6 +952,14 @@ function buildFurn(f){
       B(.05,2.0,.05, -.4,1.06,-.4, M.metal); break;
     case 'bath': B(1.7,.6,.75, 0,.3,0, M.white); B(1.5,.08,.55, 0,.58,0, M.glass); break;
     case 'plant': B(.3,.3,.3, 0,.15,0, M.terra); B(.45,.62,.45, 0,.72,0, M.green); break;
+    case 'walllamp': {
+      B(.05,.22,.05, 0,2.05,0, M.dark);                 // stem
+      const lit = new THREE.Mesh(new THREE.BoxGeometry(.13,.2,.13),
+        new THREE.MeshStandardMaterial({color:'#ffe9c4', roughness:.4,
+          emissive:'#ffca7a', emissiveIntensity:.9}));
+      lit.position.set(0, y0+2.24, 0); g.add(lit);
+      B(.16,.04,.16, 0,2.36,0, M.dark);                 // cap
+      break; }
     default: { const s = C.furniture[f.key]; B(s.w, s.h-.14, s.d, 0,(s.h-.14)/2,0, M.wood); }
   }
   g.position.set(f.lx, 0, f.lz);
@@ -932,15 +1031,111 @@ function buildBlockGroup(b, opts={}){
   // roof (none on balcony, only on the top floor) + veranda corner posts
   if(b.type!=='balcony' && opts.roof!==false){
     const roofMat = new THREE.MeshStandardMaterial({color:roofHex, roughness:.8});
-    if(state.roofStyle==='gable'){
-      const rise = Math.min(1.0, W*0.28);
+    const addRoofEnds = profile=>{
+      const geo = new THREE.ExtrudeGeometry(profile, {depth:.08, bevelEnabled:false});
+      geo.translate(0,0,-.04);
+      geo.rotateY(Math.PI/2);
+      [-L/2,L/2].forEach((x,i)=>{
+        const end = new THREE.Mesh(i ? geo.clone() : geo, mkFacade(W,H));
+        end.position.set(x,H,0); end.castShadow = true; end.userData.roof = true; g.add(end);
+      });
+    };
+    if(state.roofStyle==='gable' || state.roofStyle==='gabled'){
+      const steep = state.roofStyle==='gabled';
+      const ovh = steep ? .35 : .15;                    // eaves overhang
+      const rise = steep ? Math.min(2.3, W*0.5) : Math.min(1.0, W*0.28);
+      const half = W/2 + ovh;
       const sh = new THREE.Shape();
-      sh.moveTo(-W/2-.15, 0); sh.lineTo(W/2+.15, 0); sh.lineTo(0, rise); sh.closePath();
-      const geo = new THREE.ExtrudeGeometry(sh, {depth:L+.3, bevelEnabled:false});
+      sh.moveTo(-half, 0); sh.lineTo(half, 0); sh.lineTo(0, rise); sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, {depth:L+ovh*2, bevelEnabled:false});
       geo.rotateY(Math.PI/2);
       const roof = new THREE.Mesh(geo, roofMat);
-      roof.position.set(-(L+.3)/2, H, 0);
+      roof.position.set(-(L+ovh*2)/2, H, 0);
       roof.castShadow = true; roof.userData.roof = true; g.add(roof);
+      if(steep){
+        // ridge cap
+        const cap = beam(L+ovh*2+.04, .07, .16, 0, H+rise, 0, roofMat);
+        cap.userData.roof = true; g.add(cap);
+        // skylights, evenly spaced on the front (+z) slope
+        const ang = Math.atan2(rise, half);
+        const slope = Math.hypot(rise, half);
+        const skyFrame = new THREE.MeshStandardMaterial({color:'#3a3f47', roughness:.5, metalness:.3});
+        const skyGlass = new THREE.MeshStandardMaterial({color:'#cfe2f4', roughness:.1, metalness:.25,
+          emissive:'#9db8d4', emissiveIntensity:.18, transparent:true, opacity:.85});
+        const n = Math.max(1, Math.min(3, Math.floor(L/2.4)));
+        for(let i=0;i<n;i++){
+          const sx = (i-(n-1)/2)*Math.max(1.5, L/(n+.5));
+          const grp = new THREE.Group();
+          const fr = new THREE.Mesh(new THREE.BoxGeometry(.82, .09, 1.14), skyFrame);
+          const gl = new THREE.Mesh(new THREE.BoxGeometry(.7, .1, 1.0), skyGlass);
+          grp.add(fr, gl);
+          grp.rotation.x = ang;
+          // centre of the slope, nudged outward along the slope normal
+          const t = .5, nz = Math.sin(ang), ny = Math.cos(ang);
+          grp.position.set(sx, H + rise*(1-t) + ny*.05, half*t + nz*.05);
+          grp.traverse(o=>{ o.castShadow = true; o.userData.roof = true; });
+          g.add(grp);
+        }
+      }
+    } else if(state.roofStyle==='monoslope'){
+      const ovh = .35;
+      const rise = Math.min(2.4, Math.max(.55, W*.42));
+      const half = W/2+ovh;
+      const angle = Math.atan2(rise, W+ovh*2);
+      const slope = Math.hypot(W+ovh*2, rise);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(L+ovh*2,.1,slope), roofMat);
+      roof.rotation.x = angle; roof.position.y = H+rise/2+.04;
+      roof.castShadow = true; roof.userData.roof = true; g.add(roof);
+      const ends = new THREE.Shape();
+      ends.moveTo(-half,0); ends.lineTo(half,0); ends.lineTo(half,rise); ends.closePath();
+      addRoofEnds(ends);
+      const fasciaMat = new THREE.MeshStandardMaterial({color:'#30343b', roughness:.65, metalness:.25});
+      [-1,1].forEach(side=>{
+        const fascia = beam(.08,.16,slope, side*(L/2+ovh-.04),H+rise/2+.04,0,fasciaMat);
+        fascia.rotation.x = angle; fascia.userData.roof = true; g.add(fascia);
+      });
+    } else if(state.roofStyle==='butterfly'){
+      const ovh = .28, half = W/2+ovh;
+      const rise = Math.min(1.55, Math.max(.45, W*.28));
+      const angle = Math.atan2(rise, half);
+      const slope = Math.hypot(half, rise);
+      const ends = new THREE.Shape();
+      ends.moveTo(-half,0); ends.lineTo(-half,rise); ends.lineTo(0,0);
+      ends.lineTo(half,rise); ends.lineTo(half,0); ends.closePath();
+      addRoofEnds(ends);
+      [-1,1].forEach(side=>{
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(L+ovh*2,.1,slope), roofMat);
+        roof.rotation.x = -side*angle;
+        roof.position.set(0,H+rise/2+.04,side*half/2);
+        roof.castShadow = true; roof.userData.roof = true; g.add(roof);
+      });
+      const valleyMat = new THREE.MeshStandardMaterial({color:'#30343b', roughness:.55, metalness:.35});
+      const valley = beam(L+ovh*2+.04,.08,.16,0,H+.05,0,valleyMat);
+      valley.userData.roof = true; g.add(valley);
+    } else if(state.roofStyle==='cantilever_flat'){
+      const ovh = .72;
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(L+ovh*2,.12,W+ovh*2), roofMat);
+      roof.position.y = H+.04; roof.castShadow = true; roof.userData.roof = true; g.add(roof);
+      const fasciaMat = new THREE.MeshStandardMaterial({color:'#30343b', roughness:.6, metalness:.25});
+      [beam(L+ovh*2+.06,.16,.08,0,H+.04,W/2+ovh,fasciaMat),
+       beam(.08,.16,W+ovh*2, L/2+ovh,H+.04,0,fasciaMat),
+       beam(.08,.16,W+ovh*2,-L/2-ovh,H+.04,0,fasciaMat)].forEach(m=>{ m.userData.roof = true; g.add(m); });
+      const soffitMat = new THREE.MeshStandardMaterial({color:'#ffd69a', roughness:.45,
+        emissive:'#ffb85c', emissiveIntensity:.75});
+      const soffit = beam(L+ovh*2-.28,.035,.055,0,H-.045,W/2+ovh-.12,soffitMat);
+      soffit.userData.roof = true; g.add(soffit);
+    } else if(state.roofStyle==='green_roof'){
+      const ovh = .22;
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(L+ovh*2,.1,W+ovh*2), roofMat);
+      roof.position.y = H+.03; roof.castShadow = true; roof.userData.roof = true; g.add(roof);
+      const curbMat = new THREE.MeshStandardMaterial({color:'#30343b', roughness:.7, metalness:.18});
+      [beam(L+ovh*2,.2,.08,0,H+.15,W/2+ovh-.04,curbMat),
+       beam(L+ovh*2,.2,.08,0,H+.15,-W/2-ovh+.04,curbMat),
+       beam(.08,.2,W+ovh*2,L/2+ovh-.04,H+.15,0,curbMat),
+       beam(.08,.2,W+ovh*2,-L/2-ovh+.04,H+.15,0,curbMat)].forEach(m=>{ m.userData.roof = true; g.add(m); });
+      const planted = new THREE.Mesh(new THREE.BoxGeometry(Math.max(.5,L-.28),.12,Math.max(.5,W-.28)),
+        new THREE.MeshStandardMaterial({color:'#6f8258', roughness:1}));
+      planted.position.y = H+.16; planted.castShadow = true; planted.userData.roof = true; g.add(planted);
     } else {
       const ov = state.roofStyle==='overhang' ? .7 : .16;
       const roof = new THREE.Mesh(new THREE.BoxGeometry(L+ov, .09, W+ov), roofMat);
@@ -1854,6 +2049,26 @@ function stdSelect(id, map, key, onPick){
   SEL_H[id] = v=>commit(()=>{ state[key]=v; onPick&&onPick(v); });
   return selectHTML(id, optionsFrom(map, state[key]), curLabel(map, state[key]));
 }
+function applyModernPreset(key){
+  const preset = MODERN_PRESETS[key];
+  if(!preset) return;
+  commit(()=>{
+    Object.assign(state, {
+      paint:preset.paint,
+      facade:preset.facade,
+      facadeMat:preset.facadeMat,
+      roofStyle:preset.roofStyle,
+      roofCol:preset.roofCol,
+    });
+    ensureExteriorState();
+  });
+}
+function modernPresetButtons(){
+  return '<div class="f-label">Modern presets</div><div class="preset-grid">'+
+    Object.entries(MODERN_PRESETS).map(([key,preset])=>
+      '<button type="button" class="preset-btn" data-preset="'+key+'">'+preset.name+'</button>'
+    ).join('')+'</div>';
+}
 
 function renderSidebar(){
   if(!state){ side.innerHTML=''; return; }
@@ -1865,7 +2080,7 @@ function renderSidebar(){
 
   const bb = state.blocks.length ? boundsOf(state.blocks) : {w:0,d:0};
   const secs = [
-    ['exterior','Exterior', ()=>`
+    ['exterior','Exterior', ()=>modernPresetButtons()+`
       <div class="f-label">Facade material</div>${stdSelect('facadeMat', C.facadeMat, 'facadeMat')}
       <div class="f-label">Facade colour</div>${stdSelect('facade', C.facade, 'facade')}
       <div class="f-label">Roof style</div>${stdSelect('roofStyle', C.roofStyle, 'roofStyle')}
@@ -2078,6 +2293,11 @@ side.addEventListener('click', e=>{
     const wrap = selBtn.closest('.sel');
     document.querySelectorAll('.sel.open').forEach(s=>s!==wrap&&s.classList.remove('open'));
     wrap.classList.toggle('open'); return;
+  }
+  const preset = e.target.closest('[data-preset]');
+  if(preset){
+    applyModernPreset(preset.dataset.preset);
+    return;
   }
   const item = e.target.closest('.sel-item');
   if(item){
@@ -2674,6 +2894,7 @@ function loadProject(){
 }
 function renderAll(){
   if(!state) return;
+  ensureExteriorState();
   rebuild3D();
   if(ui.view==='2d') render2D(); else renderHotspots();
   renderSidebar();
@@ -2777,39 +2998,90 @@ function tRoom(type, cx, cz, opts={}){
   state.blocks.push(b);
   return b;
 }
-const TEMPLATES = {
-  studio:{name:'Studio — hall, kitchen, bath', build(){
-    tRoom('hall', 0, 0, {doors:[[0,.5,'ext_hard']], wins:[[0,.15],[1,.5]]});
-    tRoom('kitchen', -.9, -3, {doors:[[0,.5]], wins:[[2,.5]]});
-    tRoom('bath', 1.8, -2.7, {doors:[[0,.5]]});
-  }},
-  onebed:{name:'1-bedroom', build(){
-    tRoom('hall', 0, 0, {doors:[[0,.85,'ext_hard']], wins:[[1,.5]]});
-    tRoom('kitchen', -.9, -3, {doors:[[0,.5]], wins:[[2,.5]]});
-    tRoom('bath', 1.8, -2.7, {doors:[[0,.5]]});
-    tRoom('bedroom', -.6, 3.3, {doors:[[2,.5]], wins:[[0,.5]]});
-  }},
-  twobed:{name:'2-bedroom', build(){
-    tRoom('hall', 0, 0, {doors:[[0,.875,'ext_hard']]});
-    tRoom('kitchen', -.9, -3, {doors:[[0,.5]], wins:[[2,.5]]});
-    tRoom('bath', 1.8, -2.7, {doors:[[0,.5]]});
-    tRoom('bedroom', -.6, 3.3, {doors:[[2,.5]], wins:[[0,.5]]});
-    tRoom('bedroom', 4.2, 0, {doors:[[3,.5]], wins:[[1,.5]]});
-  }},
-  empty:{name:'Empty — single hall', build(){ state.blocks.push(firstRoom()); }},
-};
+const TEMPLATES = {};
+function addTemplate(key, name, cat, desc, rooms){
+  TEMPLATES[key] = {name, cat, desc, build(){ rooms.forEach(room=>tRoom(...room)); }};
+}
+const D = {front:{doors:[[2,.5,'ext_hard']]}, entry:{doors:[[0,.85,'ext_hard']]}, glass:{doors:[[0,.5,'ext_glass']]}, plain:{doors:[[0,.5]]}, side:{doors:[[3,.5]]}, win:{wins:[[1,.5]]}, back:{wins:[[2,.5]]}};
+const room = (type, cx, cz, opts={})=>[type, cx, cz, opts];
+
+// Indian houses (10)
+addTemplate('in_1bhk', '1BHK Compact Indian House', 'indian', 'Veranda, living room, kitchen, bedroom and bath', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bath',3.3,-2.7,D.plain)]);
+addTemplate('in_2bhk', '2BHK Indian Family Home', 'indian', 'Family hall, kitchen, two bedrooms and two baths', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bath',-3,-2.7,D.plain), room('bath',3.3,-2.7,D.plain)]);
+addTemplate('in_3bhk', '3BHK Modern Indian Home', 'indian', 'Living hall, kitchen, three bedrooms, bath and balcony', [room('veranda',0,3.6,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bath',3.3,-2.7,D.plain), room('bath',-3,-6.3,D.plain), room('balcony',0,-6.9,{doors:[[0,.5,'ext_glass']]})]);
+addTemplate('in_vastu', 'Vastu 2BHK Home', 'indian', 'Living, kitchen and bedrooms arranged in vastu zones', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bedroom',3.3,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
+addTemplate('in_villa', 'South Indian Courtyard Villa', 'indian', 'Front and rear verandas with three bedrooms', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bedroom',3.3,-3.6,{...D.plain,...D.back}), room('bedroom',-3,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain), room('veranda',0,-6.9,{doors:[[0,.5,'ext_glass']]})]);
+addTemplate('in_kothi', 'North Indian Kothi (4BHK)', 'indian', 'Foyer, living, kitchen, four bedrooms and balconies', [room('veranda',0,3.6,D.front), room('hallway',0,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-2.5,0,{...D.plain,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-6.9,{...D.plain,...D.back}), room('bedroom',0,-6.9,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain), room('bath',-5.2,-3.6,D.side), room('balcony',0,3.6,{doors:[[2,.5,'ext_glass']]})]);
+addTemplate('in_row', 'Builder Floor / Row House', 'indian', 'Long home with porch, living, kitchen and two bedrooms', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',0,-3.6,{...D.plain,...D.back}), room('bedroom',0,-6.9,{...D.plain,...D.back}), room('bath',2.4,-6.9,D.side), room('bedroom',0,-10.5,{...D.plain,...D.back}), room('balcony',0,-13.8,{doors:[[0,.5,'ext_glass']]})]);
+addTemplate('in_village', '1KTH Village House', 'indian', 'Front veranda, large hall, kitchen and bathroom', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,wins:[[1,.5],[3,.5]]}), room('kitchen',-2.7,-3.6,{...D.plain,...D.back}), room('bath',1.8,-3.6,D.plain)]);
+addTemplate('in_courtyard', 'Traditional Courtyard House', 'indian', 'Perimeter rooms around a central family hall', [room('veranda',0,3.6,D.front), room('hall',0,0,{...D.entry,...D.win}), room('bedroom',-3.3,0,{...D.plain,...D.win}), room('bedroom',3.3,0,{...D.side,...D.win}), room('kitchen',-3.3,-3.6,{...D.plain,...D.back}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bedroom',-3.3,-7.2,{...D.plain,...D.back}), room('bath',3.3,-3.6,D.plain), room('bath',0,-6.3,D.plain)]);
+addTemplate('in_bungalow', 'Luxury 5BHK Indian Villa', 'indian', 'Grand hall, kitchen, five bedrooms, baths and balconies', [room('veranda',0,3.6,D.front), room('hallway',0,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-2.5,0,{...D.plain,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-6.9,{...D.plain,...D.back}), room('bedroom',0,-6.9,{...D.plain,...D.back}), room('bedroom',2.2,-9.3,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain), room('bath',-5.2,-3.6,D.side), room('bath',-5.2,-6.9,D.side), room('balcony',-2.5,3.6,{doors:[[2,.5,'ext_glass']]}), room('balcony',2.2,3.6,{doors:[[2,.5,'ext_glass']]})]);
+
+// Offices and commercial spaces (12)
+addTemplate('off_startup', 'Startup Open-Plan Office', 'office', 'Reception, open desk bays, meeting room, pantry and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('hall',2.2,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_exec', 'Corporate Executive Suite', 'office', 'Reception, boardroom, executive cabins, pantry and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.win}), room('hall',0,-3.6,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-3.6,{...D.plain,...D.back}), room('kitchen',-5.2,0,D.side), room('bath',4,0,D.side)]);
+addTemplate('off_tech', 'Tech Agency Agile Hub', 'office', 'Two agile work bays, huddle room, coffee bar and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('hall',2.2,0,{...D.side,...D.win}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_cowork', 'Co-Working Space', 'office', 'Reception, hot desks, private booths, café and meeting room', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('hall',2.2,0,{...D.side,...D.win}), room('kitchen',0,-3.6,D.plain), room('bedroom',-2.5,-3.6,D.plain), room('bedroom',2.2,-3.6,D.plain), room('bath',2.2,-6.3,D.plain)]);
+addTemplate('off_studio', 'Design & Creative Studio', 'office', 'Gallery entry, drafting bay, client pitch room and library', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('bedroom',2.2,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_clinic', 'Medical / Clinic Suite', 'office', 'Waiting room, reception, three consultation rooms and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
+addTemplate('off_law', 'Law Firm & Partners Office', 'office', 'Reception, conference room, library and four partner cabins', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bedroom',-2.5,-3.6,{...D.plain,...D.back}), room('bedroom',0,-3.6,D.plain), room('bath',4,0,D.side)]);
+addTemplate('off_finance', 'Financial & Accounting Firm', 'office', 'Client lounge, accountant work bay, archive and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('kitchen',-2.5,-3.6,D.plain), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('off_retail', 'Retail Showroom & Back Office', 'office', 'Showroom, counter, back office, inventory room and washroom', [room('hall',0,0,{...D.glass,...D.win}), room('hallway',0,-4.2,D.plain), room('bedroom',-2.2,-4.2,{...D.plain,...D.back}), room('bath',2.2,-4.2,D.side)]);
+addTemplate('off_bpo', 'Call Center / BPO Floor', 'office', 'Large agent bays, manager cabin, cafeteria and washroom', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('hall',2.2,0,{...D.side,wins:[[1,.5],[2,.5]]}), room('kitchen',0,-3.6,D.plain), room('bedroom',-2.5,-3.6,D.plain), room('bath',2.2,-3.6,D.plain)]);
+addTemplate('off_realestate', 'Real Estate Sales Suite', 'office', 'Model foyer, presentation lounge, closing rooms and pantry', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,D.plain), room('kitchen',-2.5,-3.6,D.plain), room('bath',0,-3.6,D.plain)]);
+addTemplate('off_satellite', 'Satellite Hub Workspace', 'office', 'Coffee lounge, four private offices and shared meeting room', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,D.plain), room('bedroom',-2.5,-3.6,D.plain), room('bedroom',-5.2,-3.6,D.plain), room('bath',0,-3.6,D.plain)]);
+
+// Other layouts (8)
+addTemplate('oth_japandi', 'Japandi Minimalist Villa', 'other', 'Open veranda, minimalist living, kitchen and master suite', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',3.3,0,{...D.side,...D.win}), room('bath',3.3,-2.7,D.plain)]);
+addTemplate('oth_cabin', 'Nordic Timber Cabin', 'other', 'Deck, great room, kitchenette and compact bath', [room('veranda',0,3.3,D.front), room('hall',0,0,{...D.entry,wins:[[1,.5],[3,.5]]}), room('kitchen',-2.7,-3,{...D.plain,...D.back}), room('bath',1.8,-2.7,D.plain)]);
+addTemplate('oth_loft', 'Contemporary Open Loft', 'other', 'Double-height style living, kitchen, bedroom and luxury bath', [room('hall',0,0,{...D.glass,wins:[[1,.5],[3,.5]]}), room('kitchen',-3,0,{...D.plain,...D.back}), room('bedroom',0,-3.6,{...D.plain,...D.back}), room('bath',-3,-3.6,D.plain)]);
+addTemplate('oth_wellness', 'Yoga & Wellness Studio', 'other', 'Reception lounge, practice hall, changing room and bath', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,wins:[[3,.5],[2,.5]]}), room('bedroom',2.2,0,D.side), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('oth_training', 'Education & Training Hub', 'other', 'Lecture hall, seminar rooms, administration office and bath', [room('hallway',0,0,D.glass), room('hall',-2.5,0,{...D.plain,...D.back}), room('bedroom',2.2,0,{...D.side,...D.win}), room('bedroom',2.2,-3.6,{...D.plain,...D.back}), room('bath',0,-3.6,D.plain)]);
+addTemplate('oth_cafe', 'Boutique Cafe & Kitchen', 'other', 'Dining lounge, coffee bar, kitchen and guest washroom', [room('hall',0,0,{...D.glass,wins:[[1,.5],[3,.5]]}), room('kitchen',0,-3.6,{...D.plain,...D.back}), room('bath',2.4,-3.6,D.side)]);
+addTemplate('oth_tiny', 'Micro Tiny House', 'other', 'Living/kitchen room, wet bath and front deck', [room('veranda',0,3,D.front), room('hall',0,0,{...D.entry,...D.win}), room('bath',0,-3,D.plain)]);
+addTemplate('oth_townhouse', 'Multi-Level Townhouse', 'other', 'Living, kitchen, stairs, bedroom and bath starter layout', [room('hallway',0,0,{doors:[[0,.5,'ext_hard']]}), room('hall',-2.5,0,{...D.plain,...D.back}), room('kitchen',-2.5,-3.6,{...D.plain,...D.back}), room('stairs',0,-3.6,D.plain), room('bedroom',2.2,0,{...D.side,...D.win}), room('bath',2.2,-2.7,D.plain)]);
+addTemplate('empty', 'Empty — single hall', 'other', 'Start from a single blank room', []);
+TEMPLATES.empty.build = ()=>state.blocks.push(firstRoom());
+
+function assertTemplateCatalog(){
+  const counts = {indian:0, office:0, other:0};
+  Object.entries(TEMPLATES).forEach(([key, template])=>{
+    if(!template.name || !template.cat || typeof template.build !== 'function') throw new Error('Invalid template '+key);
+    if(key !== 'empty') counts[template.cat]++;
+  });
+  if(counts.indian !== 10 || counts.office !== 12 || counts.other !== 8) throw new Error('Template catalog count mismatch');
+  return true;
+}
+assertTemplateCatalog();
+
+let activeTplCat = 'indian';
+function renderTplList(cat){
+  return Object.entries(TEMPLATES).filter(([key, template])=>key === 'empty' || template.cat === cat).map(([key, template])=>
+    '<button class="tpl-card'+(key === 'empty' ? ' ghost' : '')+'" data-tpl="'+key+'">'+
+      '<span class="nm">'+template.name+'</span><span class="desc">'+template.desc+'</span></button>'
+  ).join('');
+}
 function showTemplatePicker(){
-  showModal(`
-    <h3>New project</h3>
-    <p class="hint">Start from a layout template, or from a single hall.</p>
-    ${Object.entries(TEMPLATES).map(([k,t])=>
-      `<button class="mbtn${k==='empty'?' ghost':''}" data-tpl="${k}">${t.name}</button>`).join('')}`);
+  activeTplCat = 'indian';
+  showModal('<div class="tpl-modal"><h3>New project</h3><p class="hint">Start from a layout template or begin with an empty room.</p>'+ 
+    '<div class="tpl-tabs"><button type="button" class="tpl-tab active" data-tpl-cat="indian">Indian Houses (10)</button>'+ 
+    '<button type="button" class="tpl-tab" data-tpl-cat="office">Offices (12)</button>'+ 
+    '<button type="button" class="tpl-tab" data-tpl-cat="other">Other Layouts (8)</button></div>'+ 
+    '<div class="tpl-grid" id="tplGrid">'+renderTplList('indian')+'</div></div>');
 }
 modal.addEventListener('click', e=>{
-  const t = e.target.closest('[data-tpl]');
-  if(!t) return;
+  const tab = e.target.closest('[data-tpl-cat]');
+  if(tab){
+    activeTplCat = tab.dataset.tplCat;
+    modal.querySelectorAll('.tpl-tab').forEach(button=>button.classList.toggle('active', button === tab));
+    const grid = modal.querySelector('#tplGrid');
+    if(grid) grid.innerHTML = renderTplList(activeTplCat);
+    return;
+  }
+  const template = e.target.closest('[data-tpl]');
+  if(!template) return;
   hideModal();
-  newProject(t.dataset.tpl);
+  newProject(template.dataset.tpl);
 });
 
 /* ============================== share link ============================== */
