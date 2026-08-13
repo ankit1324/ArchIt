@@ -2,9 +2,7 @@ import { db } from "@/lib/db";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.warn("CRON_SECRET unset — keepalive endpoint is unauthenticated");
-  } else if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
   const { data, error } = await db.from("properties").select("id").limit(1);

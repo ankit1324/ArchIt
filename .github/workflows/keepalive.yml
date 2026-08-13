@@ -1,0 +1,34 @@
+name: Supabase keepalive
+
+# Vercel's own cron targets the *.vercel.app deployment host, which is behind
+# Deployment Protection (ssoProtection: all_except_custom_domains) and gets
+# redirected to the SSO wall before the function runs. This workflow hits the
+# custom domain instead, which is exempt from protection.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping keepalive endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -sS -o response.json -w '%{http_code}' \
+              --max-time 30 \
+              -H "authorization: Bearer $CRON_SECRET" \
+              https://archit.chaudharyankit.in/api/keepalive) && \
+            if [ "$code" = "200" ]; then
+              echo "ok (attempt $attempt): $(cat response.json)"
+              exit 0
+            fi
+            echo "attempt $attempt failed: HTTP $code $(cat response.json 2>/dev/null)"
+            sleep 30
+          done
+          echo "keepalive ping failed after 3 attempts"
+          exit 1

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# Least privilege: CI only reads the repo. Nothing here needs write access.
+permissions:
+  contents: read
+
+# A new push supersedes the run it interrupted; don't burn minutes on stale commits.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # .nvmrc keeps CI on the same Node as local dev. The .mjs tests import
+      # .ts modules directly, which needs Node's native type stripping (22.18+).
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Placeholder values only. next build evaluates route modules to collect
+      # page data, and lib/db.ts + lib/purchases.ts construct their clients at
+      # module scope, so the build needs *syntactically* valid config or it dies
+      # with "supabaseUrl is required". Nothing here authenticates against
+      # anything — no request is made during a build. Real secrets live in Vercel.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+          SUPABASE_SECRET_KEY: sb_secret_ci_placeholder
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_ci_placeholder
+          RAZORPAY_KEY_ID: rzp_test_ci_placeholder
+          RAZORPAY_KEY_SECRET: ci_placeholder
+          RAZORPAY_WEBHOOK_SECRET: ci_placeholder

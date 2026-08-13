@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { FEES } from "@/lib/fees";
+import { isFeePurpose } from "@/lib/payment-validation";
 import { retryTransientDb } from "@/lib/retry";
 
 /**
@@ -14,7 +14,9 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const purpose = params.get("purpose") ?? "";
   const ref = params.get("ref");
-  if (!(purpose in FEES)) {
+  // isFeePurpose, not `purpose in FEES`: `in` also matches inherited keys, so
+  // ?purpose=toString would sail past the guard.
+  if (!isFeePurpose(purpose)) {
     return Response.json({ error: "unknown purpose" }, { status: 400 });
   }
 

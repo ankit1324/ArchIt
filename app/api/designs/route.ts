@@ -1,12 +1,17 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
+import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
 
 // Designs are private: every query is scoped to the signed-in user.
+// The builder is a paid product (₹2000 builder_unlock) — the ledger check here
+// is the real gate; the paywall in app/designer/page.tsx is only a UI hint.
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const locked = await builderUnlockError(userId);
+  if (locked) return locked;
   const { data, error } = await db
     .from("designs")
     .select("*")
@@ -22,6 +27,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const locked = await builderUnlockError(userId);
+  if (locked) return locked;
   const d = (await request.json()) as Omit<Design, "id">;
   if (
     !d.plotCenter ||

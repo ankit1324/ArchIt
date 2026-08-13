@@ -120,12 +120,17 @@ export default function Map3D({
   const draftMarkerRef = useRef<maplibregl.Marker | null>(null);
   const loadedRef = useRef(false);
   const listingsRef = useRef(listings);
-  listingsRef.current = listings;
   const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
   const onMapClickRef = useRef(onMapClick);
-  onMapClickRef.current = onMapClick;
   const refreshRef = useRef<((m: maplibregl.Map) => void) | null>(null);
+
+  // Refreshed after every commit, not during render. The init effect below runs
+  // once and reads these from maplibre callbacks, which always fire post-commit.
+  useEffect(() => {
+    listingsRef.current = listings;
+    onSelectRef.current = onSelect;
+    onMapClickRef.current = onMapClick;
+  });
 
   // init once
   useEffect(() => {
