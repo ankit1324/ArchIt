@@ -1,36 +1,148 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Getting Started
+# ArchIt
 
-First, run the development server:
+**Find a property on a 3D map, then design the house that goes on it — in the browser.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+[**Live app →**](https://archit.chaudharyankit.in)
+
+[![CI](https://github.com/ankit1324/ArchIt/actions/workflows/ci.yml/badge.svg)](https://github.com/ankit1324/ArchIt/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+
+</div>
+
+---
+
+Most property sites hand you a photo gallery and a floor plan drawn in 2004. ArchIt
+puts listings on a real 3D basemap you can fly through, and then lets you build the
+house on the plot you just looked at — massing, roofs, materials, lighting — without
+installing anything.
+
+## What's in it
+
+| Surface | Route | What it does |
+| --- | --- | --- |
+| Landing | `/` | Marketing page and demo reels for the suite |
+| **Find** | `/find` | 3D map property search — pan, tilt, filter by type, price, beds, area. Listings render as extruded buildings on the basemap. |
+| **Designer** | `/designer` | Browser house builder. Place a plot, stack floors, cut openings, apply materials, save designs to your account. |
+
+Three demo reels live in [`public/demo/`](public/demo) — `find.mp4`, `builder.mp4`,
+`wireframe.mp4`, and `suite.mp4` — or just use the [live app](https://archit.chaudharyankit.in).
+
+## Stack
+
+- **[Next.js 16](https://nextjs.org)** (App Router, Turbopack) + React 19 + TypeScript
+- **[MapLibre GL](https://maplibre.org)** 5.x with [OpenFreeMap](https://openfreemap.org) tiles — no map vendor key
+- **[Three.js](https://threejs.org)** 0.160 for the designer, served as a standalone
+  page in `public/builder/` and embedded as an iframe
+- **[Supabase](https://supabase.com)** — Postgres for listings, designs, and the
+  purchase ledger; Storage for listing photos
+- **[Clerk](https://clerk.com)** for auth
+- **[Razorpay](https://razorpay.com)** for payments
+- **Tailwind CSS 4**
+- Tests on `node --test`, no test framework dependency
+
+## Design decisions worth calling out
+
+**The server owns every price.** Clients send a *purpose*, never an amount.
+[`lib/fees.ts`](lib/fees.ts) is the single source of truth, in paise:
+
+```ts
+contact_owner:     5000   // ₹50   — unlock owner contact details
+featured_property: 25000  // ₹250  — one-time boost per listing
+builder_unlock:    200000 // ₹2000 — one-time per user, full builder suite
+template_unlock:   9900   // ₹99   — one-time per template
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+A tampered request body cannot buy a ₹2000 unlock for ₹1, because the amount is
+never in the body to begin with. Entitlements are derived from the purchase ledger
+rather than trusted from the client — including whether a listing is `featured`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Row Level Security is deny-all on purpose.** Every table has RLS enabled and
+zero policies, so the anon and publishable keys can read nothing. All data access
+goes through server routes holding the secret key, which stamp `user_id` from the
+Clerk session and never from the request body. The one deliberate exception is the
+`photos` storage bucket: public reads (they are public URLs anyway), writes only
+through the upload route.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**The Supabase client is lazy.** `next build` evaluates every route module to
+collect page data, so a client constructed at import time fails the build on any
+machine without secrets. [`lib/db.ts`](lib/db.ts) defers construction to the first
+real query behind a `Proxy`.
 
-## Learn More
+## Running it locally
 
-To learn more about Next.js, take a look at the following resources:
+Node **22.18+** is required — the test files import `.ts` modules directly and rely
+on Node's native type stripping. The version is pinned in [`.nvmrc`](.nvmrc).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+git clone https://github.com/ankit1324/ArchIt.git
+cd ArchIt
+npm ci
+cp .env.example .env.local   # then fill it in
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000).
 
-## Deploy on Vercel
+### Environment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Needed for |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase browser client |
+| `SUPABASE_SECRET_KEY` | Server routes; bypasses RLS, never expose |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser client |
+| `CLERK_SECRET_KEY` | Clerk server verification |
+| `RAZORPAY_KEY_ID` | Checkout |
+| `RAZORPAY_KEY_SECRET` | Order creation and payment verification |
+| `RAZORPAY_WEBHOOK_SECRET` | Webhook signature verification |
+| `CRON_SECRET` | Authorizes `/api/keepalive`; the endpoint 401s without it |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Database
+
+Migrations are plain SQL in [`supabase/migrations/`](supabase/migrations), applied
+with the [Supabase CLI](https://supabase.com/docs/guides/cli):
+
+```bash
+supabase db push
+```
+
+## Layout
+
+```
+app/                  routes — pages and API handlers
+  api/                properties, designs, templates, payments, webhooks
+  find/               3D map property search
+  designer/           house builder shell
+components/           React UI
+lib/                  db, fees, payment validation, entitlements, types
+public/builder/       standalone Three.js builder, iframed by /designer
+public/demo/          demo reels
+supabase/migrations/  schema, forward-only
+tests/                node --test suites
+```
+
+## Scripts
+
+```bash
+npm run dev      # dev server
+npm run build    # production build
+npm run lint     # eslint
+npm test         # node --test
+npx tsc --noEmit # type check
+```
+
+## Contributing
+
+Pull requests welcome. `main` is protected by a
+[ruleset](.github/rulesets/README.md): PRs only, `build-and-test` must pass and be
+up to date with `main`, review threads resolved, squash merges, linear history.
+
+CI runs type check, lint, tests, and a production build on every PR.
+
+## License
+
+[MIT](LICENSE) © Ankit Chaudhary
