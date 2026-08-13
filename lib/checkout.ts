@@ -96,6 +96,16 @@ export async function payFee(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(r),
           });
+          // 202 = the payment is real and still settling (auto-capture in
+          // flight). The webhook finishes it, so this is not an error and the
+          // user must not be pushed toward paying again.
+          if (v.status === 202) {
+            window.alert(
+              "Payment received — it’s still being confirmed. Your unlock will appear here shortly; refresh in a moment. Do not pay again.",
+            );
+            resolve(false);
+            return;
+          }
           if (!v.ok) {
             window.alert(
               "Payment could not be confirmed. If money was deducted, do not pay again—refresh the page or contact support.",

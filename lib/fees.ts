@@ -3,12 +3,14 @@
 export type FeePurpose =
   | "contact_owner"      // ₹50 — unlock owner contact details
   | "featured_property"  // ₹250 — one-time boost per listing, highlights it on the map
-  | "builder_unlock";    // ₹2000 — one-time per user, full builder suite
+  | "builder_unlock"     // ₹2000 — one-time per user, full builder suite
+  | "template_unlock";   // ₹99 — one-time per template, ref = template key
 
 export const FEES: Record<FeePurpose, number> = {
   contact_owner: 5000,      // ₹50
   featured_property: 25000, // ₹250
   builder_unlock: 200000,   // ₹2000
+  template_unlock: 9900,    // ₹99 per template (office + other categories)
 };
 
 export function feeLabel(purpose: FeePurpose): string {
