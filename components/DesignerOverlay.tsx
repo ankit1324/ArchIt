@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { payFee } from "@/lib/checkout";
 import type { DesignMeta, DesignStateV3 } from "@/lib/types";
 import type { Neighbor } from "@/lib/design";
 
@@ -22,7 +23,8 @@ type BuilderMessage =
       type: "archit:save";
       payload: { design: DesignStateV3; snapshot: string };
     }
-  | { type: "archit:close"; dirty: boolean };
+  | { type: "archit:close"; dirty: boolean }
+  | { type: "archit:buy-template"; payload: { key: string; name: string } };
 
 export default function DesignerOverlay({
   plot,
@@ -34,6 +36,7 @@ export default function DesignerOverlay({
   onClose,
 }: DesignerOverlayProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const buyingRef = useRef(false);
   const propsRef = useRef({
     plot,
     neighbors,
@@ -83,6 +86,24 @@ export default function DesignerOverlay({
         p.onSave(m.payload.design, m.payload.snapshot);
       } else if (m.type === "archit:close") {
         if (!m.dirty || window.confirm("Discard unsaved changes?")) p.onClose();
+      } else if (m.type === "archit:buy-template") {
+        // Checkout lives here, not in the iframe: the builder is a static file
+        // and must never hold payment logic. On success we only signal the key —
+        // the geometry still comes from the server, which re-checks the ledger.
+        const { key, name } = m.payload;
+        if (buyingRef.current) return; // ignore double-clicks mid-checkout
+        buyingRef.current = true;
+        void payFee("template_unlock", `Template — ${name}`, key)
+          .then((paid) => {
+            if (!paid) return;
+            frame.contentWindow?.postMessage(
+              { type: "archit:template-purchased", payload: { key } },
+              location.origin,
+            );
+          })
+          .finally(() => {
+            buyingRef.current = false;
+          });
       }
     };
     window.addEventListener("message", onMessage);
