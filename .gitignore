@@ -78,3 +78,8 @@ Desktop.ini
 # local reference assets
 reference.mp4
 omni-vid
+.vercel
+.env*
+
+# scratch output from scripts/gen-templates.mjs
+.templates.extracted.json
