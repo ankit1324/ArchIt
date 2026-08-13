@@ -1,14 +1,20 @@
 import Link from "next/link";
-import { Fraunces } from "next/font/google";
+import localFont from "next/font/local";
 import Navbar from "@/components/Navbar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
 import { feeLabel } from "@/lib/fees";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["400", "600"],
-  style: ["normal", "italic"],
+// Self-hosted rather than next/font/google: a build that has to reach Google
+// Fonts is a build that can fail offline. See assets/fonts/README.md.
+const fraunces = localFont({
+  src: [
+    { path: "../assets/fonts/fraunces-latin-wght-normal.woff2", weight: "100 900", style: "normal" },
+    { path: "../assets/fonts/fraunces-latin-wght-italic.woff2", weight: "100 900", style: "italic" },
+  ],
   variable: "--font-fraunces",
+  // Serif metric fallback, matching what next/font/google inferred. The local
+  // loader would otherwise size the swap against Arial.
+  adjustFontFallback: "Times New Roman",
 });
 
 const PRODUCTS = [

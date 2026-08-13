@@ -1,13 +1,17 @@
 import {ClerkProvider} from "@clerk/nextjs";
 import CelebrationLayer from "@/components/Celebration";
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const jakarta = Plus_Jakarta_Sans({
+// Self-hosted rather than next/font/google: a build that has to reach Google
+// Fonts is a build that can fail offline. See assets/fonts/README.md.
+// One variable file replaces the 400–800 static cuts this used to request.
+const jakarta = localFont({
+  src: "../assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2",
+  weight: "200 800", // the file's own wght range; 400–800 is what we actually use
+  style: "normal",
   variable: "--font-jakarta",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {

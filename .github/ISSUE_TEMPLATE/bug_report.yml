@@ -1,0 +1,98 @@
+name: Bug report
+description: Something in Find, Designer, or the landing page does not work
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Find and Designer are both WebGL surfaces, so the browser and GPU fields
+        below are load-bearing — a blank map is far more often a driver or a
+        failed tile fetch than app logic. Please fill them in.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface
+      options:
+        - Find (/find — the 3D map)
+        - Designer (/designer — the house builder)
+        - Landing page (/)
+        - Checkout or payments
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open /find
+        2. Filter by price
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      description: Name and version, e.g. Chrome 141 on Windows 11, Safari 18 on macOS 15.
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU / renderer
+      description: >
+        In Chrome or Edge open chrome://gpu and paste the "GL_RENDERER" line;
+        in Firefox use about:support → Graphics. If WebGL is software-rendered
+        or blocklisted, say so — that alone explains a lot of rendering bugs.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: signed-out
+    attributes:
+      label: Does it reproduce while signed out?
+      description: >
+        Separates auth and entitlement problems from rendering and data ones.
+      options:
+        - "Yes — happens signed out too"
+        - "No — only when signed in"
+        - "Cannot tell (the page requires sign-in)"
+        - Did not try
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console and network errors
+      description: >
+        Paste anything red from the browser console, plus any failed requests
+        from the Network tab (tile, /api/, or storage URLs especially).
+      render: text
+
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      description: Where it happened — the live app or a local dev server.
+      placeholder: https://archit.chaudharyankit.in/find
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, screen recordings, or a listing/design id.

@@ -2,24 +2,37 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Fraunces, Manrope, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import Image from "next/image";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { feeLabel } from "@/lib/fees";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600"],
+// Self-hosted rather than next/font/google: a build that has to reach Google
+// Fonts is a build that can fail offline. See assets/fonts/README.md.
+// Fraunces and Manrope collapse to one variable file each; Plex Mono has no
+// variable release, so it still needs one file per weight we use.
+const fraunces = localFont({
+  src: [
+    { path: "../assets/fonts/fraunces-latin-wght-normal.woff2", weight: "100 900", style: "normal" },
+    { path: "../assets/fonts/fraunces-latin-wght-italic.woff2", weight: "100 900", style: "italic" },
+  ],
   variable: "--f-disp",
+  // next/font/google inferred a serif metric fallback for Fraunces; next/font/local
+  // defaults to Arial, which would reflow the 148px display headings during swap.
+  adjustFontFallback: "Times New Roman",
 });
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+const manrope = localFont({
+  src: "../assets/fonts/manrope-latin-wght-normal.woff2",
+  weight: "200 800", // the file's own wght range; 400–800 is what we actually use
+  style: "normal",
   variable: "--f-body",
 });
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const plexMono = localFont({
+  src: [
+    { path: "../assets/fonts/ibm-plex-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../assets/fonts/ibm-plex-mono-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../assets/fonts/ibm-plex-mono-latin-600-normal.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--f-mono",
 });
 
@@ -760,12 +773,22 @@ export default function MarketingLanding() {
                   poster={heroPoster}
                   onCanPlayThrough={() => setReadyTheme(theme)}
                 />
-                {/* still stays until the film can loop without buffering */}
-                <img
+                {/* still stays until the film can loop without buffering.
+                    fill: the CSS already reserves this box (absolute, inset 0,
+                    object-fit cover), so next/image adds no layout shift.
+                    eager + high priority, not lazy: this fills the viewport
+                    above the fold and is the LCP candidate. `preload` would be
+                    pointless here — the element only mounts once themeReady
+                    flips on the client, long after the <head> is flushed. */}
+                <Image
                   className={`hero-still ${heroReady ? "hidden" : ""}`}
                   src={heroPoster}
                   alt=""
                   aria-hidden
+                  fill
+                  sizes="100vw"
+                  loading="eager"
+                  fetchPriority="high"
                 />
               </>
             )}
