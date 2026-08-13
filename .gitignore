@@ -80,6 +80,9 @@ reference.mp4
 omni-vid
 .vercel
 .env*
+# Re-negated: this .env* is the last matching pattern, so it would otherwise
+# override the !.env.example above and hide the template from the repo.
+!.env.example
 
 # scratch output from scripts/gen-templates.mjs
 .templates.extracted.json
