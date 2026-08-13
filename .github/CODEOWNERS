@@ -1,0 +1,15 @@
+# Default owner for everything not matched below.
+*                       @ankit1324
+
+# Money paths: payment validation, fee table, entitlements, checkout routes.
+# Nothing here merges without an explicit review of the money logic.
+/lib/payment-validation.ts   @ankit1324
+/lib/fees.ts                 @ankit1324
+/lib/entitlements.ts         @ankit1324
+/app/api/                    @ankit1324
+
+# Database migrations are replay-once-in-production; review every one.
+/supabase/                    @ankit1324
+
+# CI, secrets wiring, and branch rules themselves.
+/.github/                     @ankit1324
