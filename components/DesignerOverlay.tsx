@@ -46,15 +46,19 @@ export default function DesignerOverlay({
     onSave,
     onClose,
   });
-  propsRef.current = {
-    plot,
-    neighbors,
-    floors,
-    facing,
-    existingDesign,
-    onSave,
-    onClose,
-  };
+  // Refreshed after every commit, not during render: the message listener below
+  // mounts once and reads propsRef at event time, which is always post-commit.
+  useEffect(() => {
+    propsRef.current = {
+      plot,
+      neighbors,
+      floors,
+      facing,
+      existingDesign,
+      onSave,
+      onClose,
+    };
+  });
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {

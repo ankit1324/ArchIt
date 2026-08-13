@@ -475,8 +475,11 @@ export default function MarketingLanding() {
   const [themeReady, setThemeReady] = useState(false);
   // hero holds a crisp poster still until the film is buffered enough to loop
   // smoothly — first-frame decode jank plays out behind the still, so the
-  // reveal never looks like lag (most visible on the light-theme suite film)
-  const [heroReady, setHeroReady] = useState(false);
+  // reveal never looks like lag (most visible on the light-theme suite film).
+  // Stored as *which* theme's film is buffered rather than a bare boolean, so
+  // toggling the theme brings the still back by derivation — no reset effect.
+  const [readyTheme, setReadyTheme] = useState<Theme | null>(null);
+  const heroReady = readyTheme === theme;
   // mobile-only nav sheet (burger is display:none above 640px)
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDialogElement>(null);
@@ -499,11 +502,13 @@ export default function MarketingLanding() {
 
   const closeMenu = () => setMenuOpen(false);
 
-  // toggling theme remounts the hero with a new film — show its still again
-  useEffect(() => setHeroReady(false), [theme]);
-
+  // Hydration-safe read of the saved theme: localStorage is an external store
+  // that does not exist during SSR, so the first paint has to be the default and
+  // the stored value has to arrive after mount. react-hooks/set-state-in-effect
+  // cannot distinguish that from a derivable value.
   useEffect(() => {
     const saved = localStorage.getItem("mx-theme");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === "light" || saved === "dark") setTheme(saved);
     setThemeReady(true);
   }, []);
@@ -753,7 +758,7 @@ export default function MarketingLanding() {
                   preload="auto"
                   src={heroSrc}
                   poster={heroPoster}
-                  onCanPlayThrough={() => setHeroReady(true)}
+                  onCanPlayThrough={() => setReadyTheme(theme)}
                 />
                 {/* still stays until the film can loop without buffering */}
                 <img
