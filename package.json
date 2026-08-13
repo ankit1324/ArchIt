@@ -13,14 +13,14 @@
     "node": ">=22.18"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.5.16",
-    "@supabase/ssr": "^0.12.0",
+    "@clerk/nextjs": "^7.7.1",
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.110.2",
     "maplibre-gl": "^5.24.0",
-    "next": "16.2.12",
-    "razorpay": "^2.9.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "next": "16.3.0",
+    "razorpay": "^2.9.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "sharp": "^0.35.0"
   },
   "overrides": {
@@ -37,7 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
