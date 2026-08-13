@@ -13,14 +13,32 @@ import type {
 const globalForDb = globalThis as unknown as { __supabase?: SupabaseClient };
 
 // Secret key: server-only, bypasses RLS. Never import this module in client code.
-export const db =
-  globalForDb.__supabase ??
-  createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-    { auth: { persistSession: false } },
-  );
-globalForDb.__supabase = db;
+function connect(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Supabase server env missing: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY",
+    );
+  }
+  return (globalForDb.__supabase ??= createClient(url, key, {
+    auth: { persistSession: false },
+  }));
+}
+
+// Lazy on purpose. `next build` evaluates every route module to collect page
+// data, so a client constructed at import time fails the build on any machine
+// without Supabase secrets (CI). The proxy defers connect() to the first real
+// query, which only happens in a request where the env is present.
+export const db = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = connect();
+    const value = Reflect.get(client, prop);
+    // Bind to the real client, not the proxy, so methods relying on internal
+    // state (including any private fields) see the instance they belong to.
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 // columns safe to expose publicly; `owner` stays paywalled (#3) and
 // `user_id` never leaves the server unprompted
