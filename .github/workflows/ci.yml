@@ -42,5 +42,19 @@ jobs:
       - name: Test
         run: npm test
 
+      # Placeholder values only. next build evaluates route modules to collect
+      # page data, and lib/db.ts + lib/purchases.ts construct their clients at
+      # module scope, so the build needs *syntactically* valid config or it dies
+      # with "supabaseUrl is required". Nothing here authenticates against
+      # anything — no request is made during a build. Real secrets live in Vercel.
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+          SUPABASE_SECRET_KEY: sb_secret_ci_placeholder
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_ci_placeholder
+          RAZORPAY_KEY_ID: rzp_test_ci_placeholder
+          RAZORPAY_KEY_SECRET: ci_placeholder
+          RAZORPAY_WEBHOOK_SECRET: ci_placeholder
