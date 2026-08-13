@@ -43,10 +43,13 @@ jobs:
         run: npm test
 
       # Placeholder values only. next build evaluates route modules to collect
-      # page data, and lib/db.ts + lib/purchases.ts construct their clients at
-      # module scope, so the build needs *syntactically* valid config or it dies
-      # with "supabaseUrl is required". Nothing here authenticates against
-      # anything — no request is made during a build. Real secrets live in Vercel.
+      # page data, so anything constructed at module scope runs during the build:
+      # lib/purchases.ts builds its Razorpay client that way, and Clerk wants a
+      # publishable key it can parse. lib/db.ts no longer needs this — its client
+      # is lazy now — but the Supabase entries stay so a future module-scope
+      # regression fails on its own merits rather than on missing config.
+      # Nothing here authenticates against anything; no request is made during a
+      # build. Real secrets live in Vercel.
       - name: Build
         run: npm run build
         env:

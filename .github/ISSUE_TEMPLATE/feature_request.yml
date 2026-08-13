@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest something ArchIt should be able to do
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface would this land in
+      options:
+        - Find (/find — the 3D map)
+        - Designer (/designer — the house builder)
+        - Landing page (/)
+        - Checkout or payments
+        - Cross-cutting / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: >
+        The situation you hit, not the implementation you have in mind. Why the
+        current behaviour is not enough is the part that decides whether this
+        gets built.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds or alternatives you tried
+      description: Including "nothing works" — that is useful signal.
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to open a pull request for this
+          required: false
