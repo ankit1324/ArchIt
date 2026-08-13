@@ -78,21 +78,20 @@ async function ownershipError(id: string): Promise<Response | null> {
 }
 
 /**
- * The featured boost is a paid feature: only keep `featured: true` when a
- * verified featured_property purchase exists for this user + listing (the
- * client pays with ref = listing id). Anything else is forced to false, so a
- * lister can't flip it for free via the edit form.
+ * The featured boost is a paid feature, so its value is always derived from the
+ * purchases ledger — never from the request body. The client is not consulted
+ * at all: a lister can neither flip it on for free, nor silently flip it *off*
+ * by submitting an edit form that omits it (which previously un-featured a
+ * listing they had already paid ₹250 to boost).
  */
 async function resolveFeatured(
   id: string,
-  userId: string | null,
-  requested: boolean | undefined,
-): Promise<{ ok: boolean; response?: Response }> {
-  if (!requested) return { ok: true };
+  userId: string,
+): Promise<{ ok: true; featured: boolean } | { ok: false; response: Response }> {
   const { count, error } = await db
     .from("purchases")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", userId ?? "")
+    .eq("user_id", userId)
     .eq("purpose", "featured_property")
     .eq("ref", id);
   if (error) {
@@ -102,7 +101,7 @@ async function resolveFeatured(
       response: Response.json({ error: "internal error" }, { status: 500 }),
     };
   }
-  return { ok: Boolean(count) };
+  return { ok: true, featured: Boolean(count) };
 }
 
 export async function PUT(
@@ -124,12 +123,13 @@ export async function PUT(
   ) {
     return Response.json({ error: "invalid photo url" }, { status: 400 });
   }
-  const featured = await resolveFeatured(id, userId, l.featured);
-  if (!featured.ok) return featured.response!;
+  // ownershipError() above already proved userId is the lister
+  const featured = await resolveFeatured(id, userId!);
+  if (!featured.ok) return featured.response;
 
   const { data, error } = await db
     .from("properties")
-    .update({ ...listingToRow(l), featured: Boolean(l.featured) })
+    .update({ ...listingToRow(l), featured: featured.featured })
     .eq("id", id)
     .select(PUBLIC_COLUMNS)
     .maybeSingle();
