@@ -6,6 +6,15 @@ on:
     branches:
       - main
 
+# Least privilege: CI only reads the repo. Nothing here needs write access.
+permissions:
+  contents: read
+
+# A new push supersedes the run it interrupted; don't burn minutes on stale commits.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -13,10 +22,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # .nvmrc keeps CI on the same Node as local dev. The .mjs tests import
+      # .ts modules directly, which needs Node's native type stripping (22.18+).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies

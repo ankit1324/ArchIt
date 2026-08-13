@@ -9,6 +9,9 @@
     "lint": "eslint",
     "test": "node --test tests/*.test.mjs"
   },
+  "engines": {
+    "node": ">=22.18"
+  },
   "dependencies": {
     "@clerk/nextjs": "^7.5.16",
     "@supabase/ssr": "^0.12.0",
