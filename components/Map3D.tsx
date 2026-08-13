@@ -1,19 +1,10 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-// Namespace import: maplibre-gl 6 is pure ESM with named exports and dropped the
-// default export, so `import maplibregl from` no longer resolves.
-import * as maplibregl from "maplibre-gl";
+import maplibregl from "maplibre-gl";
 import type { Listing, Poi } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
-
-// v6 stopped re-exporting StyleSpecification — it now lives in
-// @maplibre/maplibre-gl-style-spec, which is only a transitive dependency here.
-// Deriving both from what Map itself accepts avoids importing a package we do
-// not declare, and stays correct if maplibre widens the option later.
-type MapStyle = NonNullable<maplibregl.MapOptions["style"]>;
-type StyleJSON = Exclude<MapStyle, string>;
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const CENTER: [number, number] = [76.7794, 30.741];
@@ -173,10 +164,10 @@ export default function Map3D({
     const init = async () => {
       // fetch the style ourselves so we can drop the low-zoom shaded-relief
       // raster source: it is invisible at city zoom but delays first paint
-      let style: MapStyle = STYLE_URL;
+      let style: string | maplibregl.StyleSpecification = STYLE_URL;
       try {
         const res = await fetch(STYLE_URL);
-        const json = (await res.json()) as StyleJSON;
+        const json = (await res.json()) as maplibregl.StyleSpecification;
         delete json.sources.ne2_shaded;
         json.layers = json.layers.filter(
           (l) => !("source" in l) || l.source !== "ne2_shaded",
