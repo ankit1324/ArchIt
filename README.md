@@ -28,8 +28,65 @@ installing anything.
 | **Find** | `/find` | 3D map property search — pan, tilt, filter by type, price, beds, area. Listings render as extruded buildings on the basemap. |
 | **Designer** | `/designer` | Browser house builder. Place a plot, stack floors, cut openings, apply materials, save designs to your account. |
 
-Three demo reels live in [`public/demo/`](public/demo) — `find.mp4`, `builder.mp4`,
-`wireframe.mp4`, and `suite.mp4` — or just use the [live app](https://archit.chaudharyankit.in).
+The [live app](https://archit.chaudharyankit.in) is the fastest way to see it. Find
+and Designer sit behind a session, so they return 404 rather than a redirect when you
+are signed out — that is `auth.protect()` declining to leak which routes exist.
+
+## How it fits together
+
+```mermaid
+flowchart TB
+    subgraph browser["Browser"]
+        landing["/ landing"]
+        find["/find<br/>MapLibre GL"]
+        designer["/designer<br/>iframe shell"]
+        builder["public/builder/builder.html<br/>Three.js"]
+        designer -.embeds.-> builder
+    end
+
+    tiles["OpenFreeMap<br/>vector tiles"]
+    find -->|"basemap"| tiles
+
+    gate{"proxy.ts<br/>clerkMiddleware"}
+    landing --> gate
+    find --> gate
+    designer --> gate
+
+    subgraph server["Next.js server routes"]
+        propsApi["/api/properties"]
+        designsApi["/api/designs"]
+        payApi["/api/create-order<br/>/api/verify-payment"]
+        hook["/api/webhooks/razorpay"]
+        upload["/api/upload"]
+    end
+
+    gate -->|"session required"| propsApi
+    gate -->|"session required"| designsApi
+    gate -->|"session required"| payApi
+    gate -->|"session required"| upload
+
+    db["lib/db.ts<br/>lazy client, secret key"]
+    propsApi --> db
+    designsApi --> db
+    payApi --> db
+    hook --> db
+    upload --> db
+
+    subgraph supabase["Supabase"]
+        pg[("Postgres<br/>RLS on, zero policies")]
+        storage[("Storage<br/>photos bucket")]
+    end
+
+    db -->|"bypasses RLS"| pg
+    db --> storage
+
+    rzp["Razorpay"]
+    payApi --> rzp
+    rzp -.->|"signed webhook"| hook
+```
+
+Every arrow into Postgres goes through a server route holding the secret key. There
+is no path from the browser to the database, which is why RLS can stay deny-all.
 
 ## Stack
 
@@ -59,6 +116,37 @@ template_unlock:   9900   // ₹99   — one-time per template
 A tampered request body cannot buy a ₹2000 unlock for ₹1, because the amount is
 never in the body to begin with. Entitlements are derived from the purchase ledger
 rather than trusted from the client — including whether a listing is `featured`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Browser
+    participant O as /api/create-order
+    participant R as Razorpay
+    participant V as /api/verify-payment
+    participant L as purchases ledger
+
+    C->>O: POST purpose + optional ref
+    Note over C,O: no amount is ever sent
+    O->>O: Clerk session, else 401
+    O->>O: rate limit, 5 per minute
+    O->>O: amount looked up in the fee table
+    O->>R: create order, notes carry purpose + userId + ref
+    O-->>C: orderId, amount, keyId
+    C->>R: checkout
+    R-->>C: order_id, payment_id, signature
+    C->>V: POST the three fields
+    V->>V: HMAC-SHA256, timingSafeEqual
+    Note over V: mismatch stops here with 400
+    V->>R: read the order back
+    V->>L: record purchase, server-side only
+    V-->>C: verified
+    L-->>C: later reads derive entitlements
+```
+
+The amount is read from the fee table *after* the session check, and the purchase is
+written only after the signature verifies — so a client can choose what it is buying,
+never what it costs or whether it succeeded.
 
 **Row Level Security is deny-all on purpose.** Every table has RLS enabled and
 zero policies, so the anon and publishable keys can read nothing. All data access
