@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { payFee } from "@/lib/checkout";
+// [PAYWALL DISABLED — free for now] Razorpay checkout not needed while
+// templates are free.
+// import { payFee } from "@/lib/checkout";
 import type { DesignMeta, DesignStateV3 } from "@/lib/types";
 import type { Neighbor } from "@/lib/design";
 
@@ -91,23 +93,30 @@ export default function DesignerOverlay({
       } else if (m.type === "archit:close") {
         if (!m.dirty || window.confirm("Discard unsaved changes?")) p.onClose();
       } else if (m.type === "archit:buy-template") {
-        // Checkout lives here, not in the iframe: the builder is a static file
-        // and must never hold payment logic. On success we only signal the key —
-        // the geometry still comes from the server, which re-checks the ledger.
-        const { key, name } = m.payload;
-        if (buyingRef.current) return; // ignore double-clicks mid-checkout
-        buyingRef.current = true;
-        void payFee("template_unlock", `Template — ${name}`, key)
-          .then((paid) => {
-            if (!paid) return;
-            frame.contentWindow?.postMessage(
-              { type: "archit:template-purchased", payload: { key } },
-              location.origin,
-            );
-          })
-          .finally(() => {
-            buyingRef.current = false;
-          });
+        // [PAYWALL DISABLED — free for now] Templates are free: skip Razorpay
+        // checkout and grant instantly. The builder reloads the catalog, marks the
+        // key owned and loads geometry from the server. Restore the payFee() call
+        // below to re-enable monetization.
+        const { key } = m.payload;
+        frame.contentWindow?.postMessage(
+          { type: "archit:template-purchased", payload: { key } },
+          location.origin,
+        );
+        // --- original checkout flow (restore to re-enable the paywall) ---
+        // const { key, name } = m.payload;
+        // if (buyingRef.current) return; // ignore double-clicks mid-checkout
+        // buyingRef.current = true;
+        // void payFee("template_unlock", `Template — ${name}`, key)
+        //   .then((paid) => {
+        //     if (!paid) return;
+        //     frame.contentWindow?.postMessage(
+        //       { type: "archit:template-purchased", payload: { key } },
+        //       location.origin,
+        //     );
+        //   })
+        //   .finally(() => {
+        //     buyingRef.current = false;
+        //   });
       }
     };
     window.addEventListener("message", onMessage);

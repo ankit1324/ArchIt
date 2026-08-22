@@ -2,7 +2,8 @@ import Link from "next/link";
 import localFont from "next/font/local";
 import Navbar from "@/components/Navbar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
-import { feeLabel } from "@/lib/fees";
+// [PAYWALL DISABLED — free for now]
+// import { feeLabel } from "@/lib/fees";
 
 // Self-hosted rather than next/font/google: a build that has to reach Google
 // Fonts is a build that can fail offline. See assets/fonts/README.md.
@@ -34,7 +35,9 @@ const PRODUCTS = [
     name: "ArchIt Find",
     tagline: "Every home, on a living map",
     body: "Fly over a 3D satellite city, browse real listings, list your own property and reach owners directly.",
-    badge: `Free listing · ${feeLabel("contact_owner")} contact`,
+    // [PAYWALL DISABLED — free for now]
+    // badge: `Free listing · ${feeLabel("contact_owner")} contact`,
+    badge: "Free listing · free contact",
     badgeClass: "bg-magenta text-white",
     cta: "Open the map",
     href: "/find",

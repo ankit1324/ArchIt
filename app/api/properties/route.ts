@@ -34,13 +34,14 @@ export async function POST(request: Request) {
   if (!checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000)) {
     return rateLimitedResponse();
   }
-  // featured is a paid boost: never trust it from the client on create. The row
-  // starts unpaid; PUT flips it to featured only after verifying that a
-  // featured_property purchase exists with ref = this listing's real id
-  // (the client pays with that ref once it knows the id).
+  // [PAYWALL DISABLED — free for now] featuring is a free toggle, so the flag
+  // is trusted from the client body on create. Original paid-boost behaviour
+  // (force false, then flip via PUT only after a verified featured_property
+  // purchase with ref = this listing's id) — restore to re-enable the paywall:
+  // .insert({ ...listingToRow(l), user_id: userId, featured: false })
   const { data, error } = await db
     .from("properties")
-    .insert({ ...listingToRow(l), user_id: userId, featured: false })
+    .insert({ ...listingToRow(l), user_id: userId, featured: l.featured === true })
     .select(PUBLIC_COLUMNS)
     .single();
   if (error) {

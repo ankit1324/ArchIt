@@ -6,15 +6,21 @@ import { safeImageUrl } from "@/lib/url";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 
 /**
- * Public detail, but the owner contact field is paywalled (#3): it is only
- * included for the lister themself or after a verified contact_owner purchase
- * for this listing (same ledger pattern as the featured boost).
+ * Public detail. The owner contact field used to be paywalled (#3): it was
+ * only included for the lister themself or after a verified contact_owner
+ * purchase for this listing.
+ *
+ * [PAYWALL DISABLED — free for now] Everyone gets the owner contact.
+ * Restore the purchase check below to re-enable the paywall (plus the
+ * "Contact owner" button in components/PropertyDetailPanel.tsx).
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
+  // [PAYWALL DISABLED — free for now] session identity only mattered for the
+  // owner-contact gate below
+  // const { userId } = await auth();
   const { id } = await params;
   const { data, error } = await db
     .from("properties")
@@ -27,27 +33,30 @@ export async function GET(
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
 
-  let includeOwner = false;
-  if (userId) {
-    if (data.user_id === userId) {
-      includeOwner = true;
-    } else {
-      const { count, error: purchaseError } = await db
-        .from("purchases")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("purpose", "contact_owner")
-        .eq("ref", id);
-      if (purchaseError) {
-        console.error(`contact purchase check failed for ${id}:`, purchaseError.message);
-        return Response.json({ error: "internal error" }, { status: 500 });
-      }
-      includeOwner = Boolean(count);
-    }
-  }
+  // [PAYWALL DISABLED — free for now] owner contact is included for everyone
+  // (was `let` while the paid gate below could reassign it)
+  const includeOwner = true;
+  // --- original paid gate (restore to re-enable the paywall) ---
+  // if (userId) {
+  //   if (data.user_id === userId) {
+  //     includeOwner = true;
+  //   } else {
+  //     const { count, error: purchaseError } = await db
+  //       .from("purchases")
+  //       .select("*", { count: "exact", head: true })
+  //       .eq("user_id", userId)
+  //       .eq("purpose", "contact_owner")
+  //       .eq("ref", id);
+  //     if (purchaseError) {
+  //       console.error(`contact purchase check failed for ${id}:`, purchaseError.message);
+  //       return Response.json({ error: "internal error" }, { status: 500 });
+  //     }
+  //     includeOwner = Boolean(count);
+  //   }
+  // }
 
   const listing = rowToListing(data);
-  if (!includeOwner) delete listing.owner;
+  if (!includeOwner || !listing.owner) delete listing.owner;
   return Response.json(listing);
 }
 
@@ -77,32 +86,31 @@ async function ownershipError(id: string): Promise<Response | null> {
   return null;
 }
 
-/**
- * The featured boost is a paid feature, so its value is always derived from the
- * purchases ledger — never from the request body. The client is not consulted
- * at all: a lister can neither flip it on for free, nor silently flip it *off*
- * by submitting an edit form that omits it (which previously un-featured a
- * listing they had already paid ₹250 to boost).
+/*
+ * [PAYWALL DISABLED — free for now] Unused while featuring is free (PUT reads
+ * the flag from the request body). Restore this ledger lookup together with
+ * the paywall in app/find/page.tsx and lib/purchases.ts applyEntitlement.
+ *
+ * async function resolveFeatured(
+ *   id: string,
+ *   userId: string,
+ * ): Promise<{ ok: true; featured: boolean } | { ok: false; response: Response }> {
+ *   const { count, error } = await db
+ *     .from("purchases")
+ *     .select("*", { count: "exact", head: true })
+ *     .eq("user_id", userId)
+ *     .eq("purpose", "featured_property")
+ *     .eq("ref", id);
+ *   if (error) {
+ *     console.error(`featured purchase check failed for ${id}:`, error.message);
+ *     return {
+ *       ok: false,
+ *       response: Response.json({ error: "internal error" }, { status: 500 }),
+ *     };
+ *   }
+ *   return { ok: true, featured: Boolean(count) };
+ * }
  */
-async function resolveFeatured(
-  id: string,
-  userId: string,
-): Promise<{ ok: true; featured: boolean } | { ok: false; response: Response }> {
-  const { count, error } = await db
-    .from("purchases")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("purpose", "featured_property")
-    .eq("ref", id);
-  if (error) {
-    console.error(`featured purchase check failed for ${id}:`, error.message);
-    return {
-      ok: false,
-      response: Response.json({ error: "internal error" }, { status: 500 }),
-    };
-  }
-  return { ok: true, featured: Boolean(count) };
-}
 
 export async function PUT(
   request: Request,
@@ -124,12 +132,13 @@ export async function PUT(
     return Response.json({ error: "invalid photo url" }, { status: 400 });
   }
   // ownershipError() above already proved userId is the lister
-  const featured = await resolveFeatured(id, userId!);
-  if (!featured.ok) return featured.response;
+  // [PAYWALL DISABLED — free for now] the featured flag comes straight from the
+  // request body; restore the resolveFeatured() ledger lookup to re-gate it
+  const featured = l.featured === true;
 
   const { data, error } = await db
     .from("properties")
-    .update({ ...listingToRow(l), featured: featured.featured })
+    .update({ ...listingToRow(l), featured })
     .eq("id", id)
     .select(PUBLIC_COLUMNS)
     .maybeSingle();

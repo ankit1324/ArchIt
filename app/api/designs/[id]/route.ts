@@ -4,8 +4,9 @@ import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
 
 // Updates/deletes are owner-only — the user_id filter makes other users' ids a 404.
-// Both also require the paid builder_unlock: ownership alone is not enough,
-// or a free user could mutate designs created while they were subscribed.
+// [PAYWALL DISABLED — free for now] These routes also used to require the paid
+// builder_unlock; the ledger check is commented out so designs are free.
+// Restore the calls to re-enable the paywall.
 
 export async function PUT(
   request: Request,
@@ -13,8 +14,9 @@ export async function PUT(
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const locked = await builderUnlockError(userId);
-  if (locked) return locked;
+  // [PAYWALL DISABLED — free for now]
+  // const locked = await builderUnlockError(userId);
+  // if (locked) return locked;
   const { id } = await params;
   const d = (await request.json()) as Omit<Design, "id">;
   if (
@@ -49,8 +51,9 @@ export async function DELETE(
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const locked = await builderUnlockError(userId);
-  if (locked) return locked;
+  // [PAYWALL DISABLED — free for now]
+  // const locked = await builderUnlockError(userId);
+  // if (locked) return locked;
   const { id } = await params;
   const { count, error } = await db
     .from("designs")

@@ -7,8 +7,12 @@ import { safeImageUrl } from "@/lib/url";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay from "@/components/DesignerOverlay";
 import { CloseIcon } from "@/components/icons";
-import { payFee } from "@/lib/checkout";
+// [PAYWALL DISABLED — free for now]
+// import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
+// [PAYWALL DISABLED — free for now] kept imported on purpose: its only remaining
+// use is inside the preserved-for-restore sales card below (disabled via `if (false)`),
+// and removing the import would break compilation of that untouched JSX.
 import { feeLabel } from "@/lib/fees";
 
 interface Setup {
@@ -305,16 +309,23 @@ export default function DesignerPage() {
   const [setup, setSetup] = useState<Setup | null>(null);
   const [session, setSession] = useState(0); // bump to remount the builder
   const [listOpen, setListOpen] = useState(true);
-  const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
-  const [paying, setPaying] = useState(false);
+  // [PAYWALL DISABLED — free for now] everyone is unlocked while the builder
+  // paywall is off, so the builder renders immediately.
+  // was: const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
+  const [unlocked] = useState<boolean | null>(true);
+  // [PAYWALL DISABLED — free for now]
+  // was: const [paying, setPaying] = useState(false);
+  const [paying] = useState(false);
   const savingRef = useRef(false);
 
+  /* [PAYWALL DISABLED — free for now]
   useEffect(() => {
     fetch("/api/purchases?purpose=builder_unlock")
       .then((r) => (r.ok ? r.json() : { unlocked: false }))
       .then((d: { unlocked?: boolean }) => setUnlocked(!!d.unlocked))
       .catch(() => setUnlocked(false));
   }, []);
+  */
 
   useEffect(() => {
     if (!unlocked) return;
@@ -324,6 +335,7 @@ export default function DesignerPage() {
       .catch(() => {});
   }, [unlocked]);
 
+  /* [PAYWALL DISABLED — free for now]
   const buyUnlock = async () => {
     setPaying(true);
     try {
@@ -335,6 +347,10 @@ export default function DesignerPage() {
       setPaying(false);
     }
   };
+  */
+  // [PAYWALL DISABLED — free for now] no-op stub so the preserved sales card
+  // below still compiles; was: open Razorpay checkout via payFee().
+  const buyUnlock = async () => {};
 
   const current = designs.find((d) => d.id === currentId) ?? null;
 
@@ -425,7 +441,8 @@ export default function DesignerPage() {
     }
   };
 
-  if (unlocked !== true) {
+  if (false) {
+    // [PAYWALL DISABLED — free for now] was: unlocked !== true — sales card kept for easy restore
     return (
       <Backdrop className="relative h-full">
         {unlocked === false && (

@@ -4,14 +4,16 @@ import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
 
 // Designs are private: every query is scoped to the signed-in user.
-// The builder is a paid product (₹2000 builder_unlock) — the ledger check here
-// is the real gate; the paywall in app/designer/page.tsx is only a UI hint.
+// [PAYWALL DISABLED — free for now] The builder used to be a paid product
+// (₹2000 builder_unlock) gated by the ledger check below; it is commented out
+// so the builder is free. Restore the calls to re-enable the paywall.
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const locked = await builderUnlockError(userId);
-  if (locked) return locked;
+  // [PAYWALL DISABLED — free for now]
+  // const locked = await builderUnlockError(userId);
+  // if (locked) return locked;
   const { data, error } = await db
     .from("designs")
     .select("*")
@@ -27,8 +29,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const locked = await builderUnlockError(userId);
-  if (locked) return locked;
+  // [PAYWALL DISABLED — free for now]
+  // const locked = await builderUnlockError(userId);
+  // if (locked) return locked;
   const d = (await request.json()) as Omit<Design, "id">;
   if (
     !d.plotCenter ||
