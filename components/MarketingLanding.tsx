@@ -5,7 +5,8 @@ import Link from "next/link";
 import localFont from "next/font/local";
 import Image from "next/image";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
-import { feeLabel } from "@/lib/fees";
+// [PAYWALL DISABLED — free for now]
+// import { feeLabel } from "@/lib/fees";
 
 // Self-hosted rather than next/font/google: a build that has to reach Google
 // Fonts is a build that can fail offline. See assets/fonts/README.md.
@@ -1062,7 +1063,9 @@ export default function MarketingLanding() {
           <article className="prod" data-reveal="2">
             <div className="prod-top">
               <FindArt />
-              <span className="badge">Free list · {feeLabel("contact_owner")} contact</span>
+              {/* [PAYWALL DISABLED — free for now] */}
+              {/* <span className="badge">Free list · {feeLabel("contact_owner")} contact</span> */}
+              <span className="badge">Free list · free contact</span>
             </div>
             <h3>
               ArchIt Find<small>Buy · rent · sell</small>

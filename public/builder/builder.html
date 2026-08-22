@@ -3543,7 +3543,8 @@ addTemplate('in_bungalow', 'Luxury 5BHK Indian Villa', 'indian', 'Grand hall, ki
 // Paid templates (12 office + 8 other) are deliberately NOT defined here.
 // builder.html is a public static file, so anything inline is free to anyone —
 // their geometry is the product. Metadata comes from /api/templates; geometry
-// from /api/templates/<key>, which 402s unless a template_unlock purchase exists.
+// from /api/templates/<key>, which 402s unless a template_unlock purchase exists
+// (currently disabled — all templates free).
 const PAID_TEMPLATES = new Map(); // key -> {name, cat, desc, owned}
 let templateCatalogLoaded = false;
 
@@ -3552,10 +3553,14 @@ async function loadTemplateCatalog(){
     const res = await fetch('/api/templates', {credentials:'same-origin'});
     if(!res.ok) return false;
     const data = await res.json();
-    const ownedSet = new Set(data.owned || []);
+    // [PAYWALL DISABLED — free for now] Ownership list ignored: every paid
+    // template is marked owned so the picker unlocks all 20.
+    // const ownedSet = new Set(data.owned || []);
     PAID_TEMPLATES.clear();
     (data.templates || []).forEach(t=>{
-      if(t.paid) PAID_TEMPLATES.set(t.key, {name:t.name, cat:t.cat, desc:t.desc, owned:ownedSet.has(t.key)});
+      // [PAYWALL DISABLED — free for now]
+      // if(t.paid) PAID_TEMPLATES.set(t.key, {name:t.name, cat:t.cat, desc:t.desc, owned:ownedSet.has(t.key)});
+      if(t.paid) PAID_TEMPLATES.set(t.key, {name:t.name, cat:t.cat, desc:t.desc, owned:true});
     });
     templateCatalogLoaded = true;
     return true;
@@ -3620,7 +3625,9 @@ function tplCatCount(cat){
 function renderTplModal(){
   return '<div class="tpl-modal"><h3>New project</h3>'+
     '<p class="hint">Start from a layout template or begin with an empty room. '+
-    'Indian house layouts are free; office and speciality layouts are '+TEMPLATE_PRICE+' each, unlocked forever.</p>'+
+    // [PAYWALL DISABLED — free for now]
+    // 'Indian house layouts are free; office and speciality layouts are '+TEMPLATE_PRICE+' each, unlocked forever.'+
+    'All layout templates are free — pick one and start building.</p>'+
     '<div class="tpl-tabs">'+
       '<button type="button" class="tpl-tab'+(activeTplCat==='indian'?' active':'')+'" data-tpl-cat="indian">Indian Houses ('+tplCatCount('indian')+')</button>'+
       '<button type="button" class="tpl-tab'+(activeTplCat==='office'?' active':'')+'" data-tpl-cat="office">Offices ('+tplCatCount('office')+')</button>'+
