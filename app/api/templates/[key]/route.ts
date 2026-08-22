@@ -6,9 +6,15 @@ import { getTemplateGeometry } from "@/lib/template-geometry";
 /**
  * GET /api/templates/[key] → the room geometry for one paid template.
  *
- * This is the paywall. The geometry for paid templates exists only on the server
- * (lib/template-geometry.ts), so an unpaid client cannot obtain it by reading the
- * bundle or builder.html — unlike the free templates, which stay inline.
+ * This used to be the paywall: the geometry for paid templates exists only on
+ * the server (lib/template-geometry.ts), so an unpaid client could not obtain
+ * it by reading the bundle or builder.html — unlike the free templates, which
+ * stay inline.
+ *
+ * [PAYWALL DISABLED — free for now] All templates are free, so the
+ * template_unlock ledger check is commented out and geometry is served to any
+ * signed-in user. To re-enable monetization, restore the block marked below
+ * (and the checkout flow in components/DesignerOverlay.tsx).
  *
  * Free templates are not served here at all: builder.html already has them.
  *
@@ -39,16 +45,17 @@ export async function GET(
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
 
-  const entitlement = await hasPurchase(userId, "template_unlock", key);
-  if (!entitlement.ok) {
-    return Response.json({ error: entitlement.error }, { status: 500 });
-  }
-  if (!entitlement.granted) {
-    return Response.json(
-      { error: "template locked", purpose: "template_unlock", ref: key },
-      { status: 402 },
-    );
-  }
+  // --- original paid gate (restore to re-enable the paywall) ---
+  // const entitlement = await hasPurchase(userId, "template_unlock", key);
+  // if (!entitlement.ok) {
+  //   return Response.json({ error: entitlement.error }, { status: 500 });
+  // }
+  // if (!entitlement.granted) {
+  //   return Response.json(
+  //     { error: "template locked", purpose: "template_unlock", ref: key },
+  //     { status: 402 },
+  //   );
+  // }
 
   const geometry = getTemplateGeometry(key);
   if (!geometry) {

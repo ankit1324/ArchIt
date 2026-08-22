@@ -84,6 +84,13 @@ export default function TermsPage() {
               ArchIt offers the following one-time, paid features, processed
               securely through our payment gateway partner, Razorpay:
             </p>
+            {/* [PAYWALL DISABLED — free for now] This notice is temporary; the
+                paid-feature list below resumes in full if payments are
+                re-enabled. */}
+            <p className="mt-3">
+              Payments are temporarily disabled — all features listed below are
+              currently provided free of charge.
+            </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
                 <strong className="text-plum">Contact Unlock</strong> — ₹
