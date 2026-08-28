@@ -532,9 +532,9 @@ type Theme = "dark" | "light";
 
 export default function MarketingLanding() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
   // hero video mounts only once the saved theme is known, so a returning
-  // dark-theme visitor never downloads the light film first
+  // light-theme visitor never downloads the dark film first
   const [themeReady, setThemeReady] = useState(false);
   // hero holds a crisp poster still until the film is buffered enough to loop
   // smoothly — first-frame decode jank plays out behind the still, so the
