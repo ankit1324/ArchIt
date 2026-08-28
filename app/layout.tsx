@@ -1,4 +1,5 @@
 import {ClerkProvider} from "@clerk/nextjs";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import CelebrationLayer from "@/components/Celebration";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
@@ -32,6 +33,10 @@ export default function RootLayout({
           {children}
           <CelebrationLayer />
         </ClerkProvider>
+        {/* Outside ClerkProvider: it needs no auth context, and it reports Web
+            Vitals for signed-out landing traffic too. Its script and beacon are
+            same-origin under /_vercel, so the CSP needs no new allowance. */}
+        <SpeedInsights />
       </body>
     </html>
   );
