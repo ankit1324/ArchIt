@@ -5,9 +5,12 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
-import { payFee } from "@/lib/checkout";
-import { celebrate } from "@/components/Celebration";
-import { feeLabel } from "@/lib/fees";
+// [PAYWALL DISABLED — free for now]
+// import { payFee } from "@/lib/checkout";
+// [PAYWALL DISABLED — free for now] celebrate was only used inside unlockOwner() below
+// import { celebrate } from "@/components/Celebration";
+// [PAYWALL DISABLED — free for now]
+// import { feeLabel } from "@/lib/fees";
 import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
@@ -50,12 +53,14 @@ export default function PropertyDetailPanel({
   // only the lister manages a property
   const { userId } = useAuth();
   const canManage = !!userId && listing.userId === userId;
-  // owner contact is paywalled; a paid unlock persists per listing in the
+  // [PAYWALL DISABLED — free for now] owner contact is free, no unlock gate.
+  // was: owner contact is paywalled; a paid unlock persists per listing in the
   // purchases ledger, so it survives reloads and sessions
-  const [unlockedId, setUnlockedId] = useState<string | null>(null);
-  const [unlocking, setUnlocking] = useState(false);
-  const ownerUnlocked = unlockedId === listing.id;
+  // const [unlockedId, setUnlockedId] = useState<string | null>(null);
+  // const [unlocking, setUnlocking] = useState(false);
+  // const ownerUnlocked = unlockedId === listing.id;
 
+  /* [PAYWALL DISABLED — free for now]
   useEffect(() => {
     let stale = false;
     fetch(`/api/purchases?purpose=contact_owner&ref=${listing.id}`)
@@ -68,6 +73,7 @@ export default function PropertyDetailPanel({
       stale = true;
     };
   }, [listing.id]);
+  */
 
   // the public list drops the paywalled `owner` field — refetch the gated
   // detail route when the lister or a paying viewer opens this panel
@@ -86,8 +92,9 @@ export default function PropertyDetailPanel({
     // ponytail: refetches only on unlock change; a manual refresh button is
     // the upgrade when staleness matters
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listing.id, userId, ownerUnlocked]);
+  }, [listing.id, userId]);
 
+  /* [PAYWALL DISABLED — free for now]
   const unlockOwner = async () => {
     if (unlocking) return;
     setUnlocking(true);
@@ -100,6 +107,7 @@ export default function PropertyDetailPanel({
       setUnlocking(false);
     }
   };
+  */
   return (
     <section className="glass no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-3xl p-4">
       <header className="flex items-start justify-between gap-2">
@@ -151,7 +159,8 @@ export default function PropertyDetailPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        {listing.owner && ownerUnlocked && (
+        {/* [PAYWALL DISABLED — free for now] was: {listing.owner && ownerUnlocked && ( */}
+        {listing.owner && (
           <Fact label="Owner" value={listing.owner} />
         )}
         <Fact label="Type" value={listing.kind} />
@@ -166,6 +175,7 @@ export default function PropertyDetailPanel({
         />
       </div>
 
+      {/* [PAYWALL DISABLED — free for now]
       {listing.owner && !ownerUnlocked && (
         <button
           onClick={unlockOwner}
@@ -177,6 +187,7 @@ export default function PropertyDetailPanel({
             : `Contact owner · ${feeLabel("contact_owner")}`}
         </button>
       )}
+      */}
 
       {canManage && (
       <div className="mt-1 flex gap-2">

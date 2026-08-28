@@ -14,7 +14,8 @@ import PropertyDetailPanel from "@/components/PropertyDetailPanel";
 import AddPropertyForm, {
   type PropertyDraft,
 } from "@/components/AddPropertyForm";
-import { payFee } from "@/lib/checkout";
+// [PAYWALL DISABLED — free for now]
+// import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
@@ -243,23 +244,26 @@ export default function Home() {
       }
       const saved = (await res.json()) as Listing;
 
+      // [PAYWALL DISABLED — free for now] featuring a listing is free; the
+      // server persists `featured` straight from the POST/PUT request body,
+      // so no Razorpay checkout or follow-up flip is needed.
       // Featured boost is a paid add-on; the server only persists it after
       // verifying a purchase tied to this listing's id (see properties/[id]).
-      if (!editing && d.featured && !saved.featured) {
-        const paid = await payFee(
-          "featured_property",
-          "Featured listing boost",
-          saved.id,
-        );
-        if (paid) {
-          const flip = await fetch(`/api/properties/${saved.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...saved, featured: true }),
-          });
-          if (flip.ok) Object.assign(saved, await flip.json());
-        }
-      }
+      // if (!editing && d.featured && !saved.featured) {
+      //   const paid = await payFee(
+      //     "featured_property",
+      //     "Featured listing boost",
+      //     saved.id,
+      //   );
+      //   if (paid) {
+      //     const flip = await fetch(`/api/properties/${saved.id}`, {
+      //       method: "PUT",
+      //       headers: { "Content-Type": "application/json" },
+      //       body: JSON.stringify({ ...saved, featured: true }),
+      //     });
+      //     if (flip.ok) Object.assign(saved, await flip.json());
+      //   }
+      // }
 
       setListings((prev) =>
         editing
