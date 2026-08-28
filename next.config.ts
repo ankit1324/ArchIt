@@ -25,6 +25,15 @@ const TILES = [
 ];
 const NOMINATIM = "https://nominatim.openstreetmap.org"; // app/find/page.tsx geocoding
 const JSDELIVR = "https://cdn.jsdelivr.net"; // three.js ESM importmap in public/builder/builder.html
+// <SpeedInsights /> in app/layout.tsx. On Vercel the script is proxied same-origin
+// from /_vercel/speed-insights/script.js, but off-platform (and in dev) it loads
+// from va.vercel-scripts.com and beacons to vitals.vercel-insights.com. Both are
+// listed so the component works in every environment — without these the script is
+// silently blocked and no metrics are ever reported.
+const VERCEL_INSIGHTS = [
+  "https://va.vercel-scripts.com",
+  "https://vitals.vercel-insights.com",
+];
 
 // NOTE: script-src uses 'unsafe-inline' because Next.js injects inline bootstrap
 // scripts (and public/builder/builder.html ships an inline importmap). Upgrading
@@ -41,15 +50,15 @@ const csp = [
   `frame-ancestors 'self'`,
   `form-action 'self'`,
   // 'unsafe-eval' is only needed in dev (React uses eval for error overlays/HMR).
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${[...RAZORPAY, ...CLERK, "https://challenges.cloudflare.com", JSDELIVR].join(" ")}`,
-  `script-src-elem 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${[...RAZORPAY, ...CLERK, "https://challenges.cloudflare.com", JSDELIVR].join(" ")}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${[...RAZORPAY, ...CLERK, "https://challenges.cloudflare.com", JSDELIVR, ...VERCEL_INSIGHTS].join(" ")}`,
+  `script-src-elem 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${[...RAZORPAY, ...CLERK, "https://challenges.cloudflare.com", JSDELIVR, ...VERCEL_INSIGHTS].join(" ")}`,
   // Tailwind and maplibre-gl both inject <style> tags at runtime.
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
   `font-src 'self' data: https://fonts.gstatic.com`,
   // blob:/data: cover maplibre's canvas + WebGL textures and builder screenshots.
   `img-src 'self' data: blob: https://images.unsplash.com ${SUPABASE} ${TILES.join(" ")} https://img.clerk.com ${RAZORPAY.join(" ")}`,
   `media-src 'self' blob:`,
-  `connect-src 'self'${isDev ? " ws://localhost:* http://localhost:*" : ""} ${SUPABASE} ${SUPABASE_WS} ${[...CLERK, ...CLERK_EXTRA, ...RAZORPAY, "https://lumberjack.razorpay.com", ...TILES, NOMINATIM, JSDELIVR].join(" ")}`,
+  `connect-src 'self'${isDev ? " ws://localhost:* http://localhost:*" : ""} ${SUPABASE} ${SUPABASE_WS} ${[...CLERK, ...CLERK_EXTRA, ...RAZORPAY, "https://lumberjack.razorpay.com", ...TILES, NOMINATIM, JSDELIVR, ...VERCEL_INSIGHTS].join(" ")}`,
   // Razorpay checkout renders in an iframe; Clerk uses one for its handshake and
   // Cloudflare Turnstile for bot protection.
   `frame-src 'self' ${[...RAZORPAY, ...CLERK, "https://challenges.cloudflare.com"].join(" ")}`,
@@ -89,6 +98,10 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    // Default is WebP only. AVIF first lets the hero still (the LCP candidate,
+    // rendered through next/image) land noticeably smaller on browsers that
+    // negotiate it; WebP stays as the fallback, JPEG for anything older.
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       {
