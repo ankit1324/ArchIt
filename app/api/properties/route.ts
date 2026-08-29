@@ -1,20 +1,24 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, rowToListing, PUBLIC_COLUMNS } from "@/lib/db";
+import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
 import type { Listing } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 
-// owner contact is paywalled (#3): the public list never includes it
+// owner contact is paywalled (#3): the public list never includes it, and the
+// raw lister user_id is dropped — each row carries a server-computed `mine`.
 export async function GET() {
+  const { userId } = await auth();
   const { data, error } = await db
     .from("properties")
-    .select(PUBLIC_COLUMNS)
+    .select(OWNED_COLUMNS)
     .order("created_at");
   if (error) {
     console.error("GET /api/properties failed:", error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
-  return Response.json(data.map(rowToListing));
+  return Response.json(
+    data.map((r) => ({ ...rowToListing(r), mine: ownsRow(r, userId) })),
+  );
 }
 
 export async function POST(request: Request) {
@@ -31,7 +35,7 @@ export async function POST(request: Request) {
   // lister recorded from the session, never from the client body
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  if (!checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000)) {
+  if (!(await checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000))) {
     return rateLimitedResponse();
   }
   // [PAYWALL DISABLED — free for now] featuring is a free toggle, so the flag
@@ -42,16 +46,16 @@ export async function POST(request: Request) {
   const { data, error } = await db
     .from("properties")
     .insert({ ...listingToRow(l), user_id: userId, featured: l.featured === true })
-    .select(PUBLIC_COLUMNS)
+    .select(OWNED_COLUMNS)
     .single();
   if (error) {
     console.error("POST /api/properties failed:", error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   // the lister just typed the owner field — echo it back so the UI keeps it
-  // without a paid lookup
+  // without a paid lookup; they own the row they just created
   return Response.json(
-    { ...rowToListing(data), owner: l.owner ?? undefined },
+    { ...rowToListing(data), owner: l.owner ?? undefined, mine: true },
     { status: 201 },
   );
 }

@@ -28,8 +28,12 @@ export interface Listing {
   /** up to 5 photos, Supabase Storage public URLs */
   photos?: string[];
   kind: PropertyKind;
-  /** Clerk id of the lister; only they may edit/delete. Absent on legacy rows. */
-  userId?: string;
+  /**
+   * True when the current session user is the lister (server-computed).
+   * Only the lister may edit/delete. The raw Clerk id is never sent to the
+   * client — the server compares it and returns this flag instead.
+   */
+  mine?: boolean;
   /** true when the lister paid the ₹250 featured-listing fee */
   featured?: boolean;
 }

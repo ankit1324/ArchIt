@@ -2,6 +2,7 @@ import {ClerkProvider} from "@clerk/nextjs";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CelebrationLayer from "@/components/Celebration";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -21,15 +22,19 @@ export const metadata: Metadata = {
     "Find homes on a living 3D map of Chandigarh — buy, rent, explore neighborhoods in three dimensions.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The nonce is minted per request in proxy.ts. Reading it here also opts every
+  // page into dynamic rendering, which a per-request nonce requires. Clerk needs
+  // it so its injected scripts satisfy the nonce-based CSP (no 'unsafe-inline').
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="h-full">
-        <ClerkProvider>
+        <ClerkProvider nonce={nonce}>
           {children}
           <CelebrationLayer />
         </ClerkProvider>
