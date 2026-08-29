@@ -9,8 +9,18 @@ export async function POST(request: Request) {
   if (!userId) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!checkRateLimit(ipKey(request, "upload", userId), 10, 60_000)) {
+  if (!(await checkRateLimit(ipKey(request, "upload", userId), 10, 60_000))) {
     return rateLimitedResponse();
+  }
+
+  // Reject oversized bodies before request.formData() buffers the whole payload
+  // into memory. Content-Length includes multipart boundaries/headers, so allow
+  // a little headroom over MAX_UPLOAD_BYTES; the exact file.size check below is
+  // still the authoritative guard. This only stops the pathological case (a
+  // several-hundred-MB body that would otherwise be materialized in full).
+  const declaredBytes = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_UPLOAD_BYTES + 64 * 1024) {
+    return Response.json({ error: "max 8 MB" }, { status: 413 });
   }
 
   const form = await request.formData();

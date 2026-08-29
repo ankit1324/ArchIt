@@ -43,7 +43,12 @@ export const db = new Proxy({} as SupabaseClient, {
 // columns safe to expose publicly; `owner` stays paywalled (#3) and
 // `user_id` never leaves the server unprompted
 export const PUBLIC_COLUMNS =
-  "id, building_name, address, city, price, type, kind, beds, baths, sqft, rooms, area_m, floors, lng, lat, photo, photos, user_id, featured";
+  "id, building_name, address, city, price, type, kind, beds, baths, sqft, rooms, area_m, floors, lng, lat, photo, photos, featured";
+
+// Same set plus user_id, for selects that need to derive ownership server-side.
+// user_id is used to compute the `mine` flag and is stripped before the row is
+// returned — it must never appear in a response body (rowToListing drops it).
+export const OWNED_COLUMNS = `${PUBLIC_COLUMNS}, user_id`;
 
 export type PublicPropertyRow = Omit<PropertyRow, "owner">;
 
@@ -159,7 +164,16 @@ export function rowToListing(r: PublicPropertyRow): Listing {
     coords: [r.lng, r.lat],
     photo: r.photos?.[0] ?? r.photo ?? undefined,
     photos: r.photos?.length ? r.photos : r.photo ? [r.photo] : [],
-    userId: r.user_id ?? undefined,
+    // `mine` is stamped by the route from the session; the raw user_id is never
+    // returned to the client (see OWNED_COLUMNS).
     featured: r.featured ?? false,
   };
+}
+
+/** True when `row` belongs to the given session user. Server-side only. */
+export function ownsRow(
+  row: { user_id?: string | null },
+  userId: string | null | undefined,
+): boolean {
+  return !!userId && row.user_id === userId;
 }

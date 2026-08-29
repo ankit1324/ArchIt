@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const amount = FEES[purpose]; // paise, fixed server-side (min 100 enforced by fee table)
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  if (!checkRateLimit(ipKey(request, "create-order", userId), 5, 60_000)) {
+  if (!(await checkRateLimit(ipKey(request, "create-order", userId), 5, 60_000))) {
     return rateLimitedResponse();
   }
   try {

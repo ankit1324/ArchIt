@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, rowToListing, PUBLIC_COLUMNS } from "@/lib/db";
+import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
 import type { Listing } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
@@ -18,13 +18,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // [PAYWALL DISABLED — free for now] session identity only mattered for the
-  // owner-contact gate below
-  // const { userId } = await auth();
+  // session identity drives the `mine` flag (and, when restored, the
+  // owner-contact paid gate below)
+  const { userId } = await auth();
   const { id } = await params;
+  // explicit column list (never select("*")): keeps `owner` under the gate
+  // below and derives `mine` from user_id without ever returning it raw
   const { data, error } = await db
     .from("properties")
-    .select("*")
+    .select(`${OWNED_COLUMNS}, owner`)
     .eq("id", id)
     .maybeSingle<PropertyRow>();
   if (error) {
@@ -56,6 +58,7 @@ export async function GET(
   // }
 
   const listing = rowToListing(data);
+  listing.mine = ownsRow(data, userId);
   if (!includeOwner || !listing.owner) delete listing.owner;
   return Response.json(listing);
 }
@@ -121,7 +124,7 @@ export async function PUT(
   if (denied) return denied;
 
   const { userId } = await auth();
-  if (!checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000)) {
+  if (!(await checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000))) {
     return rateLimitedResponse();
   }
   const l = (await request.json()) as Omit<Listing, "id">;
@@ -140,15 +143,15 @@ export async function PUT(
     .from("properties")
     .update({ ...listingToRow(l), featured })
     .eq("id", id)
-    .select(PUBLIC_COLUMNS)
+    .select(OWNED_COLUMNS)
     .maybeSingle();
   if (error) {
     console.error(`PUT /api/properties/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
-  // the lister may see their own owner field
-  return Response.json({ ...rowToListing(data), owner: l.owner ?? undefined });
+  // ownershipError() above already proved the caller is the lister
+  return Response.json({ ...rowToListing(data), owner: l.owner ?? undefined, mine: true });
 }
 
 export async function DELETE(

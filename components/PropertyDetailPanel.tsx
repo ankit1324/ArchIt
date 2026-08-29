@@ -50,9 +50,10 @@ export default function PropertyDetailPanel({
     setListingRaw(propListing);
   }
   const sale = listing.type === "sale";
-  // only the lister manages a property
+  // only the lister manages a property; the server tells us via `mine`
+  // (the raw lister id is never sent to the client)
   const { userId } = useAuth();
-  const canManage = !!userId && listing.userId === userId;
+  const canManage = !!listing.mine;
   // [PAYWALL DISABLED — free for now] owner contact is free, no unlock gate.
   // was: owner contact is paywalled; a paid unlock persists per listing in the
   // purchases ledger, so it survives reloads and sessions
