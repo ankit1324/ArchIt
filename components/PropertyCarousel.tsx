@@ -7,17 +7,28 @@ export default function PropertyCarousel({
   listings,
   onSelect,
   hasAny = true,
+  status = "ready",
+  selectedId,
+  onReset,
+  onRetry,
 }: {
   listings: Listing[];
   onSelect: (id: string) => void;
   hasAny?: boolean;
+  status?: "loading" | "ready" | "error";
+  selectedId?: string | null;
+  onReset?: () => void;
+  onRetry?: () => void;
 }) {
+  if (status === "loading") return <div role="status" className="rounded-2xl bg-cream/95 p-6 text-sm font-semibold text-plum">Loading properties…</div>;
+  if (status === "error") return <div role="alert" className="pointer-events-auto rounded-2xl bg-cream/95 p-5 text-sm text-plum"><p className="font-bold">Properties couldn’t be loaded.</p><p className="mt-1 text-xs">Check your connection and try again.</p><button onClick={onRetry} className="mt-3 rounded-full bg-plum px-4 py-2 text-xs font-bold text-cream">Try again</button></div>;
   if (listings.length === 0) {
     return (
-      <div className="glass pointer-events-auto rounded-2xl px-5 py-4 text-[13px] font-semibold text-plum">
+      <div role="status" className="bg-cream/95 pointer-events-auto rounded-2xl px-5 py-4 text-[13px] font-semibold text-plum">
         {hasAny
-          ? "No homes match these filters — try widening the price range."
+          ? "No properties match your search."
           : "No properties yet — press “+ Add property”, then click a spot on the map."}
+        {hasAny && <div className="mt-2"><p className="mb-3 text-xs font-normal text-plum-soft">Try another location or clear your filters to explore more places.</p><button onClick={onReset} className="rounded-full bg-plum px-4 py-2 text-xs text-cream">Clear search & filters</button></div>}
       </div>
     );
   }
@@ -26,7 +37,7 @@ export default function PropertyCarousel({
        only the cards are interactive */
     <div className="no-scrollbar pointer-events-none flex snap-x gap-3 overflow-x-auto pb-1">
       {listings.map((l) => (
-        <PropertyCard key={l.id} listing={l} onClick={() => onSelect(l.id)} />
+        <PropertyCard key={l.id} listing={l} selected={selectedId === l.id} onClick={() => onSelect(l.id)} />
       ))}
     </div>
   );

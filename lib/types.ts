@@ -46,6 +46,7 @@ export interface Poi {
 }
 
 export interface Filters {
+  type: ListingType | null;
   kind: PropertyKind | null;
   price: [number, number];
   rooms: number | null; // 5 means 5+

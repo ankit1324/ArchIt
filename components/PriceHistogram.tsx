@@ -5,21 +5,21 @@ import type { Listing } from "@/lib/types";
 import { PRICE_DOMAIN } from "@/lib/listings";
 
 const BUCKETS = 26;
-const LOG_MIN = Math.log10(PRICE_DOMAIN[0]);
-const LOG_MAX = Math.log10(PRICE_DOMAIN[1]);
 
-/** slider position 0..100 <-> price, on a log scale (prices span $5k rent to $1.5M sale) */
-export function posToPrice(pos: number): number {
-  return Math.round(10 ** (LOG_MIN + (pos / 100) * (LOG_MAX - LOG_MIN)));
+/** Slider position 0..100 <-> rupee price, on a log scale. */
+export function posToPrice(pos: number, domain = PRICE_DOMAIN): number {
+  return Math.round(10 ** (Math.log10(domain[0]) + (pos / 100) * (Math.log10(domain[1]) - Math.log10(domain[0]))));
 }
-export function priceToPos(price: number): number {
-  return ((Math.log10(price) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * 100;
+export function priceToPos(price: number, domain = PRICE_DOMAIN): number {
+  if (price <= 0) return 0;
+  return Math.max(0, Math.min(100, ((Math.log10(price) - Math.log10(domain[0])) / (Math.log10(domain[1]) - Math.log10(domain[0]))) * 100));
 }
 
 function compact(n: number): string {
-  if (n >= 1_000_000) return `₹${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
-  if (n >= 1_000) return `₹${Math.round(n / 1_000).toLocaleString()},000`;
-  return `₹${n}`;
+  if (!Number.isFinite(n)) return "Any";
+  if (n >= 10_000_000) return `₹${Number((n / 10_000_000).toFixed(1))} Cr`;
+  if (n >= 100_000) return `₹${Number((n / 100_000).toFixed(1))} L`;
+  return `₹${n.toLocaleString("en-IN")}`;
 }
 
 interface PriceHistogramProps {
@@ -33,31 +33,31 @@ export default function PriceHistogram({
   value,
   onChange,
 }: PriceHistogramProps) {
+  const domain = useMemo<[number, number]>(() => {
+    const prices = listings.map((l) => l.price).filter((price) => price > 0);
+    return [Math.min(PRICE_DOMAIN[0], ...prices), Math.max(PRICE_DOMAIN[1], ...prices)];
+  }, [listings]);
   const bars = useMemo(() => {
     const counts = new Array(BUCKETS).fill(0);
     listings.forEach((l) => {
       const i = Math.min(
         BUCKETS - 1,
-        Math.max(0, Math.floor((priceToPos(l.price) / 100) * BUCKETS)),
+        Math.max(0, Math.floor((priceToPos(l.price, domain) / 100) * BUCKETS)),
       );
       counts[i] += 1;
     });
     const max = Math.max(1, ...counts);
-    // organic skyline: real counts + a soft pseudo-random floor
-    return counts.map((c, i) => {
-      const noise = 0.22 + 0.28 * Math.abs(Math.sin(i * 2.7 + 1.3));
-      return Math.max(noise, c / max);
-    });
-  }, [listings]);
+    return counts.map((c) => c / max);
+  }, [listings, domain]);
 
   const [lo, hi] = value;
-  const loPos = priceToPos(lo);
-  const hiPos = priceToPos(hi);
+  const loPos = priceToPos(lo, domain);
+  const hiPos = priceToPos(hi, domain);
 
   const setLo = (pos: number) =>
-    onChange([Math.min(posToPrice(pos), hi), hi]);
+    onChange([Math.min(pos === 0 ? 0 : posToPrice(pos, domain), hi), hi]);
   const setHi = (pos: number) =>
-    onChange([lo, Math.max(posToPrice(pos), lo)]);
+    onChange([lo, Math.max(pos === 100 ? Infinity : posToPrice(pos, domain), lo)]);
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -79,7 +79,7 @@ export default function PriceHistogram({
       </div>
 
       <div className="text-center text-[15px] font-bold text-plum">
-        {compact(lo)}-{compact(hi).replace("₹", "")}
+        {lo === 0 && !Number.isFinite(hi) ? "Any price" : `${compact(lo)} – ${Number.isFinite(hi) ? compact(hi) : "No limit"}`}
       </div>
 
       {/* dual-thumb slider */}
@@ -98,6 +98,7 @@ export default function PriceHistogram({
           onChange={(e) => setLo(Number(e.target.value))}
           className="range-input"
           aria-label="Minimum price"
+          aria-valuetext={lo === 0 ? "No minimum" : compact(lo)}
         />
         <input
           type="range"
@@ -108,6 +109,7 @@ export default function PriceHistogram({
           onChange={(e) => setHi(Number(e.target.value))}
           className="range-input"
           aria-label="Maximum price"
+          aria-valuetext={Number.isFinite(hi) ? compact(hi) : "No maximum"}
         />
       </div>
     </div>

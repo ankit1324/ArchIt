@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import type { Filters, Listing } from "@/lib/types";
-import { POIS, PRICE_DOMAIN } from "@/lib/listings";
+import { POIS } from "@/lib/listings";
+import { DEFAULT_FILTERS, countFilters, findListings, type ListingSort } from "@/lib/find";
+import styles from "./find.module.css";
 import Navbar from "@/components/Navbar";
 import FilterSidebar from "@/components/FilterSidebar";
 import SearchBar from "@/components/SearchBar";
@@ -20,19 +22,16 @@ import { celebrate } from "@/components/Celebration";
 
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
-const DEFAULT_FILTERS: Filters = {
-  kind: null,
-  price: PRICE_DOMAIN,
-  rooms: null,
-  areaFrom: 40,
-  areaTo: 60,
-  floorArea: null,
-};
-
 type AddStage = "idle" | "picking" | "form";
 
 export default function Home() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<ListingSort>("recommended");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const activeFilters = countFilters(filters);
   const [is3D, setIs3D] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,56 +47,72 @@ export default function Home() {
   const mapRef = useRef<MapLibreMap | null>(null);
 
   useEffect(() => {
-    fetch("/api/properties")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Listing[]) => setListings(data))
-      .catch(() => {});
-  }, []);
+    const controller = new AbortController();
+    fetch("/api/properties", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load properties");
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error("Invalid properties response");
+        if (!controller.signal.aborted) {
+          setListings(data);
+          setLoadState("ready");
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setLoadState("error");
+      });
+    return () => controller.abort();
+  }, [loadAttempt]);
 
   const filtered = useMemo(
-    () =>
-      listings.filter((l) => {
-        if (filters.kind && l.kind !== filters.kind) return false;
-        if (l.price < filters.price[0] || l.price > filters.price[1]) return false;
-        if (filters.rooms !== null) {
-          if (filters.rooms === 5 ? l.rooms < 5 : l.rooms !== filters.rooms)
-            return false;
-        }
-        if (l.areaM < filters.areaFrom || l.areaM > filters.areaTo) return false;
-        if (filters.floorArea === "less5" && l.floors > 5) return false;
-        if (filters.floorArea === "6-10" && (l.floors < 6 || l.floors > 10))
-          return false;
-        if (filters.floorArea === "more10" && l.floors <= 10) return false;
-        return true;
-      }),
-    [filters, listings],
+    () => findListings(listings, filters, query, sort),
+    [filters, listings, query, sort],
   );
 
-  const selected = listings.find((l) => l.id === selectedId) ?? null;
+  const resetSearch = () => {
+    setFilters(DEFAULT_FILTERS);
+    setQuery("");
+  };
+
+  const showResults = () => {
+    const map = mapRef.current;
+    if (!map || !filtered.length) return;
+    const height = map.getContainer().clientHeight;
+    const lngs = filtered.map((l) => l.coords[0]);
+    const lats = filtered.map((l) => l.coords[1]);
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { padding: { top: Math.min(140, height * 0.2), bottom: Math.min(260, height * 0.4), left: window.innerWidth >= 1024 ? 300 : 40, right: 60 }, maxZoom: 16, duration: 1000 },
+    );
+  };
+
+  const selected = filtered.find((l) => l.id === selectedId) ?? null;
   const editing = listings.find((l) => l.id === editingId) ?? null;
 
   const flyToListing = (id: string) => {
     const l = listings.find((x) => x.id === id);
     if (!l) return;
+    setFiltersOpen(false);
     setSelectedId(id);
     mapRef.current?.flyTo({ center: l.coords, zoom: 16.4, duration: 1600 });
   };
 
-  const searchPlace = async (query: string): Promise<boolean> => {
+  const searchPlace = async (query: string, signal: AbortSignal): Promise<boolean> => {
     const map = mapRef.current;
-    if (!map) return false;
+    if (!map) throw new Error("Map is still loading");
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&limit=1`,
+        { signal },
       );
-      if (!res.ok) return false;
+      if (!res.ok) throw new Error("Place search unavailable");
       const results = (await res.json()) as Array<{
         lat: string;
         lon: string;
         boundingbox: [string, string, string, string];
       }>;
       const hit = results[0];
-      if (!hit) return false;
+      if (!hit || signal.aborted) return false;
 
       // fit the result's bounding box, but keep the 3D perspective
       const [s, n, w, e] = hit.boundingbox.map(Number);
@@ -113,11 +128,12 @@ export default function Home() {
         zoom: Math.min(cam?.zoom ?? 13, 16),
         pitch: is3D ? 58 : 0,
         duration: 3000,
-        essential: true,
+        essential: false,
       });
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (signal.aborted) return false;
+      throw error;
     }
   };
 
@@ -270,16 +286,7 @@ export default function Home() {
           ? prev.map((l) => (l.id === saved.id ? saved : l))
           : [...prev, saved],
       );
-      // widen filters so the saved property is never hidden by defaults
-      setFilters({
-        ...DEFAULT_FILTERS,
-        price: [
-          Math.min(PRICE_DOMAIN[0], d.price),
-          Math.max(PRICE_DOMAIN[1], d.price),
-        ],
-        areaFrom: Math.min(DEFAULT_FILTERS.areaFrom, d.areaM),
-        areaTo: Math.max(DEFAULT_FILTERS.areaTo, d.areaM),
-      });
+      resetSearch();
       cancelAdd();
       setSelectedId(saved.id);
       mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
@@ -316,7 +323,7 @@ export default function Home() {
     <div className="flex h-full flex-col bg-cream">
       <Navbar />
 
-      <main className="relative mx-3 mb-3 flex-1 overflow-hidden rounded-[22px] bg-cream-soft">
+      <main className={`${styles.canvas} relative mx-2 mb-2 min-h-0 flex-1 overflow-hidden rounded-[22px] bg-cream-soft sm:mx-3 sm:mb-3`}>
         <Map3D
           listings={filtered}
           pois={POIS}
@@ -329,19 +336,26 @@ export default function Home() {
 
         {/* overlay chrome */}
         <div className="pointer-events-none absolute inset-0 z-10 p-3.5">
-          <div className="absolute bottom-3.5 left-3.5 top-3.5">
+          <div id="find-filters" onKeyDown={(event) => { if (event.key === "Escape") setFiltersOpen(false); }} className={`${styles.filters} ${filtersOpen ? styles.filtersOpen : ""}`}>
+            <div className={styles.filterHeading}><div><span className={styles.eyebrow}>MAKE IT YOURS</span><h1>Find a property</h1></div><button onClick={() => setFiltersOpen(false)} className={styles.closeFilters} aria-label="Close filters">✕</button></div>
             <FilterSidebar
               filters={filters}
               onChange={setFilters}
-              allListings={listings}
+              allListings={filters.type ? listings.filter((l) => l.type === filters.type) : listings}
+              onReset={resetSearch}
+              activeCount={activeFilters}
             />
           </div>
 
-          <div className="pointer-events-auto absolute right-3.5 top-3.5 flex items-center gap-2.5">
+          <div className={styles.toolbar}>
+            <SearchBar value={query} onChange={setQuery} onSearch={searchPlace} onShowResults={showResults} resultCount={filtered.length} />
+            <button className={styles.filterToggle} aria-expanded={filtersOpen} aria-controls="find-filters" onClick={() => setFiltersOpen(!filtersOpen)}>Filters{activeFilters ? ` (${activeFilters})` : ""}</button>
             <button
-              onClick={() =>
-                addStage === "idle" ? setAddStage("picking") : cancelAdd()
-              }
+              onClick={() => {
+                setFiltersOpen(false);
+                if (addStage === "idle") setAddStage("picking");
+                else cancelAdd();
+              }}
               className={`glass rounded-full px-4 py-2.5 text-[13px] font-bold transition-colors ${
                 addStage === "idle"
                   ? "text-plum hover:bg-white/70"
@@ -350,16 +364,16 @@ export default function Home() {
             >
               {addStage === "idle" ? "+ Add property" : "Cancel"}
             </button>
-            <SearchBar onSearch={searchPlace} />
+
           </div>
 
           {addStage === "picking" && (
-            <div className="glass absolute left-1/2 top-3.5 -translate-x-1/2 rounded-full px-5 py-2.5 text-[13px] font-semibold text-plum">
+            <div className={`${styles.pickHint} glass rounded-full px-5 py-2.5 text-[13px] font-semibold text-plum`}>
               Click a spot on the map to place the property
             </div>
           )}
 
-          <div className="pointer-events-auto absolute right-3.5 top-[38%]">
+          <div className={styles.mapControls}>
             <MapControls
               is3D={is3D}
               onZoomIn={() => mapRef.current?.zoomIn()}
@@ -368,18 +382,34 @@ export default function Home() {
             />
           </div>
 
-          <div className="absolute bottom-3.5 left-[268px] right-3.5">
+          <div className={styles.results}>
+            <div className={styles.resultBar}>
+              <div aria-live="polite"><strong>{loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}` : "Explore properties"}</strong><span>{query ? `Matching “${query}”` : "Find your next place"}</span></div>
+              <div className={styles.resultActions}>
+                <button onClick={showResults} disabled={!filtered.length}>Show on map ↗</button>
+                <select aria-label="Sort properties" value={sort} onChange={(e) => setSort(e.target.value as ListingSort)}>
+                  <option value="recommended">Featured first</option>
+                  <option value="price-asc">Price: low to high</option>
+                  <option value="price-desc">Price: high to low</option>
+                  <option value="area-desc">Largest area</option>
+                </select>
+              </div>
+            </div>
             <PropertyCarousel
               listings={filtered}
               onSelect={flyToListing}
               hasAny={listings.length > 0}
+              status={loadState}
+              selectedId={selectedId}
+              onReset={resetSearch}
+              onRetry={() => { setLoadState("loading"); setLoadAttempt((n) => n + 1); }}
             />
           </div>
 
           {/* panels render last so they paint above the carousel strip and
               map controls without needing a z-index scheme */}
           {addStage === "form" && draftCoords && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
+            <div className={styles.detailPanel}>
               <AddPropertyForm
                 key={editingId ?? "new"}
                 coords={draftCoords}
@@ -395,7 +425,7 @@ export default function Home() {
           )}
 
           {addStage === "idle" && selected && (
-            <div className="absolute bottom-3.5 right-3.5 top-[68px] flex items-start">
+            <div className={styles.detailPanel}>
               <PropertyDetailPanel
                 listing={selected}
                 onClose={() => setSelectedId(null)}
