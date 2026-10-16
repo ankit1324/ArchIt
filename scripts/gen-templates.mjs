@@ -31,6 +31,8 @@
  *     with another room, and the whole door leaf fits inside the shared segment
  *   - windows sit on fully exterior walls (designIssues() flags the rest)
  *   - furniture fits inside its room (clampFurn would otherwise move it silently)
+ *   - then scripts/check-plans.mjs runs on the compiled output: doorways clear of
+ *     furniture, no overlapping furniture, every room reachable, no duplicate doors
  */
 
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -59,11 +61,14 @@ const DOOR_TYPES = [
   "int_hard", "int_mdf", "int_pvc", "int_panel",
 ];
 const FURN = {
-  bed: [1.6, 2.0], wardrobe: [1.8, 0.6], nightstand: [0.45, 0.4], sofa: [2.0, 0.9],
-  coffee: [0.9, 0.55], tv: [1.4, 0.4], table: [1.4, 0.8], chair: [0.45, 0.45],
-  desk: [1.2, 0.6], fridge: [0.7, 0.7], kunit: [1.8, 0.6], toilet: [0.4, 0.65],
-  basin: [0.5, 0.4], shower: [0.9, 0.9], bath: [1.7, 0.75], plant: [0.45, 0.45],
-  walllamp: [0.16, 0.16],
+  sofa: [2.0, 0.9], sofa_l: [2.4, 1.6], armchair: [0.9, 0.9], coffee: [0.9, 0.55], tv: [1.4, 0.4],
+  side_table: [0.5, 0.5], floor_lamp: [0.4, 0.4], plant: [0.45, 0.45], bed: [1.6, 2.0],
+  bed_single: [1.0, 2.0], wardrobe: [1.8, 0.6], dresser: [1.2, 0.5], nightstand: [0.45, 0.4],
+  bookshelf: [0.9, 0.35], kunit: [1.8, 0.6], fridge: [0.7, 0.7], oven: [0.6, 0.6],
+  table: [1.4, 0.8], chair: [0.45, 0.45], bar_stool: [0.4, 0.4], toilet: [0.4, 0.65],
+  basin: [0.5, 0.4], shower: [0.9, 0.9], bath: [1.7, 0.75], mirror_cab: [0.6, 0.15],
+  desk: [1.2, 0.6], office_chair: [0.6, 0.6], wall_art: [0.8, 0.05], rug: [1.6, 1.1],
+  ceiling_light: [0.4, 0.4], walllamp: [0.16, 0.16],
 };
 const ROOM_MIN = 1.2, ROOM_MAX = 8;
 const WIN_W = { std: 1.3, pano: 2.2 };
@@ -89,17 +94,20 @@ function desks(nx, nz, { sx = 1.9, sz = 2.2, ox = 0, oz = 0 } = {}) {
     for (let i = 0; i < nx; i++) {
       const lx = r3(ox + (i - (nx - 1) / 2) * sx);
       const lz = r3(oz + (j - (nz - 1) / 2) * sz);
-      out.push(["desk", lx, lz, 0], ["chair", lx, r3(lz + 0.78), 2]);
+      out.push(["desk", lx, lz, 0], ["office_chair", lx, r3(lz + 0.78), 2]);
     }
   }
   return out;
 }
-/** a long meeting table: `n` chairs per long side */
+/** a long meeting table: `n` chairs per long side. Table modules abut end to end
+ *  (1.4 m each) — overlapping them z-fights in 3D — and the run is centred on the chairs. */
 function boardroom(n, { sx = 1.0, oz = 0, ox = 0 } = {}) {
   const out = [];
+  const tables = Math.max(1, Math.round((n * sx) / 1.4));
+  for (let i = 0; i < tables; i++) out.push(["table", r3(ox + (i - (tables - 1) / 2) * 1.4), oz, 0]);
   for (let i = 0; i < n; i++) {
     const lx = r3(ox + (i - (n - 1) / 2) * sx);
-    out.push(["table", lx, oz, 0], ["chair", lx, r3(oz - 0.95), 0], ["chair", lx, r3(oz + 0.95), 2]);
+    out.push(["chair", lx, r3(oz - 0.95), 0], ["chair", lx, r3(oz + 0.95), 2]);
   }
   return out;
 }
@@ -121,7 +129,7 @@ function cafeTables(n, { sx = 2.0, oz = 0, ox = 0 } = {}) {
   return out;
 }
 
-/* ===================== catalog metadata (all 31 keys, order preserved) ===================== */
+/* ===================== catalog metadata (all 33 keys, order preserved) ===================== */
 
 const CATALOG = [
   ["in_1bhk", "1BHK Compact Indian House", "indian", "Veranda, living room, kitchen, bedroom and bath", false],
@@ -134,6 +142,8 @@ const CATALOG = [
   ["in_village", "1KTH Village House", "indian", "Front veranda, large hall, kitchen and bathroom", false],
   ["in_courtyard", "Traditional Courtyard House", "indian", "Perimeter rooms around a central family hall", false],
   ["in_bungalow", "Luxury 5BHK Indian Villa", "indian", "Grand hall, kitchen, five bedrooms, baths and balconies", false],
+  ["in_3bhk_porch", "3BHK East-Facing Home with Car Porch", "indian", "East-facing 30x40 home: car porch, pooja, 3 beds, 2 attached baths", false],
+  ["in_farmhouse", "Indian Farmhouse with Sit-outs", "indian", "Farmhouse: wraparound sit-outs, big kitchen, store, wash yard, 3BHK", false],
   ["off_startup", "Startup Open-Plan Office", "office", "Reception, open desk bays, meeting room, pantry and washroom", true],
   ["off_exec", "Corporate Executive Suite", "office", "Reception, boardroom, executive cabins, pantry and washroom", true],
   ["off_tech", "Tech Agency Agile Hub", "office", "Two agile work bays, huddle room, coffee bar and washroom", true],
@@ -171,10 +181,10 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.6, 4.8, {
         name: "Reception", paint: "white", floorCol: "gtile",
-        doors: [d("S", 4.3, "ext_glass", 1.8, 2.3), d("N", 4.7)],
+        doors: [d("S", 4.3, "ext_glass", 1.8, 2.3)],
         wins: [win("S", 1.5, "pano"), win("W", 2.4, "pano")],
-        furniture: [["desk", -1.4, -1.0, 0], ["chair", -1.4, -0.1, 2], ["sofa", 1.4, -1.2, 0],
-          ["coffee", 1.4, -0.2, 0], ["plant", 2.3, 1.6, 0], ["plant", -2.3, 1.6, 0]],
+        furniture: [["desk", -1.4, -1.0, 0], ["chair", -1.4, -0.1, 2], ["sofa", 2.2, 0.6, 3],
+          ["coffee", 1.3, 0.6, 1], ["plant", 2.3, 1.9, 0], ["plant", -2.3, 1.6, 0]],
       }),
       R("hall", 5.6, 0, 9.4, 4.8, {
         name: "Meeting room", paint: "greige", floorCol: "ash",
@@ -182,17 +192,20 @@ const PLANS = {
         furniture: boardroom(3, { sx: 0.95, oz: -0.2 }).concat([["plant", 1.4, 1.4, 0]]),
       }),
       R("hallway", 0, 4.8, 6.5, 6.2, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("E", 5.5)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("S", 2.6)], furniture: [],
       }),
       R("hallway", 6.5, 4.8, 13.0, 6.2, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.5)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.5)], furniture: [],
       }),
       R("kitchen", 9.4, 2.8, 13.0, 4.8, {
         name: "Pantry", paint: "mint", floorCol: "wtile",
         doors: [d("N", 11.2)], wins: [win("S", 11.2)],
+        furniture: [["kunit", -0.6, -0.56, 0], ["fridge", 1.3, -0.51, 0]],
       }),
       R("bath", 11.0, 6.2, 13.0, 8.6, {
-        name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("S", 12.0, "int_pvc", 0.8)],
+        name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("S", 12.4, "int_pvc", 0.8)],
+        wins: [win("E", 7.4)],
+        furniture: [["toilet", -0.5, 0.73, 2], ["basin", -0.66, -0.2, 1]],
       }),
       R("hall", 0, 6.2, 7.0, 11.4, {
         name: "Open desk bay", paint: "white", floorCol: "oak",
@@ -203,10 +216,12 @@ const PLANS = {
       R("hall", 7.0, 6.2, 11.0, 11.4, {
         name: "Open desk bay", paint: "white", floorCol: "oak",
         doors: [d("S", 9.0, "int_hard", 0.9)], wins: [win("N", 9.0, "pano")],
-        furniture: desks(2, 2, { sx: 1.9, sz: 2.3 }).concat([["plant", -1.5, -2.0, 0]]),
+        furniture: desks(2, 2, { sx: 1.9, sz: 2.5 }).concat([["plant", -1.5, -2.0, 0]]),
       }),
       R("bedroom", 11.0, 8.6, 13.0, 11.4, {
-        name: "Server / store", paint: "gray", floorCol: "slate", doors: [d("W", 10.0)],
+        name: "Server / store", paint: "gray", floorCol: "slate", doors: [d("W", 9.15)],
+        wins: [win("N", 12.0)],
+        furniture: [["bookshelf", 0.68, -0.45, 3], ["bookshelf", 0.68, 0.45, 3]],
       }),
     ],
   },
@@ -216,16 +231,16 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 6.0, 5.0, {
         name: "Reception", paint: "greige", floorCol: "gtile",
-        doors: [d("S", 4.4, "ext_glass", 2.0, 2.4), d("N", 5.2)],
+        doors: [d("S", 4.4, "ext_glass", 2.0, 2.4)],
         wins: [win("S", 1.4, "pano"), win("W", 2.5, "pano")],
-        furniture: [["desk", -1.8, -1.2, 0], ["chair", -1.8, -0.3, 2], ["sofa", 1.6, -1.4, 0],
-          ["coffee", 1.6, -0.3, 0], ["plant", 2.5, 1.8, 0]],
+        furniture: [["desk", -1.8, -1.2, 0], ["chair", -1.8, -0.3, 2], ["sofa", 2.4, 0.3, 3],
+          ["coffee", 1.5, 0.3, 1], ["plant", -2.5, 1.8, 0]],
       }),
       R("hall", 6.0, 0, 12.0, 5.0, {
         name: "Boardroom", paint: "beige", floorCol: "walnut",
         doors: [d("N", 9.0, "int_panel", 0.9, 2.1)],
         wins: [win("S", 9.0, "pano")],
-        furniture: boardroom(5, { sx: 1.05 }).concat([["plant", -2.3, 1.4, 0], ["tv", 2.1, 1.5, 0]]),
+        furniture: boardroom(5, { sx: 1.05 }).concat([["plant", -2.3, 1.4, 0], ["tv", 2.1, 2.16, 2]]),
       }),
       R("hall", 12.0, 0, 15.0, 5.0, {
         name: "Visitor lounge", paint: "cream", floorCol: "oak",
@@ -234,32 +249,41 @@ const PLANS = {
           ["chair", 1.0, 0.9, 3], ["plant", 1.1, -1.8, 0]],
       }),
       R("hallway", 0, 5.0, 7.5, 6.4, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("E", 5.7)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("S", 3.0)], furniture: [],
       }),
       R("hallway", 7.5, 5.0, 15.0, 6.4, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.7)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.7)], furniture: [],
       }),
       R("bedroom", 0, 6.4, 3.8, 10.6, {
         name: "Executive cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 1.9, "int_panel")], wins: [win("N", 1.9, "pano"), win("W", 8.5)],
+        furniture: [["desk", 0, 0.7, 0], ["office_chair", 0, 1.45, 2], ["chair", -0.4, -0.1, 0],
+          ["chair", 0.4, -0.1, 0], ["bookshelf", 1.48, 0.8, 3], ["plant", -1.4, -1.7, 0]],
       }),
       R("bedroom", 3.8, 6.4, 7.4, 10.6, {
         name: "Executive cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 5.6, "int_panel")], wins: [win("N", 5.6, "pano")],
+        furniture: [["desk", 0, 0.7, 0], ["office_chair", 0, 1.45, 2], ["chair", -0.4, -0.1, 0],
+          ["chair", 0.4, -0.1, 0], ["bookshelf", 1.48, 0.8, 3], ["plant", -1.4, -1.7, 0]],
       }),
       R("bedroom", 7.4, 6.4, 11.0, 10.6, {
         name: "Executive cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 9.2, "int_panel")], wins: [win("N", 9.2, "pano")],
+        furniture: [["desk", 0, 0.7, 0], ["office_chair", 0, 1.45, 2], ["chair", -0.4, -0.1, 0],
+          ["chair", 0.4, -0.1, 0], ["bookshelf", 1.48, 0.8, 3], ["plant", -1.4, -1.7, 0]],
       }),
       R("hallway", 11.0, 6.4, 12.4, 10.6, {
         rot: 1, name: "Service corridor", paint: "white", floorCol: "gtile", doors: [d("S", 11.7)],
+        furniture: [],
       }),
       R("kitchen", 12.4, 6.4, 15.0, 8.6, {
         name: "Pantry", paint: "mint", floorCol: "wtile", doors: [d("W", 7.5)], wins: [win("E", 7.5)],
+        furniture: [["kunit", 0.86, 0, 3], ["fridge", 0.1, -0.61, 0]],
       }),
       R("bath", 12.4, 8.6, 15.0, 10.6, {
         name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("W", 9.6, "int_pvc", 0.8)],
         wins: [win("N", 13.7)],
+        furniture: [["toilet", 0.83, 0.4, 3], ["basin", 0, 0.66, 2], ["shower", 0.71, -0.41, 0]],
       }),
     ],
   },
@@ -270,6 +294,7 @@ const PLANS = {
       R("hallway", 6.0, 0, 7.4, 7.0, {
         rot: 1, name: "Entry spine", paint: "white", floorCol: "slate",
         doors: [d("S", 6.7, "ext_glass", 1.1, 2.3)],
+        furniture: [],
       }),
       R("hall", 0, 0, 6.0, 7.0, {
         name: "Agile bay A", paint: "gray", floorCol: "oak",
@@ -285,18 +310,20 @@ const PLANS = {
       }),
       R("hall", 0, 7.0, 4.0, 10.4, {
         name: "Huddle room", paint: "sage", floorCol: "ash",
-        doors: [d("S", 2.0)], wins: [win("N", 2.0, "pano")],
-        furniture: boardroom(3, { sx: 0.9 }),
+        doors: [d("S", 3.0)], wins: [win("N", 2.0, "pano")],
+        furniture: boardroom(3, { sx: 0.9, oz: 0.35 }).concat([["tv", -1.66, 0.35, 1]]),
       }),
       R("kitchen", 4.0, 7.0, 7.6, 10.4, {
         name: "Coffee bar", paint: "terra", floorCol: "terra",
-        doors: [d("S", 5.0)], wins: [win("N", 5.8)],
-        furniture: [["kunit", 0, -1.2, 0], ["kunit", -1.3, 0, 1], ["fridge", 1.3, -1.0, 0],
-          ["table", -0.5, 0.8, 0], ["chair", -0.5, 0.1, 0], ["chair", -0.5, 1.3, 2]],
+        doors: [d("S", 6.7)], wins: [win("N", 5.0)],
+        furniture: [["kunit", -0.7, 1.26, 2], ["fridge", 0.65, 1.21, 2], ["table", -0.9, -0.2, 0],
+          ["chair", -1.25, -0.95, 0], ["chair", -0.55, -0.95, 0], ["chair", -1.25, 0.55, 2],
+          ["chair", -0.55, 0.55, 2], ["plant", 1.43, 0.2, 0]],
       }),
       R("bath", 7.6, 7.0, 9.8, 9.4, {
-        name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("S", 8.7, "int_pvc", 0.8)],
-        wins: [win("E", 8.2)],
+        name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("S", 8.15, "int_pvc", 0.8)],
+        wins: [win("E", 7.75)],
+        furniture: [["toilet", -0.6, 0.73, 2], ["basin", 0.76, -0.6, 3], ["shower", 0.51, 0.61, 0]],
       }),
     ],
   },
@@ -306,27 +333,27 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.0, 4.4, {
         name: "Reception", paint: "white", floorCol: "gtile",
-        doors: [d("S", 3.7, "ext_glass", 1.9, 2.3), d("N", 4.2)],
+        doors: [d("S", 3.7, "ext_glass", 1.9, 2.3)],
         wins: [win("S", 1.3, "pano"), win("W", 2.2, "pano")],
-        furniture: [["desk", -1.1, -0.9, 0], ["chair", -1.1, 0.0, 2], ["sofa", 1.2, -1.1, 0],
-          ["plant", 1.9, 1.4, 0]],
+        furniture: [["desk", -1.1, -0.9, 0], ["chair", -1.1, 0.0, 2], ["sofa", 1.91, 0.2, 3],
+          ["coffee", 1.1, 0.2, 1], ["plant", -2.0, 1.6, 0]],
       }),
       R("kitchen", 5.0, 0, 9.0, 4.4, {
         name: "Café", paint: "terra", floorCol: "terra",
-        doors: [d("N", 6.2)], wins: [win("S", 7.0, "pano")],
-        furniture: [["kunit", -0.9, -1.5, 0], ["fridge", 1.4, -1.5, 0]]
-          .concat(cafeTables(2, { sx: 1.2, oz: 0.7 })),
+        doors: [d("N", 8.0)], wins: [win("S", 7.0, "pano")],
+        furniture: [["kunit", -0.9, -1.76, 0], ["fridge", 1.4, -1.71, 0]]
+          .concat(cafeTables(1, { ox: -0.4, oz: -0.3 }), cafeTables(1, { ox: -0.4, oz: 0.9 })),
       }),
       R("hall", 9.0, 0, 14.6, 4.4, {
         name: "Meeting room", paint: "greige", floorCol: "ash",
         doors: [d("N", 11.5)], wins: [win("E", 2.2, "pano"), win("S", 12.6, "pano")],
-        furniture: boardroom(4, { sx: 1.05 }).concat([["tv", -1.9, 1.8, 0]]),
+        furniture: boardroom(4, { sx: 1.05 }).concat([["tv", -1.9, 1.86, 2]]),
       }),
       R("hallway", 0, 4.4, 7.0, 5.8, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("E", 5.1)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("S", 2.4)], furniture: [],
       }),
       R("hallway", 7.0, 4.4, 14.6, 5.8, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.1)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.1)], furniture: [],
       }),
       R("hall", 0, 5.8, 7.6, 11.6, {
         name: "Hot desks", paint: "white", floorCol: "oak",
@@ -336,16 +363,22 @@ const PLANS = {
       }),
       R("bedroom", 7.6, 5.8, 10.0, 8.6, {
         name: "Private booth", paint: "lavender", floorCol: "ash", doors: [d("S", 8.8)],
+        furniture: [["desk", 0, 0.96, 2], ["office_chair", 0, 0.18, 0], ["bookshelf", -0.885, -0.2, 1]],
       }),
       R("bedroom", 10.0, 5.8, 12.4, 8.6, {
         name: "Private booth", paint: "lavender", floorCol: "ash", doors: [d("S", 11.2)],
+        wins: [win("N", 11.2)],
+        furniture: [["desk", 0, 0.96, 2], ["office_chair", 0, 0.18, 0], ["bookshelf", -0.885, -0.2, 1]],
       }),
       R("bedroom", 12.4, 5.8, 14.6, 8.6, {
         name: "Private booth", paint: "lavender", floorCol: "ash",
         doors: [d("S", 13.5)], wins: [win("E", 7.2)],
+        furniture: [["desk", 0, 0.96, 2], ["office_chair", 0, 0.18, 0], ["bookshelf", -0.785, -0.2, 1]],
       }),
       R("bath", 7.6, 8.6, 9.6, 11.0, {
         name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("W", 9.8, "int_pvc", 0.8)],
+        wins: [win("N", 8.6)],
+        furniture: [["toilet", 0.3, 0.73, 2], ["basin", 0.66, -0.6, 3]],
       }),
     ],
   },
@@ -355,7 +388,7 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 8.0, 3.2, {
         name: "Gallery entry", paint: "white", floorCol: "slate",
-        doors: [d("S", 4.0, "ext_glass", 2.2, 2.4), d("N", 2.0, "int_hard", 1.0)],
+        doors: [d("S", 4.0, "ext_glass", 2.2, 2.4)],
         wins: [win("S", 1.4, "pano"), win("S", 6.6, "pano")],
         furniture: [["plant", -3.2, 0.9, 0], ["plant", 3.2, 0.9, 0], ["sofa", 0, 0.9, 0]],
       }),
@@ -369,15 +402,19 @@ const PLANS = {
         name: "Client pitch room", paint: "greige", floorCol: "walnut",
         doors: [d("W", 1.6, "int_panel", 0.9)],
         wins: [win("E", 2.3, "pano"), win("S", 10.3, "pano")],
-        furniture: boardroom(3, { sx: 1.0 }).concat([["tv", -1.4, 1.9, 0]]),
+        furniture: boardroom(3, { sx: 1.0 }).concat([["tv", -1.4, 1.96, 2]]),
       }),
       R("bedroom", 7.6, 4.6, 11.0, 8.2, {
         name: "Material library", paint: "sage", floorCol: "walnut",
         doors: [d("W", 6.4)], wins: [win("E", 6.4)],
+        furniture: [["bookshelf", -0.9, 1.485, 2], ["bookshelf", 0, 1.485, 2], ["bookshelf", 0.9, 1.485, 2],
+          ["bookshelf", -0.9, -1.485, 0], ["bookshelf", 0, -1.485, 0], ["bookshelf", 0.9, -1.485, 0],
+          ["table", 0.2, 0, 0], ["chair", 0.2, -0.8, 0], ["chair", 0.2, 0.8, 2]],
       }),
       R("bath", 7.6, 8.2, 9.4, 10.6, {
         name: "Washroom", paint: "mint", floorCol: "wtile",
         doors: [d("W", 8.9, "int_pvc", 0.8)], wins: [win("N", 8.5)],
+        furniture: [["toilet", 0.3, 0.73, 2], ["basin", 0.56, -0.5, 3]],
       }),
     ],
   },
@@ -387,37 +424,44 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 6.4, 4.6, {
         name: "Waiting room", paint: "mint", floorCol: "wtile",
-        doors: [d("S", 4.6, "ext_glass", 1.8, 2.3), d("N", 1.6)],
+        doors: [d("S", 4.6, "ext_glass", 1.8, 2.3)],
         wins: [win("S", 1.4, "pano"), win("W", 2.3, "pano")],
         furniture: seating(4, 2, { sx: 0.85, sz: 1.5, oz: -0.4 })
-          .concat([["plant", 2.6, 1.5, 0], ["coffee", -1.6, 1.5, 0]]),
+          .concat([["plant", 2.8, -0.4, 0], ["plant", -2.8, 1.8, 0], ["coffee", 0, 1.5, 0]]),
       }),
       R("hall", 6.4, 0, 9.4, 4.6, {
         name: "Reception & records", paint: "white", floorCol: "wtile",
         doors: [d("W", 3.6)], wins: [win("S", 7.9)],
-        furniture: [["desk", -0.7, -1.2, 0], ["chair", -0.7, -0.3, 2], ["wardrobe", 1.0, 0.8, 1]],
+        furniture: [["desk", -0.7, -1.2, 0], ["chair", -0.7, -0.3, 2], ["wardrobe", 1.06, 0.8, 3]],
       }),
       R("hallway", 0, 4.6, 6.5, 6.0, {
-        name: "Corridor", paint: "white", floorCol: "wtile", doors: [d("E", 5.3)],
+        name: "Corridor", paint: "white", floorCol: "wtile", doors: [d("S", 1.6)], furniture: [],
       }),
       R("hallway", 6.5, 4.6, 11.4, 6.0, {
-        name: "Corridor", paint: "white", floorCol: "wtile", doors: [d("W", 5.3)],
+        name: "Corridor", paint: "white", floorCol: "wtile", doors: [d("W", 5.3)], furniture: [],
       }),
       R("bedroom", 0, 6.0, 3.6, 9.6, {
         name: "Consultation 1", paint: "mint", floorCol: "wtile",
         doors: [d("S", 1.8, "int_mdf")], wins: [win("N", 1.8), win("W", 7.8)],
+        furniture: [["desk", -0.6, 0.55, 0], ["office_chair", -0.6, 1.33, 2], ["chair", -0.6, -0.2, 0],
+          ["bed_single", 1.16, -0.66, 0], ["basin", -1.46, -0.8, 1]],
       }),
       R("bedroom", 3.6, 6.0, 7.2, 9.6, {
         name: "Consultation 2", paint: "mint", floorCol: "wtile",
         doors: [d("S", 5.4, "int_mdf")], wins: [win("N", 5.4)],
+        furniture: [["desk", -0.6, 0.55, 0], ["office_chair", -0.6, 1.33, 2], ["chair", -0.6, -0.2, 0],
+          ["bed_single", 1.16, -0.66, 0], ["basin", -1.46, -0.8, 1]],
       }),
       R("bedroom", 7.2, 6.0, 10.8, 9.6, {
         name: "Consultation 3", paint: "mint", floorCol: "wtile",
         doors: [d("S", 9.0, "int_mdf")], wins: [win("N", 9.0), win("E", 7.8)],
+        furniture: [["desk", -0.6, 0.55, 0], ["office_chair", -0.6, 1.33, 2], ["chair", -0.6, -0.2, 0],
+          ["bed_single", 1.16, -0.66, 0], ["basin", -1.46, -0.8, 1]],
       }),
       R("bath", 9.4, 2.2, 11.4, 4.6, {
         name: "Washroom", paint: "white", floorCol: "wtile",
         doors: [d("N", 10.4, "int_pvc", 0.8)], wins: [win("S", 10.4)],
+        furniture: [["toilet", -0.5, -0.73, 0], ["basin", 0.66, 0, 3]],
       }),
     ],
   },
@@ -427,10 +471,10 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.6, 5.0, {
         name: "Reception", paint: "beige", floorCol: "walnut",
-        doors: [d("S", 4.3, "ext_glass", 1.8, 2.3), d("N", 4.6)],
+        doors: [d("S", 4.3, "ext_glass", 1.8, 2.3)],
         wins: [win("S", 1.5, "pano"), win("W", 2.5, "pano")],
-        furniture: [["desk", -1.5, -1.1, 0], ["chair", -1.5, -0.2, 2], ["sofa", 1.3, -1.3, 0],
-          ["coffee", 1.3, -0.2, 0], ["plant", 2.2, 1.6, 0]],
+        furniture: [["desk", -1.5, -1.1, 0], ["chair", -1.5, -0.2, 2], ["sofa", 2.2, 0.4, 3],
+          ["coffee", 1.3, 0.4, 1], ["plant", -2.3, 1.9, 0], ["plant", 2.3, 2.1, 0]],
       }),
       R("hall", 5.6, 0, 12.0, 5.0, {
         name: "Conference room", paint: "greige", floorCol: "walnut",
@@ -440,34 +484,46 @@ const PLANS = {
       R("hall", 12.0, 0, 15.4, 5.0, {
         name: "Law library", paint: "sage", floorCol: "walnut",
         doors: [d("N", 13.7)], wins: [win("E", 2.5)],
-        furniture: [["wardrobe", -1.2, -0.8, 1], ["wardrobe", -1.2, 0.8, 1], ["table", 0.5, 0, 0],
-          ["chair", 0.5, -0.9, 0], ["chair", 0.5, 0.9, 2]],
+        furniture: [["bookshelf", -1.385, -1.35, 1], ["bookshelf", -1.385, -0.45, 1],
+          ["bookshelf", -1.385, 0.45, 1], ["bookshelf", -1.385, 1.35, 1],
+          ["bookshelf", 1.385, -1.6, 3], ["bookshelf", 1.385, 1.6, 3], ["table", 0, -0.3, 0],
+          ["chair", -0.35, -0.95, 0], ["chair", 0.35, -0.95, 0], ["chair", -0.35, 0.35, 2],
+          ["chair", 0.35, 0.35, 2]],
       }),
       R("hallway", 0, 5.0, 7.7, 6.4, {
-        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("E", 5.7)],
+        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("S", 2.6)], furniture: [],
       }),
       R("hallway", 7.7, 5.0, 15.4, 6.4, {
-        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("W", 5.7)],
+        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("W", 5.7)], furniture: [],
       }),
       R("bedroom", 0, 6.4, 3.4, 10.4, {
         name: "Partner cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 1.7, "int_panel")], wins: [win("N", 1.7), win("W", 8.4)],
+        furniture: [["desk", 0, 0.6, 0], ["office_chair", 0, 1.38, 2], ["chair", -0.4, -0.2, 0],
+          ["chair", 0.4, -0.2, 0], ["bookshelf", 1.385, 0.6, 3], ["plant", -1.33, -1.6, 0]],
       }),
       R("bedroom", 3.4, 6.4, 6.8, 10.4, {
         name: "Partner cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 5.1, "int_panel")], wins: [win("N", 5.1)],
+        furniture: [["desk", 0, 0.6, 0], ["office_chair", 0, 1.38, 2], ["chair", -0.4, -0.2, 0],
+          ["chair", 0.4, -0.2, 0], ["bookshelf", 1.385, 0.6, 3], ["plant", -1.33, -1.6, 0]],
       }),
       R("bedroom", 6.8, 6.4, 10.2, 10.4, {
         name: "Partner cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 8.5, "int_panel")], wins: [win("N", 8.5)],
+        furniture: [["desk", 0, 0.6, 0], ["office_chair", 0, 1.38, 2], ["chair", -0.4, -0.2, 0],
+          ["chair", 0.4, -0.2, 0], ["bookshelf", 1.385, 0.6, 3], ["plant", -1.33, -1.6, 0]],
       }),
       R("bedroom", 10.2, 6.4, 13.6, 10.4, {
         name: "Partner cabin", paint: "beige", floorCol: "walnut",
         doors: [d("S", 11.9, "int_panel")], wins: [win("N", 11.9)],
+        furniture: [["desk", 0, 0.6, 0], ["office_chair", 0, 1.38, 2], ["chair", -0.4, -0.2, 0],
+          ["chair", 0.4, -0.2, 0], ["bookshelf", 1.385, 0.6, 3], ["plant", -1.33, -1.6, 0]],
       }),
       R("bath", 13.6, 6.4, 15.4, 8.8, {
         name: "Washroom", paint: "white", floorCol: "wtile",
         doors: [d("S", 14.5, "int_pvc", 0.8)], wins: [win("E", 7.6)],
+        furniture: [["toilet", -0.45, 0.73, 2], ["basin", -0.56, 0, 1]],
       }),
     ],
   },
@@ -477,20 +533,22 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 6.0, 4.8, {
         name: "Client lounge", paint: "cream", floorCol: "oak",
-        doors: [d("S", 4.4, "ext_glass", 1.8, 2.3), d("N", 4.9)],
+        doors: [d("S", 4.4, "ext_glass", 1.8, 2.3)],
         wins: [win("S", 1.4, "pano"), win("W", 2.4, "pano")],
         furniture: [["sofa", -1.5, -1.3, 0], ["coffee", -1.5, -0.2, 0], ["desk", 1.6, -1.1, 0],
-          ["chair", 1.6, -0.2, 2], ["plant", 2.3, 1.6, 0]],
+          ["chair", 1.6, -0.2, 2], ["plant", -2.6, 1.9, 0]],
       }),
-      R("bedroom", 6.0, 0, 9.6, 4.8, {
+      R("bedroom", 6.0, 0, 9.0, 4.8, {
         name: "Partner cabin", paint: "beige", floorCol: "walnut",
-        doors: [d("N", 7.8, "int_panel")], wins: [win("S", 7.8, "pano")],
+        doors: [d("N", 7.5, "int_panel")], wins: [win("S", 7.5, "pano")],
+        furniture: [["desk", 0, -0.6, 2], ["office_chair", 0, -1.38, 0], ["chair", -0.4, 0.2, 2],
+          ["chair", 0.4, 0.2, 2], ["bookshelf", -1.185, 0.9, 1], ["plant", 1.13, 2.0, 0]],
       }),
       R("hallway", 0, 4.8, 6.2, 6.2, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("E", 5.5)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("S", 4.9)], furniture: [],
       }),
       R("hallway", 6.2, 4.8, 11.6, 6.2, {
-        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.5)],
+        name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("W", 5.5)], furniture: [],
       }),
       R("hall", 0, 6.2, 7.4, 11.4, {
         name: "Accounts work bay", paint: "white", floorCol: "gtile",
@@ -500,15 +558,19 @@ const PLANS = {
       }),
       R("bedroom", 7.4, 6.2, 9.8, 9.4, {
         name: "Archive", paint: "gray", floorCol: "slate", doors: [d("S", 8.6)],
-        furniture: [["wardrobe", -0.7, -0.5, 1], ["wardrobe", -0.7, 0.5, 1], ["wardrobe", 0.7, -0.5, 1]],
+        furniture: [["wardrobe", -0.76, 0.4, 1], ["wardrobe", 0.76, 0.4, 3], ["bookshelf", 0, 1.285, 2]],
       }),
       R("bath", 9.8, 6.2, 11.6, 8.6, {
         name: "Washroom", paint: "mint", floorCol: "wtile",
         doors: [d("S", 10.7, "int_pvc", 0.8)], wins: [win("E", 7.4)],
+        furniture: [["toilet", -0.45, 0.73, 2], ["basin", -0.56, 0, 1]],
       }),
-      R("kitchen", 9.6, 2.4, 11.6, 4.8, {
+      R("kitchen", 9.0, 0, 11.6, 4.8, {
         name: "Pantry", paint: "mint", floorCol: "wtile",
-        doors: [d("N", 10.6)], wins: [win("S", 10.6)],
+        doors: [d("N", 10.3)], wins: [win("S", 10.3), win("E", 2.4)],
+        furniture: [["kunit", 0, -1.96, 0], ["fridge", 0.81, -1.2, 3], ["table", -0.1, 0.2, 0],
+          ["chair", -0.45, -0.55, 0], ["chair", 0.25, -0.55, 0], ["chair", -0.45, 0.95, 2],
+          ["chair", 0.25, 0.95, 2]],
       }),
     ],
   },
@@ -520,32 +582,37 @@ const PLANS = {
         name: "Showroom", paint: "white", floorCol: "gtile",
         doors: [d("S", 3.9, "ext_glass", 2.4, 2.4)],
         wins: [win("S", 1.2, "pano"), win("S", 6.6, "pano"), win("W", 3.8, "pano")],
-        furniture: [["wardrobe", -2.8, -3.0, 0], ["wardrobe", -0.9, -3.0, 0], ["wardrobe", 1.0, -3.0, 0],
-          ["table", -2.0, 0.4, 0], ["table", 1.2, 0.4, 0], ["sofa", -2.0, 2.6, 0],
-          ["plant", 3.2, 2.8, 0], ["plant", 3.2, -3.0, 0]],
+        furniture: [["wardrobe", -2.8, 3.36, 2], ["wardrobe", -0.9, 3.36, 2], ["wardrobe", 1.0, 3.36, 2],
+          ["table", -2.0, 0.6, 0], ["table", 1.2, 0.6, 0], ["sofa", -3.31, -1.2, 1],
+          ["coffee", -2.3, -1.2, 1], ["plant", 3.5, -1.2, 0], ["plant", -3.5, -3.3, 0]],
       }),
       R("hall", 7.8, 0, 11.4, 2.4, {
         name: "Sales counter", paint: "greige", floorCol: "gtile",
         doors: [d("W", 1.2, "int_hard", 1.0)], wins: [win("E", 1.2, "pano")],
-        furniture: [["desk", -0.9, -0.5, 0], ["chair", -0.9, 0.3, 2], ["desk", 0.7, -0.5, 0]],
+        furniture: [["desk", 0, -0.4, 1], ["office_chair", 0.78, -0.4, 3], ["chair", -0.7, -0.4, 1],
+          ["plant", 1.43, 0.8, 0]],
       }),
       R("hallway", 7.8, 2.4, 9.4, 8.8, {
         rot: 1, name: "Service corridor", paint: "white", floorCol: "slate",
         doors: [d("W", 7.0, "int_hard", 0.9)],
+        furniture: [],
       }),
       R("bedroom", 9.4, 2.4, 12.6, 5.4, {
         name: "Back office", paint: "gray", floorCol: "ash",
         doors: [d("W", 3.9)], wins: [win("E", 3.9)],
+        furniture: [["desk", 0.4, -0.55, 0], ["office_chair", 0.4, 0.23, 2], ["chair", 0.4, -1.13, 0],
+          ["bookshelf", 0.4, 1.185, 2], ["plant", -1.2, 1.1, 0]],
       }),
       R("bedroom", 9.4, 5.4, 12.6, 8.8, {
         name: "Inventory", paint: "gray", floorCol: "slate",
         doors: [d("W", 7.1, "int_hard", 0.9)], wins: [win("E", 7.1)],
-        furniture: [["wardrobe", -1.1, -0.6, 1], ["wardrobe", 1.1, -0.6, 1], ["wardrobe", -1.1, 0.6, 1],
-          ["wardrobe", 1.1, 0.6, 1]],
+        furniture: [["wardrobe", -0.5, -1.26, 0], ["bookshelf", 0.95, -1.385, 0], ["wardrobe", -0.5, 1.26, 2],
+          ["bookshelf", 0.95, 1.385, 2], ["table", 0.4, 0, 1]],
       }),
       R("bath", 7.8, 8.8, 9.6, 11.2, {
         name: "Staff washroom", paint: "mint", floorCol: "wtile",
         doors: [d("S", 8.6, "int_pvc", 0.8)], wins: [win("N", 8.7)],
+        furniture: [["toilet", 0.5, 0.73, 2], ["basin", -0.56, 0.1, 1]],
       }),
     ],
   },
@@ -556,42 +623,53 @@ const PLANS = {
       R("hallway", 6.8, 0, 9.2, 2.6, {
         rot: 1, name: "Lobby", paint: "white", floorCol: "slate",
         doors: [d("S", 8.0, "ext_glass", 1.8, 2.3)],
+        furniture: [["plant", -0.935, 0.835, 0]],
       }),
       R("hall", 0, 0, 6.8, 7.4, {
         name: "Agent bay A", paint: "gray", floorCol: "gtile",
         doors: [d("E", 1.3, "int_hard", 0.9)],
         wins: [win("W", 3.7, "pano"), win("S", 3.4, "pano")],
-        furniture: desks(3, 3, { sx: 2.0, sz: 2.2 }),
+        furniture: desks(3, 3, { sx: 1.9, sz: 2.2, oz: -0.5 }),
       }),
       R("hall", 9.2, 0, 16.0, 7.4, {
         name: "Agent bay B", paint: "gray", floorCol: "gtile",
         doors: [d("W", 1.3, "int_hard", 0.9)],
         wins: [win("E", 3.7, "pano"), win("S", 12.6, "pano")],
-        furniture: desks(3, 3, { sx: 2.0, sz: 2.2 }),
+        furniture: desks(3, 3, { sx: 1.9, sz: 2.2, oz: -0.5 }),
       }),
       R("hallway", 6.8, 2.6, 9.2, 7.4, {
-        rot: 1, name: "Spine", paint: "white", floorCol: "slate", doors: [d("S", 8.0, "int_hard", 1.0)],
+        rot: 1, name: "Spine", paint: "white", floorCol: "slate",
+        doors: [d("S", 8.0, "int_hard", 1.0), d("W", 5.0, "int_hard", 0.9), d("E", 5.0, "int_hard", 0.9)],
+        furniture: [],
       }),
       R("bedroom", 0, 7.4, 3.6, 11.0, {
         name: "Manager cabin", paint: "beige", floorCol: "ash",
         doors: [d("S", 1.8, "int_panel")], wins: [win("N", 1.8), win("W", 9.2)],
+        furniture: [["desk", 0, 0.5, 0], ["office_chair", 0, 1.28, 2], ["chair", -0.4, -0.25, 0],
+          ["chair", 0.4, -0.25, 0], ["bookshelf", -1.485, -1.1, 1], ["plant", 1.435, -1.435, 0]],
       }),
       R("bedroom", 3.6, 7.4, 7.2, 11.0, {
         name: "Training room", paint: "sage", floorCol: "ash",
         doors: [d("S", 5.4)], wins: [win("N", 5.4)],
+        furniture: boardroom(3, { sx: 1.0, oz: 0.3, ox: -0.25 }).concat([["tv", 1.46, 0.3, 3]]),
       }),
       R("kitchen", 7.2, 7.4, 12.0, 11.4, {
         name: "Cafeteria", paint: "terra", floorCol: "terra",
         doors: [d("S", 10.0, "int_hard", 0.9)], wins: [win("N", 9.6, "pano")],
-        furniture: [["kunit", -1.3, -1.5, 0], ["fridge", 1.9, -1.5, 0]]
-          .concat(cafeTables(2, { sx: 2.1, oz: 0.8 })),
+        furniture: [["kunit", -1.3, -1.5, 0], ["fridge", 1.9, -1.5, 0],
+          ["table", -1.1, 0.6, 0], ["chair", -1.45, -0.05, 0], ["chair", -0.75, -0.05, 0],
+          ["chair", -1.45, 1.25, 2], ["chair", -0.75, 1.25, 2],
+          ["table", 1.1, 0.6, 0], ["chair", 0.75, -0.05, 0], ["chair", 1.45, -0.05, 0],
+          ["chair", 0.75, 1.25, 2], ["chair", 1.45, 1.25, 2]],
       }),
       R("bath", 12.0, 7.4, 14.2, 9.8, {
         name: "Washroom", paint: "mint", floorCol: "wtile", doors: [d("S", 13.1, "int_pvc", 0.8)],
+        furniture: [["toilet", -0.55, 0.735, 2], ["basin", 0.5, 0.86, 2], ["mirror_cab", 0.5, 0.985, 2]],
       }),
       R("bath", 14.2, 7.4, 16.0, 9.8, {
         name: "Washroom", paint: "mint", floorCol: "wtile",
         doors: [d("S", 15.1, "int_pvc", 0.8)], wins: [win("E", 8.6)],
+        furniture: [["toilet", -0.45, 0.735, 2], ["basin", 0.4, 0.86, 2], ["mirror_cab", 0.4, 0.985, 2]],
       }),
     ],
   },
@@ -601,38 +679,45 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.0, 4.6, {
         name: "Model foyer", paint: "white", floorCol: "gtile",
-        doors: [d("S", 3.6, "ext_glass", 2.0, 2.4), d("N", 2.5), d("E", 2.0, "int_hard", 1.0)],
+        doors: [d("S", 3.6, "ext_glass", 2.0, 2.4)],
         wins: [win("S", 1.2, "pano"), win("W", 2.3, "pano")],
         furniture: [["table", -0.9, 0, 0], ["desk", 1.4, -1.2, 0], ["chair", 1.4, -0.4, 2],
           ["plant", 1.9, 1.5, 0]],
       }),
       R("hall", 5.0, 0, 12.0, 4.6, {
         name: "Presentation lounge", paint: "greige", floorCol: "walnut",
-        doors: [d("N", 8.0)], wins: [win("S", 8.5, "pano"), win("E", 2.3, "pano")],
+        doors: [d("W", 2.0, "int_hard", 1.0)], wins: [win("S", 8.5, "pano"), win("E", 2.3, "pano")],
         furniture: [["sofa", -2.2, -1.3, 0], ["sofa", 0.2, -1.3, 0], ["coffee", -1.0, -0.2, 0],
-          ["tv", -1.0, 1.5, 0]].concat(boardroom(2, { sx: 1.0, ox: 2.0, oz: 0.2 })),
+          ["tv", -1.0, 1.96, 2]].concat(boardroom(2, { sx: 1.0, ox: 2.0, oz: 0.2 })),
       }),
       R("hallway", 0, 4.6, 6.2, 6.0, {
-        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("E", 5.3)],
+        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("S", 2.5), d("E", 5.3)], furniture: [],
       }),
       R("hallway", 6.2, 4.6, 12.0, 6.0, {
-        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("W", 5.3)],
+        name: "Corridor", paint: "white", floorCol: "ash", doors: [d("S", 11.0)], furniture: [],
       }),
       R("bedroom", 0, 6.0, 3.2, 9.6, {
         name: "Closing room", paint: "cream", floorCol: "oak",
         doors: [d("S", 1.6, "int_panel")], wins: [win("N", 1.6), win("W", 7.8)],
+        furniture: [["table", 0, 0.5, 0], ["chair", -0.35, -0.15, 0], ["chair", 0.35, -0.15, 0],
+          ["chair", -0.35, 1.15, 2], ["chair", 0.35, 1.15, 2], ["plant", 1.235, -1.435, 0]],
       }),
       R("bedroom", 3.2, 6.0, 6.4, 9.6, {
         name: "Closing room", paint: "cream", floorCol: "oak",
         doors: [d("S", 4.8, "int_panel")], wins: [win("N", 4.8)],
+        furniture: [["table", 0, 0.5, 0], ["chair", -0.35, -0.15, 0], ["chair", 0.35, -0.15, 0],
+          ["chair", -0.35, 1.15, 2], ["chair", 0.35, 1.15, 2], ["plant", 1.235, -1.435, 0]],
       }),
       R("bedroom", 6.4, 6.0, 9.6, 9.6, {
         name: "Closing room", paint: "cream", floorCol: "oak",
         doors: [d("S", 8.0, "int_panel")], wins: [win("N", 8.0)],
+        furniture: [["table", 0, 0.5, 0], ["chair", -0.35, -0.15, 0], ["chair", 0.35, -0.15, 0],
+          ["chair", -0.35, 1.15, 2], ["chair", 0.35, 1.15, 2], ["plant", -1.235, -1.435, 0]],
       }),
       R("kitchen", 9.6, 6.0, 12.0, 8.2, {
         name: "Pantry", paint: "mint", floorCol: "wtile",
-        doors: [d("S", 10.8)], wins: [win("E", 7.1)],
+        doors: [d("S", 10.2)], wins: [win("E", 7.4)],
+        furniture: [["kunit", 0, 0.66, 2], ["fridge", 0.71, -0.61, 0]],
       }),
     ],
   },
@@ -642,41 +727,52 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.4, 4.2, {
         name: "Coffee lounge", paint: "cream", floorCol: "oak",
-        doors: [d("S", 4.2, "ext_glass", 1.8, 2.3), d("E", 2.0, "int_hard", 0.9)],
+        doors: [d("S", 4.2, "ext_glass", 1.8, 2.3)],
         wins: [win("S", 1.4, "pano"), win("W", 2.1, "pano")],
-        furniture: [["sofa", -1.2, -1.1, 0], ["coffee", -1.2, -0.1, 0], ["kunit", 1.4, -1.2, 0],
-          ["table", 1.0, 1.0, 0], ["chair", 1.0, 0.3, 0], ["plant", 2.1, 1.3, 0]],
+        furniture: [["sofa", -1.2, -1.1, 0], ["coffee", -1.2, -0.1, 0], ["kunit", 1.2, 1.66, 2],
+          ["table", 0.9, 0.3, 0], ["chair", 0.55, -0.35, 0], ["chair", 1.25, -0.35, 0],
+          ["chair", 0.55, 0.95, 2], ["chair", 1.25, 0.95, 2], ["plant", -2.335, 1.635, 0]],
       }),
       R("hallway", 5.4, 0, 6.8, 5.6, {
-        rot: 1, name: "Corridor", paint: "white", floorCol: "ash", doors: [d("N", 6.1)],
+        rot: 1, name: "Corridor", paint: "white", floorCol: "ash",
+        doors: [d("W", 2.0, "int_hard", 0.9)], furniture: [],
       }),
       R("hallway", 5.4, 5.6, 6.8, 11.0, {
-        rot: 1, name: "Corridor", paint: "white", floorCol: "ash", doors: [d("S", 6.1)],
+        rot: 1, name: "Corridor", paint: "white", floorCol: "ash", doors: [d("S", 6.1)], furniture: [],
       }),
       R("bedroom", 6.8, 0, 10.2, 3.2, {
         name: "Private office", paint: "beige", floorCol: "ash",
         doors: [d("W", 1.6, "int_mdf")], wins: [win("E", 1.6), win("S", 8.5)],
+        furniture: [["desk", 0.3, 0.2, 0], ["office_chair", 0.3, 0.98, 2], ["chair", 0, -0.5, 0],
+          ["chair", 0.6, -0.5, 0], ["plant", 1.335, -1.235, 0]],
       }),
       R("bedroom", 6.8, 3.2, 10.2, 6.4, {
         name: "Private office", paint: "beige", floorCol: "ash",
         doors: [d("W", 4.6, "int_mdf")], wins: [win("E", 4.8)],
+        furniture: [["desk", 0.3, 0.2, 0], ["office_chair", 0.3, 0.98, 2], ["chair", 0, -0.5, 0],
+          ["chair", 0.6, -0.5, 0], ["plant", 1.335, -1.235, 0]],
       }),
       R("bedroom", 2.0, 4.2, 5.4, 7.6, {
         name: "Private office", paint: "beige", floorCol: "ash",
         doors: [d("E", 6.2, "int_mdf")], wins: [win("W", 5.9)],
+        furniture: [["desk", -0.3, 0.2, 0], ["office_chair", -0.3, 0.98, 2], ["chair", -0.6, -0.5, 0],
+          ["chair", 0, -0.5, 0], ["plant", -1.335, -1.235, 0]],
       }),
       R("bedroom", 2.0, 7.6, 5.4, 11.0, {
         name: "Private office", paint: "beige", floorCol: "ash",
         doors: [d("E", 9.3, "int_mdf")], wins: [win("W", 9.3), win("N", 3.7)],
+        furniture: [["desk", -0.3, 0.2, 0], ["office_chair", -0.3, 0.98, 2], ["chair", -0.6, -0.5, 0],
+          ["chair", 0, -0.5, 0], ["plant", -1.335, -1.235, 0]],
       }),
       R("hall", 6.8, 6.4, 10.8, 10.4, {
         name: "Shared meeting room", paint: "greige", floorCol: "walnut",
         doors: [d("W", 7.1, "int_panel", 0.9)], wins: [win("E", 8.4, "pano"), win("N", 8.8, "pano")],
-        furniture: boardroom(3, { sx: 1.0 }).concat([["tv", -1.1, 1.5, 0]]),
+        furniture: boardroom(3, { sx: 1.0, ox: 0.25 }).concat([["tv", -1.66, 0.5, 1]]),
       }),
       R("bath", 5.4, 11.0, 7.4, 13.4, {
         name: "Washroom", paint: "mint", floorCol: "wtile",
         doors: [d("S", 6.1, "int_pvc", 0.8)], wins: [win("N", 6.4)],
+        furniture: [["toilet", 0.5, 0.735, 2], ["basin", -0.66, 0.4, 1], ["mirror_cab", -0.785, 0.4, 1]],
       }),
     ],
   },
@@ -686,27 +782,36 @@ const PLANS = {
   oth_japandi: {
     profile: "home",
     rooms: [
-      R("veranda", 0, 0, 6.0, 2.6, { name: "Engawa veranda", floorCol: "oak" }),
+      R("veranda", 0, 0, 6.0, 2.6, {
+        name: "Engawa veranda", floorCol: "oak",
+        furniture: [["armchair", -2.3, -0.3, 0], ["side_table", -1.575, -0.3, 0], ["armchair", -0.85, -0.3, 0],
+          ["plant", 2.6, 0.9, 0]],
+      }),
       R("hall", 0, 2.6, 7.4, 8.0, {
         name: "Living", paint: "cream", floorCol: "oak",
         doors: [d("S", 3.0, "ext_glass", 2.2, 2.3)],
         wins: [win("W", 4.0, "pano"), win("W", 6.6, "pano"), win("E", 7.0)],
-        furniture: [["sofa", -1.9, -1.2, 0], ["coffee", -1.9, -0.1, 0], ["tv", -1.9, 1.4, 0],
-          ["table", 1.9, 0.4, 0], ["chair", 1.2, 0.4, 1], ["chair", 2.6, 0.4, 3],
-          ["plant", 3.2, -1.9, 0]],
+        furniture: [["sofa", -1.9, -1.2, 0], ["coffee", -1.9, -0.1, 0], ["tv", -1.9, 2.36, 2],
+          ["rug", -1.9, -0.3, 0],
+          ["table", 1.9, 0.4, 0], ["chair", 1.55, -0.25, 0], ["chair", 2.25, -0.25, 0],
+          ["chair", 1.55, 1.05, 2], ["chair", 2.25, 1.05, 2], ["plant", 3.335, -2.335, 0]],
       }),
       R("kitchen", 7.4, 2.6, 10.4, 6.0, {
         name: "Kitchen", paint: "greige", floorCol: "honey",
         doors: [d("W", 4.0, "int_hard", 0.9)], wins: [win("E", 4.3), win("S", 8.9)],
+        furniture: [["kunit", 0.3, 1.26, 2], ["kunit", 1.06, -0.3, 3], ["fridge", -1.01, -1.21, 0]],
       }),
       R("bedroom", 0, 8.0, 4.6, 12.0, {
         name: "Master bedroom", paint: "beige", floorCol: "oak",
-        doors: [d("S", 2.3, "int_panel")], wins: [win("N", 2.3, "pano"), win("W", 10.0)],
+        doors: [d("S", 3.6, "int_panel")], wins: [win("N", 2.3, "pano"), win("W", 10.0)],
+        furniture: [["bed", -0.4, 0.86, 2], ["nightstand", -1.45, 1.66, 2], ["nightstand", 0.65, 1.66, 2],
+          ["wardrobe", -1.2, -1.56, 0], ["rug", -0.4, -0.4, 0], ["plant", 1.935, 1.635, 0]],
       }),
       R("bath", 4.6, 8.0, 7.0, 10.6, {
         name: "Master bath", paint: "mint", floorCol: "wtile",
         doors: [d("W", 9.3, "int_pvc", 0.8)], wins: [win("E", 9.3)],
-        furniture: [["bath", -0.2, 0.6, 0], ["toilet", -0.7, -0.6, 0], ["basin", 0.6, -0.6, 0]],
+        furniture: [["bath", 0.685, 0.31, 3], ["toilet", 0, -0.835, 0], ["basin", -0.5, 0.86, 2],
+          ["mirror_cab", -0.5, 0.985, 2]],
       }),
     ],
   },
@@ -714,22 +819,31 @@ const PLANS = {
   oth_cabin: {
     profile: "home",
     rooms: [
-      R("veranda", 0, 0, 5.4, 2.4, { name: "Deck", floorCol: "walnut" }),
+      R("veranda", 0, 0, 5.4, 2.4, {
+        name: "Deck", floorCol: "walnut",
+        furniture: [["armchair", -1.8, -0.2, 0], ["armchair", -0.7, -0.2, 0], ["plant", 2.2, 0.7, 0]],
+      }),
       R("hall", 0, 2.4, 6.6, 8.4, {
         name: "Great room", paint: "white", floorCol: "walnut",
         doors: [d("S", 2.7, "ext_hard", 1.0, 2.1)],
         wins: [win("W", 5.4, "pano"), win("N", 3.3, "pano")],
-        furniture: [["sofa", -1.6, -1.6, 0], ["coffee", -1.6, -0.5, 0], ["tv", -1.6, 1.4, 0],
-          ["table", 1.7, -0.6, 0], ["chair", 1.0, -0.6, 1], ["chair", 2.4, -0.6, 3],
-          ["plant", 2.5, 2.2, 0]],
+        furniture: [["sofa", -1.6, -1.6, 0], ["coffee", -1.6, -0.5, 0], ["armchair", -0.1, -0.5, 3],
+          ["rug", -1.6, -0.7, 0],
+          ["table", 1.7, -0.6, 0], ["chair", 1.35, -1.25, 0], ["chair", 2.05, -1.25, 0],
+          ["chair", 1.35, 0.05, 2], ["chair", 2.05, 0.05, 2],
+          ["bed", -2.36, 1.86, 2], ["nightstand", -1.335, 2.66, 2], ["wardrobe", 2.0, 2.56, 2],
+          ["plant", 2.935, -2.635, 0]],
       }),
       R("kitchen", 6.6, 2.4, 9.2, 5.2, {
         name: "Kitchenette", paint: "greige", floorCol: "honey",
-        doors: [d("W", 3.8, "int_hard", 0.9)], wins: [win("E", 3.8), win("S", 7.9)],
+        doors: [d("W", 3.8, "int_hard", 0.9)], wins: [win("E", 3.8), win("S", 7.5)],
+        furniture: [["kunit", 0.2, 0.96, 2], ["fridge", 0.81, -0.91, 0]],
       }),
       R("bath", 6.6, 5.2, 8.6, 7.4, {
         name: "Compact bath", paint: "mint", floorCol: "wtile",
-        doors: [d("W", 6.3, "int_pvc", 0.8)], wins: [win("E", 6.3)],
+        doors: [d("W", 6.3, "int_pvc", 0.8)], wins: [win("N", 7.6)],
+        furniture: [["toilet", 0.5, 0.635, 2], ["basin", -0.3, 0.76, 2], ["mirror_cab", -0.3, 0.885, 2],
+          ["shower", 0.41, -0.51, 0]],
       }),
     ],
   },
@@ -739,26 +853,35 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 7.8, 6.4, {
         name: "Living", paint: "gray", floorCol: "slate",
-        doors: [d("S", 3.9, "ext_glass", 2.4, 2.4)],
+        doors: [d("S", 3.9, "ext_glass", 2.4, 2.4), d("E", 4.8, "ext_glass", 1.2, 2.3)],
         wins: [win("S", 1.4, "pano"), win("W", 3.2, "pano"), win("S", 6.4, "pano")],
-        furniture: [["sofa", -2.2, -1.9, 0], ["sofa", 0.4, -1.9, 0], ["coffee", -0.9, -0.7, 0],
-          ["tv", -0.9, 1.6, 0], ["table", 2.4, 1.6, 0], ["chair", 1.7, 1.6, 1],
-          ["chair", 3.1, 1.6, 3], ["plant", 3.2, -2.4, 0]],
+        furniture: [["sofa", -1.65, -1.9, 0], ["sofa", 0.45, -1.9, 0], ["coffee", -0.6, -0.7, 0],
+          ["rug", -0.6, -0.6, 0], ["tv", -0.1, 2.86, 2],
+          ["table", 2.3, 1.6, 0], ["chair", 1.95, 0.95, 0], ["chair", 2.65, 0.95, 0],
+          ["chair", 1.95, 2.25, 2], ["chair", 2.65, 2.25, 2], ["plant", 3.2, -2.4, 0]],
       }),
       R("kitchen", 7.8, 0, 11.4, 3.6, {
         name: "Kitchen", paint: "white", floorCol: "slate",
         doors: [d("W", 1.8, "int_hard", 0.9)], wins: [win("E", 1.8, "pano"), win("S", 9.6)],
+        furniture: [["kunit", 0.3, 1.36, 2], ["kunit", 1.36, -0.4, 3], ["fridge", -1.31, -1.31, 0],
+          ["table", -0.2, 0, 0], ["bar_stool", -0.5, -0.6, 0], ["bar_stool", 0.1, -0.6, 0]],
       }),
-      R("balcony", 7.8, 3.6, 11.4, 6.0, { name: "Terrace", floorCol: "slate" }),
+      R("balcony", 7.8, 3.6, 11.4, 6.0, {
+        name: "Terrace", floorCol: "slate",
+        furniture: [["armchair", -0.3, 0.1, 0], ["side_table", 0.45, 0.1, 0], ["armchair", 1.2, 0.1, 0],
+          ["plant", 1.435, -0.835, 0]],
+      }),
       R("bedroom", 0, 6.4, 4.8, 10.4, {
         name: "Bedroom", paint: "greige", floorCol: "walnut",
-        doors: [d("S", 2.4, "int_panel")], wins: [win("N", 2.4, "pano"), win("W", 8.4)],
+        doors: [d("S", 2.55, "int_panel")], wins: [win("N", 2.4, "pano"), win("W", 8.4)],
+        furniture: [["bed", -0.6, 0.86, 2], ["nightstand", -1.65, 1.66, 2], ["nightstand", 0.45, 1.66, 2],
+          ["wardrobe", -1.36, -1.56, 0], ["dresser", 2.01, 1.0, 3], ["rug", -0.6, -0.5, 0]],
       }),
       R("bath", 4.8, 6.4, 7.8, 9.8, {
         name: "Luxury bath", paint: "mint", floorCol: "wtile",
         doors: [d("W", 8.1, "int_pvc", 0.8)], wins: [win("E", 8.1), win("N", 6.3)],
-        furniture: [["bath", 0.4, 0.9, 0], ["shower", -0.9, 0.9, 0], ["toilet", -0.9, -0.9, 0],
-          ["basin", 0.6, -1.0, 0]],
+        furniture: [["bath", 0.5, 1.185, 2], ["shower", 0.91, -1.11, 0], ["toilet", -0.2, -1.235, 0],
+          ["basin", -1.0, -1.36, 0], ["mirror_cab", -1.0, -1.485, 0]],
       }),
     ],
   },
@@ -768,32 +891,35 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.6, 4.4, {
         name: "Reception lounge", paint: "sage", floorCol: "oak",
-        doors: [d("S", 4.3, "ext_glass", 1.8, 2.3), d("N", 2.0, "int_hard", 0.9), d("E", 1.5, "int_hard", 0.9),
-          d("E", 3.7, "int_pvc", 0.8)],
+        doors: [d("S", 4.3, "ext_glass", 1.8, 2.3)],
         wins: [win("S", 1.4, "pano"), win("W", 2.2, "pano")],
-        furniture: [["sofa", -1.4, -1.2, 0], ["coffee", -1.4, -0.2, 0], ["desk", 1.4, -1.2, 0],
-          ["chair", 1.4, -0.3, 2], ["plant", 2.2, 1.4, 0]],
+        furniture: [["sofa", -1.4, -1.2, 0], ["coffee", -1.4, -0.2, 0], ["desk", 1.0, 0.3, 0],
+          ["office_chair", 1.0, 1.08, 2], ["chair", 1.0, -0.45, 0], ["plant", -2.4, 1.8, 0]],
       }),
       R("hall", 0, 4.4, 8.0, 11.4, {
         name: "Practice hall", paint: "white", floorCol: "oak",
-        doors: [d("S", 2.0, "int_hard", 0.9), d("E", 6.0, "int_hard", 0.9)],
+        doors: [d("S", 2.0, "int_hard", 0.9)],
         wins: [win("N", 4.0, "pano"), win("W", 7.9, "pano"), win("N", 6.6, "pano")],
         furniture: [["plant", -3.4, -3.0, 0], ["plant", 3.4, -3.0, 0], ["plant", -3.4, 3.0, 0],
-          ["walllamp", 0, 3.2, 0]],
+          ["walllamp", 0, 3.2, 0], ["rug", -2.0, -0.8, 1], ["rug", 0, -0.8, 1], ["rug", 2.0, -0.8, 1],
+          ["rug", -2.0, 1.2, 1], ["rug", 0, 1.2, 1], ["rug", 2.0, 1.2, 1]],
       }),
       R("bedroom", 5.6, 0, 8.6, 3.0, {
         name: "Changing room", paint: "lavender", floorCol: "wtile",
         doors: [d("W", 1.5, "int_hard", 0.9)], wins: [win("E", 1.5), win("S", 7.1)],
-        furniture: [["wardrobe", -0.9, -0.4, 1], ["wardrobe", 0.9, -0.4, 1], ["chair", 0, 0.7, 0]],
+        furniture: [["wardrobe", 0.4, 1.06, 2], ["dresser", 1.11, -0.6, 3], ["chair", -0.2, -0.9, 0],
+          ["chair", 0.4, -0.9, 0], ["mirror_cab", -1.285, -1.0, 1]],
       }),
       R("bath", 5.6, 3.0, 7.8, 4.4, {
         name: "Washroom", paint: "mint", floorCol: "wtile",
         doors: [d("W", 3.7, "int_pvc", 0.8)],
-        furniture: [["toilet", -0.6, -0.2, 0], ["basin", 0.6, -0.3, 0]],
+        furniture: [["toilet", 0.635, 0.1, 3], ["basin", 0, 0.36, 2]],
       }),
       R("bedroom", 8.0, 4.4, 11.2, 7.6, {
         name: "Treatment room", paint: "mint", floorCol: "oak",
         doors: [d("W", 6.0, "int_mdf")], wins: [win("E", 6.0), win("S", 9.6)],
+        furniture: [["bed_single", 0.3, 0.46, 2], ["chair", -0.55, 1.1, 0], ["dresser", 1.21, -0.8, 3],
+          ["plant", -1.235, -1.235, 0]],
       }),
     ],
   },
@@ -803,41 +929,46 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 5.0, 3.6, {
         name: "Entrance foyer", paint: "white", floorCol: "gtile",
-        doors: [d("S", 1.6, "ext_glass", 2.0, 2.4), d("N", 2.5, "int_hard", 0.9),
-          d("E", 1.8, "int_hard", 1.0)],
+        doors: [d("S", 1.6, "ext_glass", 2.0, 2.4)],
         wins: [win("S", 3.8, "pano")],
-        furniture: [["desk", -1.2, -0.8, 0], ["chair", -1.2, 0.0, 2], ["plant", 1.9, 1.1, 0],
-          ["sofa", 0.6, -1.1, 0]],
+        furniture: [["desk", -1.4, 0.3, 0], ["office_chair", -1.4, 1.08, 2], ["plant", 2.135, 1.435, 0],
+          ["sofa", 1.2, -1.21, 0], ["coffee", 1.2, -0.3, 0]],
       }),
       R("hall", 5.0, 0, 12.8, 7.0, {
         name: "Lecture hall", paint: "greige", floorCol: "gtile",
         doors: [d("W", 1.8, "int_hard", 1.0)],
         wins: [win("S", 8.8, "pano"), win("E", 3.5, "pano"), win("N", 10.5, "pano")],
         furniture: seating(6, 4, { sx: 0.8, sz: 1.0, oz: 0.6 }).concat([["desk", 0, -2.6, 0],
-          ["tv", -2.4, -2.9, 0]]),
+          ["tv", -2.4, -3.16, 0]]),
       }),
       R("hallway", 0, 3.6, 5.0, 5.0, {
         name: "Corridor", paint: "white", floorCol: "gtile",
-        doors: [d("S", 2.5, "int_hard", 0.9), d("E", 4.3, "int_hard", 0.9)],
+        doors: [d("S", 2.5, "int_hard", 0.9), d("E", 4.3, "int_hard", 0.9)], furniture: [],
       }),
       R("hallway", 3.6, 5.0, 5.0, 10.0, {
         rot: 1, name: "Corridor", paint: "white", floorCol: "gtile", doors: [d("S", 4.3, "int_hard", 0.9)],
+        furniture: [],
       }),
       R("bedroom", 0, 5.0, 3.6, 8.4, {
         name: "Seminar room", paint: "sage", floorCol: "ash",
         doors: [d("E", 6.7, "int_mdf")], wins: [win("W", 6.7)],
+        furniture: seating(3, 3, { sx: 0.8, sz: 0.95, ox: -0.3, oz: 0.2 }).concat([["tv", -0.4, -1.36, 0]]),
       }),
       R("bedroom", 0, 8.4, 3.6, 11.8, {
         name: "Seminar room", paint: "sage", floorCol: "ash",
         doors: [d("E", 9.5, "int_mdf")], wins: [win("W", 10.1), win("N", 1.8)],
+        furniture: seating(3, 3, { sx: 0.8, sz: 0.95, ox: -0.3, oz: 0.2 }).concat([["tv", -0.4, -1.36, 0]]),
       }),
       R("bedroom", 5.0, 7.0, 8.4, 9.8, {
         name: "Administration", paint: "beige", floorCol: "ash",
         doors: [d("W", 8.4, "int_mdf")], wins: [win("E", 8.4), win("N", 6.7)],
+        furniture: [["desk", 0.1, -0.96, 0], ["office_chair", 0.1, -0.18, 2], ["desk", 0.96, 0.96, 2],
+          ["office_chair", 0.96, 0.18, 0], ["plant", -1.335, -1.035, 0]],
       }),
       R("bath", 3.6, 10.0, 5.2, 12.4, {
         name: "Washroom", paint: "mint", floorCol: "wtile",
         doors: [d("S", 4.2, "int_pvc", 0.8)], wins: [win("E", 11.2)],
+        furniture: [["toilet", -0.3, 0.735, 2], ["basin", 0.46, 0.3, 3]],
       }),
     ],
   },
@@ -847,33 +978,40 @@ const PLANS = {
     rooms: [
       R("hall", 0, 0, 7.6, 5.6, {
         name: "Dining lounge", paint: "cream", floorCol: "honey",
-        doors: [d("S", 3.6, "ext_glass", 2.0, 2.3), d("E", 4.0, "int_hard", 1.0),
-          d("N", 2.2, "int_hard", 0.9), d("N", 6.9, "int_pvc", 0.8)],
+        doors: [d("S", 3.6, "ext_glass", 2.0, 2.3), d("E", 0.8, "ext_glass", 1.0, 2.3)],
         wins: [win("S", 1.2, "pano"), win("S", 6.2, "pano"), win("W", 2.8, "pano")],
-        furniture: cafeTables(3, { sx: 2.2, oz: -1.3 })
-          .concat(cafeTables(3, { sx: 2.2, oz: 1.3 })),
+        furniture: [-2.625, -0.875, 0.875, 2.625].flatMap((x) => [["table", x, -0.7, 1],
+          ["chair", r3(x - 0.65), -0.7, 1], ["chair", r3(x + 0.65), -0.7, 3]])
+          .concat([-2.625, -0.875, 0.875].flatMap((x) => [["table", x, 1.25, 1],
+            ["chair", r3(x - 0.65), 1.25, 1], ["chair", r3(x + 0.65), 1.25, 3]]))
+          .concat([["plant", -3.435, 2.435, 0]]),
       }),
-      R("veranda", 7.6, 0, 11.0, 2.4, { name: "Terrace seating", floorCol: "terra" }),
+      R("veranda", 7.6, 0, 11.0, 2.4, {
+        name: "Terrace seating", floorCol: "terra",
+        furniture: cafeTables(1, { ox: 0.3 }).concat([["plant", -1.335, 0.835, 0]]),
+      }),
       R("hall", 7.6, 2.4, 11.0, 5.6, {
         name: "Coffee bar", paint: "terra", floorCol: "terra",
         doors: [d("W", 4.0, "int_hard", 1.0)], wins: [win("E", 4.0, "pano")],
-        furniture: [["kunit", 0, -1.1, 0], ["kunit", -1.2, 0, 1], ["fridge", 1.2, 1.0, 0],
-          ["chair", -0.2, 0.9, 0], ["chair", 0.8, 0.9, 0]],
+        furniture: [["kunit", -0.4, 1.16, 2], ["fridge", 0.9, 1.11, 2], ["table", 0.2, -0.3, 0],
+          ["bar_stool", -0.1, -0.95, 0], ["bar_stool", 0.5, -0.95, 0]],
       }),
       R("kitchen", 0, 5.6, 4.0, 9.0, {
         name: "Kitchen", paint: "white", floorCol: "wtile",
-        doors: [d("S", 2.2, "int_hard", 0.9), d("E", 6.9, "int_hard", 0.9)],
+        doors: [d("S", 2.2, "int_hard", 0.9)],
         wins: [win("N", 2.0), win("W", 7.3)],
-        furniture: [["kunit", -0.9, -1.1, 0], ["kunit", 0.6, -1.1, 0], ["fridge", 1.5, 1.1, 0],
-          ["table", -0.8, 0.9, 0]],
+        furniture: [["kunit", -0.9, 1.26, 2], ["kunit", 0.9, 1.26, 2], ["kunit", -1.56, -0.1, 1],
+          ["fridge", -0.9, -1.21, 0], ["table", 0.4, 0.1, 0]],
       }),
       R("kitchen", 4.0, 5.6, 6.0, 8.2, {
         name: "Prep & store", paint: "white", floorCol: "wtile",
         doors: [d("W", 6.9, "int_hard", 0.9)], wins: [win("N", 5.0)],
+        furniture: [["kunit", 0.56, 0, 3], ["bookshelf", -0.3, -0.985, 0]],
       }),
       R("bath", 6.0, 5.6, 7.8, 8.0, {
         name: "Guest washroom", paint: "mint", floorCol: "wtile",
         doors: [d("S", 6.9, "int_pvc", 0.8)], wins: [win("E", 6.8)],
+        furniture: [["toilet", -0.45, 0.735, 2], ["basin", 0.4, 0.86, 2], ["mirror_cab", 0.4, 0.985, 2]],
       }),
     ],
   },
@@ -881,22 +1019,27 @@ const PLANS = {
   oth_tiny: {
     profile: "home",
     rooms: [
-      R("veranda", 0, 0, 4.0, 1.8, { name: "Front deck", floorCol: "walnut" }),
+      R("veranda", 0, 0, 4.0, 1.8, {
+        name: "Front deck", floorCol: "walnut",
+        furniture: [["armchair", -1.3, -0.2, 0], ["side_table", -0.6, -0.2, 0], ["plant", 1.5, 0.4, 0]],
+      }),
       R("hall", 0, 1.8, 4.6, 7.0, {
         name: "Living & kitchen", paint: "white", floorCol: "oak",
         doors: [d("S", 2.0, "ext_hard", 0.9, 2.05)],
         wins: [win("W", 4.4, "pano"), win("N", 2.3, "pano")],
-        furniture: [["sofa", -1.1, -1.6, 0], ["coffee", -1.1, -0.6, 0], ["kunit", 1.1, -1.7, 0],
-          ["fridge", 1.7, -0.6, 0], ["table", 0.4, 1.4, 0], ["chair", -0.3, 1.4, 1],
-          ["chair", 1.1, 1.4, 3]],
+        furniture: [["sofa", -1.71, -0.5, 1], ["coffee", -0.8, -0.5, 1], ["kunit", 0.5, 2.16, 2],
+          ["fridge", 1.81, 2.11, 2], ["table", -0.8, 1.2, 0], ["chair", -1.75, 1.2, 1],
+          ["chair", 0.15, 1.2, 3]],
       }),
       R("bath", 4.6, 1.8, 6.4, 4.0, {
         name: "Wet bath", paint: "mint", floorCol: "wtile",
-        doors: [d("W", 2.9, "int_pvc", 0.8)], wins: [win("E", 2.9)],
+        doors: [d("W", 2.4, "int_pvc", 0.8)], wins: [win("S", 5.5)],
+        furniture: [["shower", 0.31, 0.51, 0], ["toilet", 0.5, -0.635, 0], ["basin", -0.45, 0.76, 2],
+          ["mirror_cab", -0.45, 0.885, 2]],
       }),
       R("stairs", 4.6, 4.0, 6.0, 7.0, {
         rot: 1, name: "Loft stair", paint: "white", floorCol: "walnut",
-        doors: [d("W", 5.5, "int_hard", 0.8)],
+        doors: [d("W", 5.5, "int_hard", 0.8)], furniture: [],
       }),
     ],
   },
@@ -906,30 +1049,36 @@ const PLANS = {
     rooms: [
       R("hallway", 0, 0, 1.6, 4.6, {
         rot: 1, name: "Entry hall", paint: "white", floorCol: "slate",
-        doors: [d("S", 0.8, "ext_hard", 0.9, 2.1)],
+        doors: [d("S", 0.8, "ext_hard", 0.9, 2.1)], furniture: [],
       }),
       R("hall", 1.6, 0, 6.8, 5.0, {
         name: "Living", paint: "cream", floorCol: "oak",
-        doors: [d("W", 1.6, "int_hard", 0.9), d("N", 3.0, "int_hard", 0.9), d("N", 6.0, "int_pvc", 0.8)],
+        doors: [d("W", 1.6, "int_hard", 0.9)],
         wins: [win("S", 4.2, "pano"), win("E", 2.5, "pano")],
-        furniture: [["sofa", -1.3, -1.4, 0], ["coffee", -1.3, -0.3, 0], ["tv", -1.3, 1.5, 0],
-          ["table", 1.5, 0.2, 0], ["chair", 0.8, 0.2, 1], ["chair", 2.2, 0.2, 3]],
+        furniture: [["sofa", 0, -1.4, 0], ["coffee", 0, -0.3, 0], ["tv", 0.05, 2.16, 2], ["rug", 0, -0.5, 0],
+          ["table", 1.6, 0.3, 0], ["chair", 1.25, -0.35, 0], ["chair", 1.95, -0.35, 0],
+          ["chair", 1.25, 0.95, 2], ["chair", 1.95, 0.95, 2]],
       }),
       R("kitchen", 1.6, 5.0, 5.2, 7.6, {
         name: "Kitchen", paint: "white", floorCol: "wtile",
         doors: [d("S", 3.0, "int_hard", 0.9)], wins: [win("N", 4.4)],
+        furniture: [["kunit", -0.7, 0.86, 2], ["kunit", 1.36, -0.2, 3], ["fridge", -1.31, -0.81, 0]],
       }),
       R("stairs", 0, 4.6, 1.6, 7.6, {
         rot: 1, name: "Stairs", paint: "white", floorCol: "slate",
-        doors: [d("S", 0.8, "int_hard", 0.8)],
+        doors: [d("S", 0.8, "int_hard", 0.8)], furniture: [],
       }),
       R("bath", 5.2, 5.0, 7.0, 7.4, {
         name: "Bathroom", paint: "mint", floorCol: "wtile",
-        doors: [d("S", 6.0, "int_pvc", 0.8)], wins: [win("E", 6.2)],
+        doors: [d("S", 6.0, "int_pvc", 0.8)], wins: [win("E", 5.75)],
+        furniture: [["shower", 0.31, 0.61, 0], ["toilet", -0.45, 0.735, 2], ["basin", -0.56, -0.1, 1],
+          ["mirror_cab", -0.685, -0.1, 1]],
       }),
       R("bedroom", 0, 7.6, 3.6, 11.2, {
         name: "Bedroom", paint: "greige", floorCol: "oak",
         doors: [d("S", 0.8, "int_panel")], wins: [win("N", 1.8, "pano"), win("W", 9.4)],
+        furniture: [["bed", 0.2, 0.66, 2], ["nightstand", -0.85, 1.46, 2], ["nightstand", 1.25, 1.46, 2],
+          ["wardrobe", 0.75, -1.36, 0], ["rug", 0.2, -0.6, 0]],
       }),
     ],
   },
@@ -1119,7 +1268,8 @@ function compileTemplate(key, plan) {
     if (room.floorCol) spec2.floorCol = room.floorCol;
     if (doors.length) spec2.doors = doors;
     if (wins.length) spec2.wins = wins;
-    if (furniture.length) spec2.furniture = furniture;
+    // an explicit list — even an empty one — replaces auto-furnish (corridors stay clear)
+    if (src.furniture) spec2.furniture = furniture;
     out.push(spec2);
   }
 
@@ -1135,6 +1285,15 @@ for (const k of planKeys) if (!paidKeys.includes(k)) err(k, "plan for a key that
 
 const compiled = {};
 for (const k of paidKeys) if (PLANS[k]) compiled[k] = compileTemplate(k, PLANS[k]);
+
+// Second, engine-level gate: check-plans.mjs replays builder.html's own geometry
+// and furnishRoom, so it also catches what this mirror cannot see — furniture in a
+// doorway, a piece clampFurn would shift, a room nobody can walk into.
+if (!errors.length) {
+  const { checkTemplate } = await import("./check-plans.mjs");
+  for (const [k, g] of Object.entries(compiled))
+    for (const e of checkTemplate({ key: k, profile: g.profile, rooms: g.rooms, free: false }).errors) err(k, e);
+}
 
 if (errors.length) {
   console.error(`gen-templates: ${errors.length} problem(s) — nothing written\n`);
