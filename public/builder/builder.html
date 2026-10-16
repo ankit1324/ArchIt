@@ -4074,9 +4074,22 @@ $('#resetB').addEventListener('click', ()=>{
 
 /* ============================== header / stage controls ============================== */
 function resetCam(){
-  controls.minDistance = 4; controls.maxDistance = 40; controls.maxPolarAngle = 1.45;
-  camera.position.set(10.5, 7.5, 12.5);
-  controls.target.set(0, 1.1, 0);
+  controls.minDistance = 4; controls.maxPolarAngle = 1.45;
+  // Frame every floor's footprint from the default 3/4 angle. Saved designs and
+  // paid geometry aren't guaranteed to be origin-centred, and big plans
+  // (farmhouse, bungalow) don't fit the old fixed 18 m orbit.
+  const floors = state?.floors || [{blocks: state?.blocks || []}];
+  const all = floors.flatMap(f=>f.blocks);
+  const bb = all.length ? boundsOf(all) : {cx:0, cz:0, w:0, d:0};
+  // +1.2 m for eaves overhang, +2.5 m headroom for a pitched roof
+  const R = Math.hypot(bb.w + 1.2, bb.d + 1.2, FLH()*floors.length + 2.5) / 2;
+  const vHalf = camera.fov * Math.PI / 360;
+  const half = Math.min(vHalf, Math.atan(Math.tan(vHalf) * camera.aspect));
+  const offset = new THREE.Vector3(10.5, 6.4, 12.5);   // camera (10.5, 7.5, 12.5) around target y 1.1
+  const dist = Math.max(offset.length(), R / Math.sin(half) * 1.1);
+  controls.maxDistance = Math.max(40, dist * 1.5);
+  controls.target.set(bb.cx, 1.1, bb.cz);
+  camera.position.copy(controls.target).addScaledVector(offset.normalize(), dist);
   controls.update();
 }
 function enterInterior(){
@@ -4388,7 +4401,7 @@ function openProjectFile(){
         if(!(o && o.v===3 && o.state && Array.isArray(o.state.blocks) && o.state.blocks.length)) throw 0;
         state = o.state; linkFloor();
         undoStack = []; redoStack = []; sel = null;
-        renderAll();
+        resetCam(); renderAll();
         toast('Project loaded');
       }catch(e){ toast('Not a valid project file'); }
     });
@@ -5039,6 +5052,17 @@ function buildFromGeometry(geometry){
   });
 }
 
+// Templates are authored in plot coordinates (0..W, 0..D); the camera, plot and
+// orbit target are origin-centred, so shift the built plan onto 0,0. Doors,
+// windows, partitions and furniture are room-local and move with their room.
+function centreBlocks(blocks){
+  if(!blocks.length) return;
+  const bb = boundsOf(blocks);
+  const dx = Math.round(bb.cx*10)/10, dz = Math.round(bb.cz*10)/10;
+  if(!dx && !dz) return;
+  const clean = n=>Math.round(n*1000)/1000;
+  blocks.forEach(b=>{ b.cx = clean(b.cx-dx); b.cz = clean(b.cz-dz); });
+}
 async function newProject(tpl='empty'){
   const floorCount = EMBED ? (state?.floors?.length || 1) : 1;
   state = freshState();
@@ -5053,6 +5077,7 @@ async function newProject(tpl='empty'){
   }else{
     TEMPLATES.empty.build();
   }
+  centreBlocks(state.blocks);
   undoStack = []; redoStack = []; sel = null;
   ui.interior = false; ui.focusRoomId = null; ui.tool = null;
   $('#btnIn').classList.remove('on');
@@ -5104,7 +5129,7 @@ resize();
       }
       setContext(p.plot, p.neighbors, p.facing);
       undoStack = []; redoStack = []; sel = null; dirty = false;
-      renderAll();
+      resetCam(); renderAll();
     });
     document.getElementById('saveMapB').addEventListener('click', ()=>{
       const all = (state.floors || [{blocks: state.blocks}]).flatMap(f=>f.blocks);
@@ -5122,11 +5147,11 @@ resize();
     parent.postMessage({type:'archit:ready'}, location.origin);
   } else if(await tryHashLoad()){
     undoStack = []; redoStack = []; sel = null;
-    renderAll();
+    resetCam(); renderAll();
     toast('Shared project loaded');
   } else if(loadProject()){
     undoStack = []; redoStack = []; sel = null;
-    renderAll();
+    resetCam(); renderAll();
   } else {
     newProject();
     showTemplatePicker();
