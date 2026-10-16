@@ -719,7 +719,8 @@ function windowFacesNeighbour(b, w){
   const [wx, wz] = localToWorld(b, ...wallPoint(b, wall, Number(w.t)));
   const horiz = Math.abs(az-bz) < Math.abs(ax-bx);
   for(const o of state.blocks){
-    if(o.id === b.id) continue;
+    // open rooms (veranda, balcony) are outdoors: a window onto one is fine
+    if(o.id === b.id || C.rooms[o.type]?.open) continue;
     for(let w2=0; w2<4; w2++){
       const [cx, cz] = localToWorld(o, ...wallPoint(o, w2, 0));
       const [dx, dz] = localToWorld(o, ...wallPoint(o, w2, 1));
@@ -4707,23 +4708,23 @@ addTemplate('in_villa', 'South Indian Courtyard Villa', 'indian', 'Front and rea
   planRoom('veranda',4.5,4.8,7.5,8.4,{name:'Nadumuttam courtyard',floorCol:'slate',furniture:[['plant',0,-0.2],['plant',-1.1,-1.4],['plant',1.1,-1.4]]}),
   planRoom('hallway',7.5,4.8,8.7,8.4,{name:'East courtyard passage',floorCol:'terra',doors:[[2,0.5],[0,0.5]],furniture:[]}),
   planRoom('hallway',0,6.6,3.3,8.4,{name:'Pooja room',paint:'cream',floorCol:'wtile',doors:[[1,0.5]],wins:[[3,0.5]],furniture:[['side_table',-1.05,0],['wall_art',-0.05,-0.725],['rug',0.05,0]]}),
-  planRoom('bath',8.7,6.6,12,8.4,{name:'Master bath',paint:'white',floorCol:'wtile',wins:[[1,0.5]],furniture:[['bath',0.65,0.375,2],['toilet',0.15,-0.425],['basin',-1.25,-0.55],['mirror_cab',-1.2,-0.675]]}),
+  planRoom('bath',8.7,6.6,12,8.4,{name:'Master bath',paint:'white',floorCol:'wtile',doors:[[0,0.273,'int_pvc',0.75]],wins:[[1,0.5]],furniture:[['bath',0.65,0.375,2],['toilet',0.15,-0.425],['basin',-1.25,-0.55],['mirror_cab',-1.2,-0.675]]}),
   planRoom('bedroom',0,8.4,3.3,12,{name:'Bedroom 2',paint:'blush',floorCol:'oak',doors:[[1,0.833]],wins:[[3,0.556],[0,0.5]],furniture:[['bed',-0.5,0.2,1],['nightstand',-1.3,-0.85,1],['nightstand',-1.3,1.25,1],['wardrobe',1.2,0.7,3],['rug',0.15,0.2,1]]}),
   planRoom('hall',3.3,8.4,8.7,12,{name:'Living hall',paint:'cream',floorCol:'terra',doors:[[0,0.5,'ext_hard',1],[2,0.5,'ext_glass',1.5]],wins:[[0,0.185],[0,0.815]],furniture:[['sofa',-2.1,0.4,1],['coffee',-1,0.4,1],['tv',2.35,0.4,3],['floor_lamp',2.35,-0.53],['rug',-0.6,0.4,1],['plant',2.3,1.4]]}),
-  planRoom('bedroom',8.7,8.4,12,12,{name:'Master bedroom',paint:'sage',floorCol:'walnut',doors:[[3,0.167],[2,0.727,'int_pvc',0.75]],wins:[[1,0.444],[0,0.5]],furniture:[['bed',0.5,0.2,3],['nightstand',1.3,-0.85,3],['nightstand',1.3,1.25,3],['wardrobe',-1.2,0.7,1],['rug',0.55,0.2,1]]}),
+  planRoom('bedroom',8.7,8.4,12,12,{name:'Master bedroom',paint:'sage',floorCol:'walnut',doors:[[3,0.167]],wins:[[1,0.444],[0,0.5]],furniture:[['bed',0.5,0.2,3],['nightstand',1.3,-0.85,3],['nightstand',1.3,1.25,3],['wardrobe',-1.2,0.7,1],['rug',0.55,0.2,1]]}),
   planRoom('veranda',3.3,12,8.7,14.1,{name:'Thinnai (front veranda)',floorCol:'terra',furniture:[['armchair',-1.4,0,1],['armchair',1.4,0,3],['plant',-2.25,0.6],['plant',2.25,0.6]]}),
 ]);
 addTemplate('in_kothi', 'North Indian Kothi (4BHK)', 'indian', 'Foyer, living, kitchen, four bedrooms and balconies', [
   planRoom('balcony',6,-1.5,10.2,0,{name:'Master balcony',floorCol:'slate',furniture:[['chair',-1.4,0,2],['side_table',-0.9,0],['chair',-0.4,0,2],['plant',1.7,0]]}),
   planRoom('bedroom',0,0,4.2,3.6,{name:'Bedroom 3',paint:'lavender',floorCol:'ash',doors:[[0,0.857]],wins:[[2,0.5],[3,0.444]],furniture:[['bed',-0.95,-0.2,1],['nightstand',-1.75,-1.3,1],['nightstand',-1.75,0.9,1],['wardrobe',1.65,-0.5,3],['dresser',-0.8,1.4,2],['rug',-0.1,-0.2,1]]}),
   planRoom('bath',4.2,0,6,3.6,{name:'Common bath',paint:'white',floorCol:'wtile',doors:[[0,0.5,'int_pvc',0.75]],wins:[[2,0.5]],furniture:[['basin',-0.45,-1.45],['mirror_cab',-0.45,-1.575],['toilet',0.45,-1.325],['shower',0.3,0.1,3]]}),
-  planRoom('bedroom',6,0,10.2,3.6,{name:'Master bedroom',paint:'sage',floorCol:'walnut',doors:[[0,0.31],[1,0.167,'int_pvc',0.75],[2,0.333,'ext_glass',0.9]],wins:[[2,0.762]],furniture:[['bed',-0.95,-0.2,1],['nightstand',-1.75,-1.25,1],['nightstand',-1.75,0.85,1],['wardrobe',1.65,-0.3,3],['rug',-0.1,-0.2,1]]}),
-  planRoom('bath',10.2,0,12,3.6,{name:'Master bath',paint:'white',floorCol:'wtile',wins:[[1,0.444]],furniture:[['shower',0.3,-1.2],['toilet',0.425,0.2,3],['basin',-0.55,-0.4,1],['mirror_cab',-0.675,-0.4,1]]}),
+  planRoom('bedroom',6,0,10.2,3.6,{name:'Master bedroom',paint:'sage',floorCol:'walnut',doors:[[0,0.31],[2,0.333,'ext_glass',0.9]],wins:[[2,0.762]],furniture:[['bed',-0.95,-0.2,1],['nightstand',-1.75,-1.25,1],['nightstand',-1.75,0.85,1],['wardrobe',1.65,-0.3,3],['rug',-0.1,-0.2,1]]}),
+  planRoom('bath',10.2,0,12,3.6,{name:'Master bath',paint:'white',floorCol:'wtile',doors:[[3,0.833,'int_pvc',0.75]],wins:[[1,0.444]],furniture:[['shower',0.3,-1.2],['toilet',0.425,0.2,3],['basin',-0.55,-0.4,1],['mirror_cab',-0.675,-0.4,1]]}),
   planRoom('kitchen',0,3.6,3,7.2,{name:'Kitchen',paint:'mint',floorCol:'gtile',doors:[[0,0.8]],wins:[[3,0.5]],furniture:[['kunit',-1.05,-0.75,1],['kunit',0.45,-1.35],['fridge',1,0.1,3]]}),
-  planRoom('hallway',3,3.6,7.8,4.8,{name:'Bedroom corridor',floorCol:'ash',furniture:[]}),
+  planRoom('hallway',3,3.6,7.8,4.8,{name:'Bedroom corridor',floorCol:'ash',doors:[[0,0.813]],furniture:[]}),
   planRoom('hallway',3,4.8,4.8,7.2,{name:'Pooja room',paint:'cream',floorCol:'wtile',doors:[[0,0.5]],furniture:[['side_table',0,-0.8],['wall_art',0,-1.025],['rug',0,-0.1,1]]}),
   planRoom('hallway',4.8,4.8,6,7.2,{name:'Store',floorCol:'slate',doors:[[1,0.25]],furniture:[['bookshelf',0,-0.875]]}),
-  planRoom('hallway',6,4.8,7.8,12.6,{name:'Foyer & gallery',paint:'beige',floorCol:'terra',doors:[[0,0.5,'ext_hard',1],[2,0.5]],furniture:[]}),
+  planRoom('hallway',6,4.8,7.8,12.6,{name:'Foyer & gallery',paint:'beige',floorCol:'terra',doors:[[0,0.5,'ext_hard',1]],furniture:[]}),
   planRoom('bedroom',7.8,3.6,12,7.2,{name:'Bedroom 2',paint:'blush',floorCol:'oak',doors:[[3,0.667]],wins:[[1,0.5]],furniture:[['bed',0.95,0,3],['nightstand',1.75,-1.05,3],['nightstand',1.75,1.05,3],['wardrobe',-1.05,-1.35],['desk',-0.9,1.35,2],['office_chair',-0.9,0.6],['rug',-0.5,0,1]]}),
   planRoom('bath',7.8,7.2,12,9,{name:'Bath 2',paint:'white',floorCol:'wtile',doors:[[3,0.5,'int_pvc',0.75]],wins:[[1,0.5]],furniture:[['basin',-0.9,-0.55],['mirror_cab',-0.9,-0.675],['toilet',0.1,-0.425],['bath',1.1,0.375,2]]}),
   planRoom('hall',0,7.2,6,12.6,{name:'Living & dining',paint:'cream',floorCol:'honey',doors:[[1,0.444,'int_panel',1.5]],wins:[[3,0.315],[0,0.25],[0,0.75]],furniture:[['table',0,-1],['chair',-0.4,-1.65],['chair',0.4,-1.65],['chair',-0.4,-0.35,2],['chair',0.4,-0.35,2],['chair',-1.15,-1,1],['chair',1.15,-1,3],['tv',-2.65,1,1],['sofa',0.3,1,3],['coffee',-1.1,1,1],['rug',-1,1,1],['armchair',-1.1,2.1,2],['plant',2.6,2.3]]}),
@@ -4762,15 +4763,15 @@ addTemplate('in_courtyard', 'Traditional Courtyard House', 'indian', 'Perimeter 
 ]);
 addTemplate('in_bungalow', 'Luxury 5BHK Indian Villa', 'indian', 'Grand hall, kitchen, five bedrooms, baths and balconies', [
   planRoom('veranda',-3.6,6,3.6,8.4,{name:'Entrance veranda',furniture:[['armchair',-2.9,.1,1],['coffee',-2,.1,1],['armchair',-1.1,.1,3],['plant',1.2,-.8],['plant',3,.7]]}),
-  planRoom('hall',-3.6,0,3.6,6,{name:'Grand hall',doors:[[0,.5,'ext_hard',1.2],[2,.75,'int_panel',1.2],[2,.25,'int_panel',1.2]],wins:[[0,.1806,'pano'],[0,.8194,'pano']],furniture:[['tv',-3.26,1.6,1],['sofa',-1.2,1.6,3],['coffee',-2.2,1.6,1],['rug',-2.2,1.6,1],['table',2,.9],['chair',1.6,.05],['chair',2.4,.05],['chair',1.6,1.75,2],['chair',2.4,1.75,2],['chair',.85,.9,1],['chair',3.15,.9,3],['plant',-3.235,-2.635],['plant',3.235,-2.635],['plant',0,-2.635]]}),
+  planRoom('hall',-3.6,0,3.6,6,{name:'Grand hall',doors:[[0,.5,'ext_hard',1.2]],wins:[[0,.1806,'pano'],[0,.8194,'pano']],furniture:[['tv',-3.26,1.6,1],['sofa',-1.2,1.6,3],['coffee',-2.2,1.6,1],['rug',-2.2,1.6,1],['table',2,.9],['chair',1.6,.05],['chair',2.4,.05],['chair',1.6,1.75,2],['chair',2.4,1.75,2],['chair',.85,.9,1],['chair',3.15,.9,3],['plant',-3.235,-2.635],['plant',3.235,-2.635],['plant',0,-2.635]]}),
   planRoom('bedroom',-8,2.4,-3.6,6,{name:'Bedroom 1',doors:[[1,.8333]],wins:[[3,.5],[0,.432]],furniture:[['bed',-.3,.66,2],['nightstand',-1.325,1.46,2],['nightstand',.725,1.46,2],['wardrobe',1.76,.66,3],['dresser',-1.81,-.2,1]]}),
   planRoom('bath',-8,0,-5.6,2.4,{name:'Bath 1 (attached)',doors:[[0,.6]],wins:[[3,.5]],furniture:[['toilet',-.735,-.3,1],['shower',.61,-.61],['basin',-.86,.6,1]]}),
   planRoom('bath',-5.6,0,-3.6,2.4,{name:'Common bath',doors:[[2,.75]],furniture:[['toilet',-.5,.735,2],['basin',.5,.86,2],['shower',.41,-.61]]}),
   planRoom('kitchen',3.6,2.4,8,6,{name:'Kitchen',doors:[[3,.1667]],wins:[[1,.5],[0,.591]],furniture:[['kunit',1.76,0,3],['kunit',.4,1.36,2],['fridge',-.9,1.31,2],['oven',1.76,1.25,3]]}),
   planRoom('hallway',3.6,0,5.6,2.4,{name:'Store',doors:[[0,.5]],furniture:[['bookshelf',-.685,-.3,1],['bookshelf',.685,-.3,3],['bookshelf',0,-.885]]}),
   planRoom('bath',5.6,0,8,2.4,{name:'Bath 3',doors:[[2,.7]],wins:[[1,.7]],furniture:[['shower',.61,.61],['toilet',.735,-.4,3],['basin',-.86,.3,1]]}),
-  planRoom('hallway',-8,-1.4,0,0,{name:'West corridor',furniture:[]}),
-  planRoom('hallway',0,-1.4,8,0,{name:'East corridor',furniture:[]}),
+  planRoom('hallway',-8,-1.4,0,0,{name:'West corridor',doors:[[0,.775,'int_panel',1.2]],furniture:[]}),
+  planRoom('hallway',0,-1.4,8,0,{name:'East corridor',doors:[[0,.225,'int_panel',1.2]],furniture:[]}),
   planRoom('bedroom',-8,-5.4,-4,-1.4,{name:'Bedroom 2',doors:[[0,.75],[2,.275,'ext_glass',1]],wins:[[3,.475],[2,.75]],furniture:[['bed',-.86,-.1,1],['nightstand',-1.66,-1.125,1],['nightstand',-1.66,.925,1],['wardrobe',1.56,0,3]]}),
   planRoom('bedroom',-4,-5.4,0,-1.4,{name:'Bedroom 3',doors:[[0,.25],[2,.725,'ext_glass',1]],wins:[[2,.25]],furniture:[['bed',.86,-.1,3],['nightstand',1.66,-1.125,3],['nightstand',1.66,.925,3],['wardrobe',-1.56,0,1]]}),
   planRoom('bedroom',0,-5.4,4,-1.4,{name:'Bedroom 4',doors:[[0,.75],[2,.275,'ext_glass',1]],wins:[[2,.75]],furniture:[['bed',-.86,-.1,1],['nightstand',-1.66,-1.125,1],['nightstand',-1.66,.925,1],['wardrobe',1.56,0,3]]}),
@@ -4782,28 +4783,28 @@ addTemplate('in_bungalow', 'Luxury 5BHK Indian Villa', 'indian', 'Grand hall, ki
 ]);
 addTemplate('in_3bhk_porch', '3BHK East-Facing Home with Car Porch', 'indian', 'East-facing 30x40 home: car porch, pooja, 3 beds, 2 attached baths', [
   planRoom('bedroom',-6.1,-4.6,-1.9,-1.6,{'name':'Bedroom 2','doors':[[0,0.81]],'wins':[[2,0.619],[3,0.5]],'furniture':[['bed',-0.5,-0.36],['nightstand',-1.525,-1.16],['nightstand',0.525,-1.16],['wardrobe',1.66,-0.41,3],['rug',-0.5,0.6]],'paint':'blush','floorCol':'oak'}),
-  planRoom('hallway',-3.5,-1.6,-1.9,0.8,{'name':'Bedroom lobby','doors':[[1,0.75],[0,0.5]],'furniture':[]}),
+  planRoom('hallway',-3.5,-1.6,-1.9,0.8,{'name':'Bedroom lobby','doors':[[1,0.75]],'furniture':[]}),
   planRoom('bath',-6.1,-1.6,-3.5,0.8,{'name':'Master bath','doors':[[0,0.769,'int_pvc',0.75]],'wins':[[3,0.375]],'furniture':[['toilet',-0.7,-0.735],['shower',0.71,-0.61],['basin',-0.5,0.86,2],['mirror_cab',-0.5,0.985,2]],'paint':'white','floorCol':'wtile'}),
-  planRoom('bedroom',-6.1,0.8,-1.9,4.5,{'name':'Master bedroom','wins':[[3,0.514],[0,0.381]],'furniture':[['bed',-0.96,0.05,1],['nightstand',-1.76,-0.975,1],['nightstand',-1.76,1.075,1],['wardrobe',1.66,-0.05,3],['rug',-0.1,0.05,1]],'paint':'sage','floorCol':'walnut'}),
+  planRoom('bedroom',-6.1,0.8,-1.9,4.5,{'name':'Master bedroom','doors':[[2,0.19]],'wins':[[3,0.514],[0,0.381]],'furniture':[['bed',-0.96,0.05,1],['nightstand',-1.76,-0.975,1],['nightstand',-1.76,1.075,1],['wardrobe',1.66,-0.05,3],['rug',-0.1,0.05,1]],'paint':'sage','floorCol':'walnut'}),
   planRoom('bath',-1.9,-4.6,-0.3,-1.6,{'name':'Common bath','doors':[[0,0.687,'int_pvc',0.75]],'wins':[[2,0.5]],'furniture':[['toilet',-0.3,-1.035],['shower',0.21,-0.1],['basin',-0.46,0.9,1],['mirror_cab',-0.585,0.9,1]],'paint':'white','floorCol':'wtile'}),
-  planRoom('bedroom',-0.3,-4.6,4.2,-1.6,{'name':'Bedroom 3','doors':[[0,0.156],[1,0.583,'int_pvc',0.75]],'wins':[[2,0.4]],'furniture':[['bed',0.45,-0.36],['nightstand',-0.575,-1.16],['nightstand',1.475,-1.16],['wardrobe',-1.81,-0.46,1],['rug',0.45,0.6]],'paint':'lavender','floorCol':'ash'}),
-  planRoom('bath',4.2,-4.6,6.1,-2.9,{'name':'Bath 3','wins':[[2,0.474]],'furniture':[['toilet',-0.45,-0.385],['basin',0.35,-0.51],['mirror_cab',0.35,-0.635],['shower',0.36,0.26]],'paint':'white','floorCol':'wtile'}),
+  planRoom('bedroom',-0.3,-4.6,4.2,-1.6,{'name':'Bedroom 3','doors':[[0,0.156]],'wins':[[2,0.4]],'furniture':[['bed',0.45,-0.36],['nightstand',-0.575,-1.16],['nightstand',1.475,-1.16],['wardrobe',-1.81,-0.46,1],['rug',0.45,0.6]],'paint':'lavender','floorCol':'ash'}),
+  planRoom('bath',4.2,-4.6,6.1,-2.9,{'name':'Bath 3','doors':[[3,0.725,'int_pvc',0.75]],'wins':[[2,0.474]],'furniture':[['toilet',-0.45,-0.385],['basin',0.35,-0.51],['mirror_cab',0.35,-0.635],['shower',0.36,0.26]],'paint':'white','floorCol':'wtile'}),
   planRoom('hallway',4.2,-2.9,6.1,-1.6,{'name':'Pooja','doors':[[0,0.316]],'furniture':[['side_table',0.56,0],['wall_art',0.785,0,3]],'paint':'cream','floorCol':'wtile'}),
   planRoom('hall',-1.9,-1.6,6.1,1.5,{'name':'Living & dining','doors':[[0,0.888,'ext_hard',1]],'wins':[[1,0.5,'pano'],[0,0.575]],'furniture':[['tv',0.6,-1.21],['sofa',0.6,0.96,2],['coffee',0.6,-0.1],['rug',0.6,-0.05],['armchair',2.3,-0.05,3],['plant',3.635,-1.185],['table',-2.05,0,1],['chair',-2.85,-0.35,1],['chair',-2.85,0.35,1],['chair',-1.25,-0.35,3],['chair',-1.25,0.35,3]],'paint':'cream','floorCol':'honey'}),
   planRoom('kitchen',-1.9,1.5,1.1,4.5,{'name':'Kitchen','doors':[[2,0.2]],'wins':[[0,0.367],[1,0.533]],'furniture':[['kunit',-0.46,1.06,2],['kunit',-1.06,-0.14,1],['fridge',1.01,1.01,3],['oven',1.06,0.36,3]],'paint':'mint','floorCol':'gtile'}),
   planRoom('veranda',1.1,1.5,6.1,4.5,{'name':'Car porch','furniture':[['plant',-2.135,-1.135],['plant',2.135,-0.4]],'floorCol':'slate'}),
 ]);
 addTemplate('in_farmhouse', 'Indian Farmhouse with Sit-outs', 'indian', 'Farmhouse: wraparound sit-outs, big kitchen, store, wash yard, 3BHK', [
-  planRoom('bedroom',0,5.4,4.2,9.6,{name:'Main bedroom',paint:'sage',floorCol:'oak',doors:[[2,0.7143,'int_pvc',0.75],[1,0.8571,'int_hard',0.9]],wins:[[0,0.381,'std'],[3,0.2143,'std']],furniture:[['bed',-0.96,0.3,1],['nightstand',-1.76,-0.75,1],['nightstand',-1.76,1.325,1],['wardrobe',1.66,0.7,3],['dresser',0.6,-1.71],['rug',-0.1,0.3,1]]}),
-  planRoom('bath',0,3.6,4.2,5.4,{name:'Main bath',paint:'white',floorCol:'gtile',wins:[[3,0.5,'std']],furniture:[['toilet',-1.5,-0.435],['bath',1.11,-0.385],['basin',0.5,0.56,2],['mirror_cab',0.5,0.685,2]]}),
+  planRoom('bedroom',0,5.4,4.2,9.6,{name:'Main bedroom',paint:'sage',floorCol:'oak',doors:[[1,0.8571,'int_hard',0.9]],wins:[[0,0.381,'std'],[3,0.2143,'std']],furniture:[['bed',-0.96,0.3,1],['nightstand',-1.76,-0.75,1],['nightstand',-1.76,1.325,1],['wardrobe',1.66,0.7,3],['dresser',0.6,-1.71],['rug',-0.1,0.3,1]]}),
+  planRoom('bath',0,3.6,4.2,5.4,{name:'Main bath',paint:'white',floorCol:'gtile',doors:[[0,0.2857,'int_pvc',0.75]],wins:[[3,0.5,'std']],furniture:[['toilet',-1.5,-0.435],['bath',1.11,-0.385],['basin',0.5,0.56,2],['mirror_cab',0.5,0.685,2]]}),
   planRoom('bedroom',0,0,4.2,3.6,{name:'Bedroom 2',paint:'cream',floorCol:'oak',doors:[[1,0.1667,'int_hard',0.9]],wins:[[2,0.5,'std'],[3,0.5,'std']],furniture:[['bed',-0.5,0.66,2],['nightstand',-1.55,1.46,2],['nightstand',0.525,1.46,2],['wardrobe',1.66,-0.76,3]]}),
-  planRoom('hallway',4.2,0,5.4,5.4,{name:'Bedroom passage',floorCol:'terra',doors:[[0,0.5,'int_hard',0.9],[1,0.8519,'int_pvc',0.75],[1,0.1481,'int_hard',0.9]],furniture:[]}),
-  planRoom('bath',5.4,0,7.2,2.4,{name:'Common bath',paint:'white',floorCol:'gtile',wins:[[2,0.4444,'std']],furniture:[['shower',0.31,0.61],['toilet',-0.5,0.735,2],['basin',0.3,-0.86]]}),
-  planRoom('bedroom',5.4,2.4,10.2,5.4,{name:'Bedroom 3',paint:'blush',floorCol:'ash',wins:[[2,0.3125,'std']],furniture:[['bed',1.26,0,3],['nightstand',2.06,-1.025,3],['nightstand',2.06,1.025,3],['wardrobe',-0.65,1.06,2],['desk',-1.6,-1.06],['office_chair',-1.6,-0.45,2]]}),
+  planRoom('hallway',4.2,0,5.4,5.4,{name:'Bedroom passage',floorCol:'terra',doors:[[0,0.5,'int_hard',0.9]],furniture:[]}),
+  planRoom('bath',5.4,0,7.2,2.4,{name:'Common bath',paint:'white',floorCol:'gtile',doors:[[3,0.3333,'int_pvc',0.75]],wins:[[2,0.4444,'std']],furniture:[['shower',0.31,0.61],['toilet',-0.5,0.735,2],['basin',0.3,-0.86]]}),
+  planRoom('bedroom',5.4,2.4,10.2,5.4,{name:'Bedroom 3',paint:'blush',floorCol:'ash',doors:[[3,0.7333,'int_hard',0.9]],wins:[[2,0.3125,'std']],furniture:[['bed',1.26,0,3],['nightstand',2.06,-1.025,3],['nightstand',2.06,1.025,3],['wardrobe',-0.65,1.06,2],['desk',-1.6,-1.06],['office_chair',-1.6,-0.45,2]]}),
   planRoom('hall',4.2,5.4,10.2,9.6,{name:'Living room',paint:'cream',floorCol:'terra',doors:[[0,0.4,'ext_hard',1.2],[1,0.5,'int_panel',1.5]],wins:[[0,0.7667,'pano']],furniture:[['tv',0.8,-1.76],['sofa',0.8,0.7,2],['coffee',0.8,-0.3],['rug',0.8,-0.2],['armchair',-0.9,-0.3,1],['plant',-2.6,1.7],['floor_lamp',2.5,1.7]]}),
   planRoom('hall',10.2,5.4,14.4,9.6,{name:'Dining',paint:'beige',floorCol:'terra',doors:[[2,0.7619,'int_hard',0.9],[1,0.5,'ext_glass',1.5],[0,0.8095,'ext_glass',0.9]],wins:[[0,0.3333,'pano']],furniture:[['table',0,-0.7,1],['table',0,0.7,1],['chair',0,-1.7],['chair',0,1.7,2],['plant',-1.7,1.7]]}),
-  planRoom('kitchen',10.2,2.4,14.4,5.4,{name:'Kitchen',paint:'cream',floorCol:'wtile',doors:[[2,0.8095,'ext_metal',0.9],[2,0.1905,'int_hard',0.8]],wins:[[1,0.5,'std']],furniture:[['kunit',1.66,0.3,3],['kunit',0.4,1.06,2],['fridge',-1.61,0,1]]}),
-  planRoom('hallway',12.3,0,14.4,2.4,{name:'Store',floorCol:'slate',wins:[[1,0.5833,'std']],furniture:[['bookshelf',-0.735,0,1],['bookshelf',0.05,-0.885]]}),
+  planRoom('kitchen',10.2,2.4,14.4,5.4,{name:'Kitchen',paint:'cream',floorCol:'wtile',doors:[[2,0.8095,'ext_metal',0.9]],wins:[[1,0.5,'std']],furniture:[['kunit',1.66,0.3,3],['kunit',0.4,1.06,2],['fridge',-1.61,0,1]]}),
+  planRoom('hallway',12.3,0,14.4,2.4,{name:'Store',floorCol:'slate',doors:[[0,0.619,'int_hard',0.8]],wins:[[1,0.5833,'std']],furniture:[['bookshelf',-0.735,0,1],['bookshelf',0.05,-0.885]]}),
   planRoom('balcony',7.2,0,12.3,2.4,{name:'Utility & wash yard',floorCol:'slate',furniture:[['basin',2.05,0.86,2],['plant',-2.15,-0.8],['chair',-0.75,0],['chair',0.05,0]]}),
   planRoom('veranda',4.2,9.6,10.2,12,{name:'Front sit-out',floorCol:'terra',furniture:[['armchair',0.5,0.2,1],['coffee',1.4,0.2,1],['armchair',2.3,0.2,3],['plant',-2.6,0.8]]}),
   planRoom('veranda',10.2,9.6,14.4,12,{name:'Corner veranda',floorCol:'terra',furniture:[['chair',-1.1,0.4],['side_table',-0.3,0.4],['chair',0.5,0.4],['plant',1.7,0.8]]}),

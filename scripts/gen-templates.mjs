@@ -29,7 +29,7 @@
  *   - `ext_*` doors sit on a wall with no enclosed neighbour (open rooms such as
  *     verandas are allowed on the far side); `int_*` doors sit on a wall shared
  *     with another room, and the whole door leaf fits inside the shared segment
- *   - windows sit on fully exterior walls (designIssues() flags the rest)
+ *   - windows sit on exterior walls or face open rooms (designIssues() flags the rest)
  *   - furniture fits inside its room (clampFurn would otherwise move it silently)
  *   - then scripts/check-plans.mjs runs on the compiled output: doorways clear of
  *     furniture, no overlapping furniture, every room reachable, no duplicate doors
@@ -1242,7 +1242,8 @@ function compileTemplate(key, plan) {
         err(key, `${room.__label}: ${kind} window (${WIN_W[kind]} m) does not fit in ${r3(L)} m wall (t=${t})`);
       claim(w.side, w.at, WIN_W[kind], `${kind} window`);
       const nb = neighbourAt(rooms, room, w.side, P, WIN_W[kind]);
-      if (nb) err(key, `${room.__label}: window on ${w.side} at ${w.at} faces ${nb.__label} (shared wall)`);
+      if (nb && !ROOMS[nb.type].open)
+        err(key, `${room.__label}: window on ${w.side} at ${w.at} faces ${nb.__label} (shared wall)`);
       wins.push(kind === "std" ? [wall, t] : [wall, t, kind]);
     }
 

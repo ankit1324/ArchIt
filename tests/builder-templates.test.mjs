@@ -64,8 +64,10 @@ test('checker accepts a sound plan and rejects broken ones', () => {
     [r => { delete r[1].furniture; }, /no explicit furniture/],
     // mirrors of the builder's designIssues(): each shows as an issue once the template loads
     [r => { r[1].doors = []; }, /no door of its own/],
-    [r => r.push({ type: 'veranda', cx: -3.6, cz: 0, len: 2.4, w: 3.6, furniture: [] }), /window on wall 3 opens into #3/],
+    [r => r.push({ type: 'bath', cx: -3.6, cz: 0, len: 2.4, w: 3.6, furniture: [] }), /window on wall 3 opens into #3/],
   ];
   for (const [change, expected] of cases) assert.match(fixture(change).errors.join('\n'), expected);
+  // open rooms count as outdoors: a window onto a veranda is not an issue
+  assert.doesNotMatch(fixture(r => r.push({ type: 'veranda', cx: -3.6, cz: 0, len: 2.4, w: 3.6, furniture: [] })).errors.join('\n'), /window/);
   assert.match(fixture(r => r[1].furniture.push(['wardrobe', 0, 1.06, 0])).warns.join('\n'), /wardrobe has its back/);
 });
