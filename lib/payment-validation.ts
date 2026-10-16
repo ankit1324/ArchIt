@@ -12,14 +12,21 @@ export const PAYMENT_ID_CONSTRAINT = "purchases_payment_id_key";
 
 /**
  * Valid fee purposes, mirroring FeePurpose in ./fees. Duplicated as a runtime
- * value (rather than importing FEES) to keep this module import-free; the
- * `satisfies` check below fails the build if the two ever drift apart.
+ * value (rather than importing FEES) to keep this module import-free. `satisfies`
+ * only rejects unknown entries; the exhaustiveness check below also fails the
+ * build when FeePurpose gains a member that is missing here — a purpose left out
+ * would take a captured payment and then refuse to record it.
  */
 export const FEE_PURPOSES = [
   "contact_owner",
   "featured_property",
   "builder_unlock",
+  "template_unlock",
 ] as const satisfies readonly FeePurpose[];
+
+type UnlistedPurpose = Exclude<FeePurpose, (typeof FEE_PURPOSES)[number]>;
+const allPurposesListed: [UnlistedPurpose] extends [never] ? true : UnlistedPurpose = true;
+void allPurposesListed;
 
 export function isFeePurpose(value: string): value is FeePurpose {
   // A plain array lookup, not `key in FEES`: purpose arrives from Razorpay

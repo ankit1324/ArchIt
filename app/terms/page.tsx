@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 import { FEES } from "@/lib/fees";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — ArchIt",
+  title: "Terms & Conditions",
   description: "The terms that govern your use of ArchIt.",
 };
 
