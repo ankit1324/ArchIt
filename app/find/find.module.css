@@ -1,0 +1,43 @@
+.canvas button:focus-visible, .canvas select:focus-visible { outline: 3px solid var(--color-plum); outline-offset: 3px; }
+.filters { pointer-events: auto; position: absolute; inset: 14px auto 14px 14px; width: 250px; display: flex; flex-direction: column; padding: 16px 12px; border: 1px solid #fff9; border-radius: 22px; background: #f5f1eaf0; box-shadow: 0 12px 36px #3d183018; }
+.filterHeading { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 8px; }
+.eyebrow { font-size: 9px; letter-spacing: .16em; font-weight: 700; color: var(--color-plum-soft); }
+.filterHeading h1 { font-size: 21px; font-weight: 800; letter-spacing: -.04em; }
+.closeFilters, .filterToggle { display: none; }
+.toolbar { pointer-events: auto; position: absolute; top: 14px; left: 280px; right: 14px; display: flex; align-items: center; gap: 10px; }
+.toolbar > button { white-space: nowrap; }
+.mapControls { pointer-events: auto; position: absolute; right: 14px; top: 32%; }
+.results { position: absolute; bottom: 26px; left: 280px; right: 14px; }
+.resultBar { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 12px 16px; border: 1px solid #fff9; border-radius: 18px; background: #f5f1eaf0; box-shadow: 0 8px 24px #3d183018; }
+.resultBar strong { display: block; font-size: 15px; letter-spacing: -.03em; }
+.resultBar span { display: block; max-width: 240px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--color-plum-soft); }
+.resultActions { display: flex; align-items: center; gap: 16px; font-size: 11px; font-weight: 700; }
+.resultActions button:disabled { opacity: .4; }
+.resultActions select { max-width: 145px; border-radius: 10px; padding: 8px; background: #fff9; }
+.detailPanel { pointer-events: auto; position: absolute; top: 76px; bottom: 26px; right: 14px; display: flex; align-items: flex-start; max-width: calc(100% - 28px); z-index: 20; }
+.detailPanel > * { max-width: 100%; }
+.pickHint { position: absolute; top: 80px; left: 280px; right: 80px; text-align: center; }
+@media (max-width: 1023px) {
+  .filters { display: none; z-index: 40; top: 124px; bottom: 26px; width: min(300px, calc(100% - 28px)); background: var(--color-cream); }
+  .filtersOpen { display: flex; }
+  .closeFilters { display: block; padding: 10px; border-radius: 50%; }
+  .filterToggle { display: block; padding: 10px 14px; border-radius: 999px; background: var(--color-cream); font-size: 12px; font-weight: 700; }
+  .toolbar { left: 14px; flex-wrap: wrap; gap: 8px; }
+  .toolbar form { flex-basis: 100%; }
+  .toolbar > button:last-child { margin-left: auto; }
+  .results { left: 14px; }
+  .detailPanel { top: 124px; }
+  .pickHint { top: 124px; left: 14px; right: 14px; }
+}
+@media (max-width: 600px) {
+  .resultBar { padding: 10px 12px; gap: 8px; }
+  .resultBar span { max-width: 145px; }
+  .resultActions button { display: none; }
+  .resultActions select { max-width: 130px; }
+  .results > div:last-child > button { height: 165px; width: 215px; }
+  .mapControls { top: 140px; }
+}
+@media (max-height: 650px) and (min-width: 1024px) {
+  .results > div:last-child > button { height: 150px; }
+  .mapControls { top: 100px; }
+}

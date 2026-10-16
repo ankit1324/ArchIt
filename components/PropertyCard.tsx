@@ -6,16 +6,21 @@ import { safeImageUrl } from "@/lib/url";
 export default function PropertyCard({
   listing,
   onClick,
+  selected = false,
 }: {
   listing: Listing;
   onClick?: () => void;
+  selected?: boolean;
 }) {
   const sale = listing.type === "sale";
   return (
     <button
       onClick={onClick}
+      aria-pressed={selected}
+      style={selected ? { boxShadow: "inset 0 0 0 3px #e2ef6a, 0 8px 24px #3d183030" } : undefined}
       className="group pointer-events-auto relative h-[196px] w-[236px] shrink-0 snap-start overflow-hidden rounded-2xl text-left shadow-lg transition-transform hover:-translate-y-1"
     >
+      {selected && <span className="pointer-events-none absolute inset-0 z-10 rounded-2xl border-[3px] border-lime" />}
       {safeImageUrl(listing.photo) ? (
         <Image
           src={safeImageUrl(listing.photo)!}

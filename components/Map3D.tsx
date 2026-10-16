@@ -62,6 +62,9 @@ function priceMarkerEl(l: Listing, withThumb: boolean): HTMLElement {
   const el = document.createElement("div");
   const thumb = safeImageUrl(l.photo);
   const showThumb = withThumb && !!thumb;
+  el.tabIndex = 0;
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", `${l.buildingName || l.address}, ${formatPrice(l)}`);
   el.className = `price-marker${showThumb ? "" : " no-thumb"}${l.featured ? " featured" : ""}`;
   if (showThumb && thumb) {
     const img = document.createElement("img");
@@ -144,7 +147,16 @@ export default function Map3D({
 
       listingsRef.current.forEach((l, i) => {
         const el = priceMarkerEl(l, i % 3 === 0);
-        el.addEventListener("click", () => onSelectRef.current?.(l.id));
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onSelectRef.current?.(l.id);
+        });
+        el.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelectRef.current?.(l.id);
+          }
+        });
         markersRef.current.push(
           new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -18] })
             .setLngLat(l.coords)
@@ -239,6 +251,7 @@ export default function Map3D({
         });
 
         loadedRef.current = true;
+        refreshMarkers(map);
 
         // cinematic settle, mirroring the video intro
         map.flyTo({
