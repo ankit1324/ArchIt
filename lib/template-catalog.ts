@@ -86,6 +86,20 @@ export const TEMPLATE_CATALOG: TemplateCatalogEntry[] = [
     "paid": false
   },
   {
+    "key": "in_3bhk_porch",
+    "name": "3BHK East-Facing Home with Car Porch",
+    "cat": "indian",
+    "desc": "East-facing 30x40 home: car porch, pooja, 3 beds, 2 attached baths",
+    "paid": false
+  },
+  {
+    "key": "in_farmhouse",
+    "name": "Indian Farmhouse with Sit-outs",
+    "cat": "indian",
+    "desc": "Farmhouse: wraparound sit-outs, big kitchen, store, wash yard, 3BHK",
+    "paid": false
+  },
+  {
     "key": "off_startup",
     "name": "Startup Open-Plan Office",
     "cat": "office",

@@ -79,8 +79,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [2,0.232,"ext_glass",1.8,2.3],
-          [0,0.839,"int_hard",0.85,2.05]
+          [2,0.232,"ext_glass",1.8,2.3]
         ],
         "wins": [
           [2,0.732,"pano"],
@@ -89,9 +88,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["desk",-1.4,-1],
           ["chair",-1.4,-0.1,2],
-          ["sofa",1.4,-1.2],
-          ["coffee",1.4,-0.2],
-          ["plant",2.3,1.6],
+          ["sofa",2.2,0.6,3],
+          ["coffee",1.3,0.6,1],
+          ["plant",2.3,1.9],
           ["plant",-2.3,1.6]
         ]
       },
@@ -111,13 +110,12 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5,"pano"]
         ],
         "furniture": [
-          ["table",-0.95,-0.2],
+          ["table",-0.7,-0.2],
+          ["table",0.7,-0.2],
           ["chair",-0.95,-1.15],
           ["chair",-0.95,0.75,2],
-          ["table",0,-0.2],
           ["chair",0,-1.15],
           ["chair",0,0.75,2],
-          ["table",0.95,-0.2],
           ["chair",0.95,-1.15],
           ["chair",0.95,0.75,2],
           ["plant",1.4,1.4]
@@ -133,8 +131,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [1,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.6,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -147,7 +146,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "gtile",
         "doors": [
           [3,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "kitchen",
@@ -163,6 +163,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [2,0.5]
+        ],
+        "furniture": [
+          ["kunit",-0.6,-0.56],
+          ["fridge",1.3,-0.51]
         ]
       },
       {
@@ -175,7 +179,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "mint",
         "floorCol": "wtile",
         "doors": [
-          [2,0.5,"int_pvc",0.8,2.05]
+          [2,0.3,"int_pvc",0.8,2.05]
+        ],
+        "wins": [
+          [1,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.5,0.73,2],
+          ["basin",-0.66,-0.2,1]
         ]
       },
       {
@@ -196,17 +207,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["desk",-2.1,-1.15],
-          ["chair",-2.1,-0.37,2],
+          ["office_chair",-2.1,-0.37,2],
           ["desk",0,-1.15],
-          ["chair",0,-0.37,2],
+          ["office_chair",0,-0.37,2],
           ["desk",2.1,-1.15],
-          ["chair",2.1,-0.37,2],
+          ["office_chair",2.1,-0.37,2],
           ["desk",-2.1,1.15],
-          ["chair",-2.1,1.93,2],
+          ["office_chair",-2.1,1.93,2],
           ["desk",0,1.15],
-          ["chair",0,1.93,2],
+          ["office_chair",0,1.93,2],
           ["desk",2.1,1.15],
-          ["chair",2.1,1.93,2],
+          ["office_chair",2.1,1.93,2],
           ["plant",2.9,-2]
         ]
       },
@@ -226,14 +237,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [0,0.5,"pano"]
         ],
         "furniture": [
-          ["desk",-0.95,-1.15],
-          ["chair",-0.95,-0.37,2],
-          ["desk",0.95,-1.15],
-          ["chair",0.95,-0.37,2],
-          ["desk",-0.95,1.15],
-          ["chair",-0.95,1.93,2],
-          ["desk",0.95,1.15],
-          ["chair",0.95,1.93,2],
+          ["desk",-0.95,-1.25],
+          ["office_chair",-0.95,-0.47,2],
+          ["desk",0.95,-1.25],
+          ["office_chair",0.95,-0.47,2],
+          ["desk",-0.95,1.25],
+          ["office_chair",-0.95,2.03,2],
+          ["desk",0.95,1.25],
+          ["office_chair",0.95,2.03,2],
           ["plant",-1.5,-2]
         ]
       },
@@ -247,7 +258,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "gray",
         "floorCol": "slate",
         "doors": [
-          [3,0.5,"int_hard",0.85,2.05]
+          [3,0.196,"int_hard",0.85,2.05]
+        ],
+        "wins": [
+          [0,0.5]
+        ],
+        "furniture": [
+          ["bookshelf",0.68,-0.45,3],
+          ["bookshelf",0.68,0.45,3]
         ]
       }
     ]
@@ -266,8 +284,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "greige",
         "floorCol": "gtile",
         "doors": [
-          [2,0.267,"ext_glass",2,2.4],
-          [0,0.867,"int_hard",0.85,2.05]
+          [2,0.267,"ext_glass",2,2.4]
         ],
         "wins": [
           [2,0.767,"pano"],
@@ -276,9 +293,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["desk",-1.8,-1.2],
           ["chair",-1.8,-0.3,2],
-          ["sofa",1.6,-1.4],
-          ["coffee",1.6,-0.3],
-          ["plant",2.5,1.8]
+          ["sofa",2.4,0.3,3],
+          ["coffee",1.5,0.3,1],
+          ["plant",-2.5,1.8]
         ]
       },
       {
@@ -298,22 +315,21 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["table",-2.1,0],
+          ["table",-0.7,0],
+          ["table",0.7,0],
+          ["table",2.1,0],
           ["chair",-2.1,-0.95],
           ["chair",-2.1,0.95,2],
-          ["table",-1.05,0],
           ["chair",-1.05,-0.95],
           ["chair",-1.05,0.95,2],
-          ["table",0,0],
           ["chair",0,-0.95],
           ["chair",0,0.95,2],
-          ["table",1.05,0],
           ["chair",1.05,-0.95],
           ["chair",1.05,0.95,2],
-          ["table",2.1,0],
           ["chair",2.1,-0.95],
           ["chair",2.1,0.95,2],
           ["plant",-2.3,1.4],
-          ["tv",2.1,1.5]
+          ["tv",2.1,2.16,2]
         ]
       },
       {
@@ -349,8 +365,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [1,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.6,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -363,7 +380,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "gtile",
         "doors": [
           [3,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -380,6 +398,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5,"pano"],
           [3,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.7],
+          ["office_chair",0,1.45,2],
+          ["chair",-0.4,-0.1],
+          ["chair",0.4,-0.1],
+          ["bookshelf",1.48,0.8,3],
+          ["plant",-1.4,-1.7]
         ]
       },
       {
@@ -396,6 +422,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5,"pano"]
+        ],
+        "furniture": [
+          ["desk",0,0.7],
+          ["office_chair",0,1.45,2],
+          ["chair",-0.4,-0.1],
+          ["chair",0.4,-0.1],
+          ["bookshelf",1.48,0.8,3],
+          ["plant",-1.4,-1.7]
         ]
       },
       {
@@ -412,6 +446,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5,"pano"]
+        ],
+        "furniture": [
+          ["desk",0,0.7],
+          ["office_chair",0,1.45,2],
+          ["chair",-0.4,-0.1],
+          ["chair",0.4,-0.1],
+          ["bookshelf",1.48,0.8,3],
+          ["plant",-1.4,-1.7]
         ]
       },
       {
@@ -426,7 +468,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "gtile",
         "doors": [
           [1,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "kitchen",
@@ -442,6 +485,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["kunit",0.86,0,3],
+          ["fridge",0.1,-0.61]
         ]
       },
       {
@@ -458,6 +505,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["toilet",0.83,0.4,3],
+          ["basin",0,0.66,2],
+          ["shower",0.71,-0.41]
         ]
       }
     ]
@@ -478,7 +530,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "slate",
         "doors": [
           [1,0.5,"ext_glass",1.1,2.3]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "hall",
@@ -498,17 +551,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["desk",-1.15,-2.1],
-          ["chair",-1.15,-1.32,2],
+          ["office_chair",-1.15,-1.32,2],
           ["desk",1.15,-2.1],
-          ["chair",1.15,-1.32,2],
+          ["office_chair",1.15,-1.32,2],
           ["desk",-1.15,0],
-          ["chair",-1.15,0.78,2],
+          ["office_chair",-1.15,0.78,2],
           ["desk",1.15,0],
-          ["chair",1.15,0.78,2],
+          ["office_chair",1.15,0.78,2],
           ["desk",-1.15,2.1],
-          ["chair",-1.15,2.88,2],
+          ["office_chair",-1.15,2.88,2],
           ["desk",1.15,2.1],
-          ["chair",1.15,2.88,2],
+          ["office_chair",1.15,2.88,2],
           ["plant",-2.4,2.4]
         ]
       },
@@ -530,17 +583,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["desk",-1.15,-2.1],
-          ["chair",-1.15,-1.32,2],
+          ["office_chair",-1.15,-1.32,2],
           ["desk",1.15,-2.1],
-          ["chair",1.15,-1.32,2],
+          ["office_chair",1.15,-1.32,2],
           ["desk",-1.15,0],
-          ["chair",-1.15,0.78,2],
+          ["office_chair",-1.15,0.78,2],
           ["desk",1.15,0],
-          ["chair",1.15,0.78,2],
+          ["office_chair",1.15,0.78,2],
           ["desk",-1.15,2.1],
-          ["chair",-1.15,2.88,2],
+          ["office_chair",-1.15,2.88,2],
           ["desk",1.15,2.1],
-          ["chair",1.15,2.88,2],
+          ["office_chair",1.15,2.88,2],
           ["plant",2.4,2.4]
         ]
       },
@@ -554,21 +607,21 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "sage",
         "floorCol": "ash",
         "doors": [
-          [2,0.5,"int_hard",0.85,2.05]
+          [2,0.25,"int_hard",0.85,2.05]
         ],
         "wins": [
           [0,0.5,"pano"]
         ],
         "furniture": [
-          ["table",-0.9,0],
-          ["chair",-0.9,-0.95],
-          ["chair",-0.9,0.95,2],
-          ["table",0,0],
-          ["chair",0,-0.95],
-          ["chair",0,0.95,2],
-          ["table",0.9,0],
-          ["chair",0.9,-0.95],
-          ["chair",0.9,0.95,2]
+          ["table",-0.7,0.35],
+          ["table",0.7,0.35],
+          ["chair",-0.9,-0.6],
+          ["chair",-0.9,1.3,2],
+          ["chair",0,-0.6],
+          ["chair",0,1.3,2],
+          ["chair",0.9,-0.6],
+          ["chair",0.9,1.3,2],
+          ["tv",-1.66,0.35,1]
         ]
       },
       {
@@ -581,18 +634,20 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "terra",
         "floorCol": "terra",
         "doors": [
-          [2,0.722,"int_hard",0.85,2.05]
+          [2,0.25,"int_hard",0.85,2.05]
         ],
         "wins": [
-          [0,0.5]
+          [0,0.278]
         ],
         "furniture": [
-          ["kunit",0,-1.2],
-          ["kunit",-1.3,0,1],
-          ["fridge",1.3,-1],
-          ["table",-0.5,0.8],
-          ["chair",-0.5,0.1],
-          ["chair",-0.5,1.3,2]
+          ["kunit",-0.7,1.26,2],
+          ["fridge",0.65,1.21,2],
+          ["table",-0.9,-0.2],
+          ["chair",-1.25,-0.95],
+          ["chair",-0.55,-0.95],
+          ["chair",-1.25,0.55,2],
+          ["chair",-0.55,0.55,2],
+          ["plant",1.43,0.2]
         ]
       },
       {
@@ -605,10 +660,15 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "mint",
         "floorCol": "wtile",
         "doors": [
-          [2,0.5,"int_pvc",0.8,2.05]
+          [2,0.75,"int_pvc",0.8,2.05]
         ],
         "wins": [
-          [1,0.5]
+          [1,0.687]
+        ],
+        "furniture": [
+          ["toilet",-0.6,0.73,2],
+          ["basin",0.76,-0.6,3],
+          ["shower",0.51,0.61]
         ]
       }
     ]
@@ -627,8 +687,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [2,0.26,"ext_glass",1.9,2.3],
-          [0,0.84,"int_hard",0.85,2.05]
+          [2,0.26,"ext_glass",1.9,2.3]
         ],
         "wins": [
           [2,0.74,"pano"],
@@ -637,8 +696,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["desk",-1.1,-0.9],
           ["chair",-1.1,0,2],
-          ["sofa",1.2,-1.1],
-          ["plant",1.9,1.4]
+          ["sofa",1.91,0.2,3],
+          ["coffee",1.1,0.2,1],
+          ["plant",-2,1.6]
         ]
       },
       {
@@ -651,20 +711,20 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "terra",
         "floorCol": "terra",
         "doors": [
-          [0,0.3,"int_hard",0.85,2.05]
+          [0,0.75,"int_hard",0.85,2.05]
         ],
         "wins": [
           [2,0.5,"pano"]
         ],
         "furniture": [
-          ["kunit",-0.9,-1.5],
-          ["fridge",1.4,-1.5],
-          ["table",-0.6,0.7],
-          ["chair",-1.55,0.7,1],
-          ["chair",0.35,0.7,3],
-          ["table",0.6,0.7],
-          ["chair",-0.35,0.7,1],
-          ["chair",1.55,0.7,3]
+          ["kunit",-0.9,-1.76],
+          ["fridge",1.4,-1.71],
+          ["table",-0.4,-0.3],
+          ["chair",-1.35,-0.3,1],
+          ["chair",0.55,-0.3,3],
+          ["table",-0.4,0.9],
+          ["chair",-1.35,0.9,1],
+          ["chair",0.55,0.9,3]
         ]
       },
       {
@@ -684,19 +744,18 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.357,"pano"]
         ],
         "furniture": [
-          ["table",-1.575,0],
+          ["table",-1.4,0],
+          ["table",0,0],
+          ["table",1.4,0],
           ["chair",-1.575,-0.95],
           ["chair",-1.575,0.95,2],
-          ["table",-0.525,0],
           ["chair",-0.525,-0.95],
           ["chair",-0.525,0.95,2],
-          ["table",0.525,0],
           ["chair",0.525,-0.95],
           ["chair",0.525,0.95,2],
-          ["table",1.575,0],
           ["chair",1.575,-0.95],
           ["chair",1.575,0.95,2],
-          ["tv",-1.9,1.8]
+          ["tv",-1.9,1.86,2]
         ]
       },
       {
@@ -709,8 +768,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [1,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.657,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -723,7 +783,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "gtile",
         "doors": [
           [3,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "hall",
@@ -743,17 +804,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["desk",-2.2,-1.3],
-          ["chair",-2.2,-0.52,2],
+          ["office_chair",-2.2,-0.52,2],
           ["desk",0,-1.3],
-          ["chair",0,-0.52,2],
+          ["office_chair",0,-0.52,2],
           ["desk",2.2,-1.3],
-          ["chair",2.2,-0.52,2],
+          ["office_chair",2.2,-0.52,2],
           ["desk",-2.2,1.3],
-          ["chair",-2.2,2.08,2],
+          ["office_chair",-2.2,2.08,2],
           ["desk",0,1.3],
-          ["chair",0,2.08,2],
+          ["office_chair",0,2.08,2],
           ["desk",2.2,1.3],
-          ["chair",2.2,2.08,2],
+          ["office_chair",2.2,2.08,2],
           ["plant",3.2,-2.3]
         ]
       },
@@ -768,6 +829,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "ash",
         "doors": [
           [2,0.5,"int_hard",0.85,2.05]
+        ],
+        "furniture": [
+          ["desk",0,0.96,2],
+          ["office_chair",0,0.18],
+          ["bookshelf",-0.885,-0.2,1]
         ]
       },
       {
@@ -781,6 +847,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "ash",
         "doors": [
           [2,0.5,"int_hard",0.85,2.05]
+        ],
+        "wins": [
+          [0,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.96,2],
+          ["office_chair",0,0.18],
+          ["bookshelf",-0.885,-0.2,1]
         ]
       },
       {
@@ -797,6 +871,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.96,2],
+          ["office_chair",0,0.18],
+          ["bookshelf",-0.785,-0.2,1]
         ]
       },
       {
@@ -810,6 +889,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "wtile",
         "doors": [
           [3,0.5,"int_pvc",0.8,2.05]
+        ],
+        "wins": [
+          [0,0.5]
+        ],
+        "furniture": [
+          ["toilet",0.3,0.73,2],
+          ["basin",0.66,-0.6,3]
         ]
       }
     ]
@@ -828,8 +914,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "slate",
         "doors": [
-          [2,0.5,"ext_glass",2.2,2.4],
-          [0,0.25,"int_hard",1,2.05]
+          [2,0.5,"ext_glass",2.2,2.4]
         ],
         "wins": [
           [2,0.825,"pano"],
@@ -859,17 +944,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["desk",-2.3,-1.4],
-          ["chair",-2.3,-0.62,2],
+          ["office_chair",-2.3,-0.62,2],
           ["desk",0,-1.4],
-          ["chair",0,-0.62,2],
+          ["office_chair",0,-0.62,2],
           ["desk",2.3,-1.4],
-          ["chair",2.3,-0.62,2],
+          ["office_chair",2.3,-0.62,2],
           ["desk",-2.3,1.4],
-          ["chair",-2.3,2.18,2],
+          ["office_chair",-2.3,2.18,2],
           ["desk",0,1.4],
-          ["chair",0,2.18,2],
+          ["office_chair",0,2.18,2],
           ["desk",2.3,1.4],
-          ["chair",2.3,2.18,2],
+          ["office_chair",2.3,2.18,2],
           ["plant",3.2,-2.5]
         ]
       },
@@ -890,16 +975,15 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5,"pano"]
         ],
         "furniture": [
-          ["table",-1,0],
+          ["table",-0.7,0],
+          ["table",0.7,0],
           ["chair",-1,-0.95],
           ["chair",-1,0.95,2],
-          ["table",0,0],
           ["chair",0,-0.95],
           ["chair",0,0.95,2],
-          ["table",1,0],
           ["chair",1,-0.95],
           ["chair",1,0.95,2],
-          ["tv",-1.4,1.9]
+          ["tv",-1.4,1.96,2]
         ]
       },
       {
@@ -916,6 +1000,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["bookshelf",-0.9,1.485,2],
+          ["bookshelf",0,1.485,2],
+          ["bookshelf",0.9,1.485,2],
+          ["bookshelf",-0.9,-1.485],
+          ["bookshelf",0,-1.485],
+          ["bookshelf",0.9,-1.485],
+          ["table",0.2,0],
+          ["chair",0.2,-0.8],
+          ["chair",0.2,0.8,2]
         ]
       },
       {
@@ -932,6 +1027,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["toilet",0.3,0.73,2],
+          ["basin",0.56,-0.5,3]
         ]
       }
     ]
@@ -950,8 +1049,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "mint",
         "floorCol": "wtile",
         "doors": [
-          [2,0.281,"ext_glass",1.8,2.3],
-          [0,0.25,"int_hard",0.85,2.05]
+          [2,0.281,"ext_glass",1.8,2.3]
         ],
         "wins": [
           [2,0.781,"pano"],
@@ -966,8 +1064,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           ["chair",-0.425,0.35,2],
           ["chair",0.425,0.35,2],
           ["chair",1.275,0.35,2],
-          ["plant",2.6,1.5],
-          ["coffee",-1.6,1.5]
+          ["plant",2.8,-0.4],
+          ["plant",-2.8,1.8],
+          ["coffee",0,1.5]
         ]
       },
       {
@@ -988,7 +1087,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["desk",-0.7,-1.2],
           ["chair",-0.7,-0.3,2],
-          ["wardrobe",1,0.8,1]
+          ["wardrobe",1.06,0.8,3]
         ]
       },
       {
@@ -1001,8 +1100,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "wtile",
         "doors": [
-          [1,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.754,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -1015,7 +1115,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "wtile",
         "doors": [
           [3,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -1032,6 +1133,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5],
           [3,0.5]
+        ],
+        "furniture": [
+          ["desk",-0.6,0.55],
+          ["office_chair",-0.6,1.33,2],
+          ["chair",-0.6,-0.2],
+          ["bed_single",1.16,-0.66],
+          ["basin",-1.46,-0.8,1]
         ]
       },
       {
@@ -1048,6 +1156,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["desk",-0.6,0.55],
+          ["office_chair",-0.6,1.33,2],
+          ["chair",-0.6,-0.2],
+          ["bed_single",1.16,-0.66],
+          ["basin",-1.46,-0.8,1]
         ]
       },
       {
@@ -1065,6 +1180,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5],
           [1,0.5]
+        ],
+        "furniture": [
+          ["desk",-0.6,0.55],
+          ["office_chair",-0.6,1.33,2],
+          ["chair",-0.6,-0.2],
+          ["bed_single",1.16,-0.66],
+          ["basin",-1.46,-0.8,1]
         ]
       },
       {
@@ -1081,6 +1203,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [2,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.5,-0.73],
+          ["basin",0.66,0,3]
         ]
       }
     ]
@@ -1099,8 +1225,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "beige",
         "floorCol": "walnut",
         "doors": [
-          [2,0.232,"ext_glass",1.8,2.3],
-          [0,0.821,"int_hard",0.85,2.05]
+          [2,0.232,"ext_glass",1.8,2.3]
         ],
         "wins": [
           [2,0.732,"pano"],
@@ -1109,9 +1234,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["desk",-1.5,-1.1],
           ["chair",-1.5,-0.2,2],
-          ["sofa",1.3,-1.3],
-          ["coffee",1.3,-0.2],
-          ["plant",2.2,1.6]
+          ["sofa",2.2,0.4,3],
+          ["coffee",1.3,0.4,1],
+          ["plant",-2.3,1.9],
+          ["plant",2.3,2.1]
         ]
       },
       {
@@ -1130,19 +1256,18 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5,"pano"]
         ],
         "furniture": [
-          ["table",-2.2,0],
+          ["table",-2.1,0],
+          ["table",-0.7,0],
+          ["table",0.7,0],
+          ["table",2.1,0],
           ["chair",-2.2,-0.95],
           ["chair",-2.2,0.95,2],
-          ["table",-1.1,0],
           ["chair",-1.1,-0.95],
           ["chair",-1.1,0.95,2],
-          ["table",0,0],
           ["chair",0,-0.95],
           ["chair",0,0.95,2],
-          ["table",1.1,0],
           ["chair",1.1,-0.95],
           ["chair",1.1,0.95,2],
-          ["table",2.2,0],
           ["chair",2.2,-0.95],
           ["chair",2.2,0.95,2],
           ["plant",-2.6,1.4]
@@ -1164,11 +1289,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [1,0.5]
         ],
         "furniture": [
-          ["wardrobe",-1.2,-0.8,1],
-          ["wardrobe",-1.2,0.8,1],
-          ["table",0.5,0],
-          ["chair",0.5,-0.9],
-          ["chair",0.5,0.9,2]
+          ["bookshelf",-1.385,-1.35,1],
+          ["bookshelf",-1.385,-0.45,1],
+          ["bookshelf",-1.385,0.45,1],
+          ["bookshelf",-1.385,1.35,1],
+          ["bookshelf",1.385,-1.6,3],
+          ["bookshelf",1.385,1.6,3],
+          ["table",0,-0.3],
+          ["chair",-0.35,-0.95],
+          ["chair",0.35,-0.95],
+          ["chair",-0.35,0.35,2],
+          ["chair",0.35,0.35,2]
         ]
       },
       {
@@ -1181,8 +1312,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "ash",
         "doors": [
-          [1,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.662,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -1195,7 +1327,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "ash",
         "doors": [
           [3,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -1212,6 +1345,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5],
           [3,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.6],
+          ["office_chair",0,1.38,2],
+          ["chair",-0.4,-0.2],
+          ["chair",0.4,-0.2],
+          ["bookshelf",1.385,0.6,3],
+          ["plant",-1.33,-1.6]
         ]
       },
       {
@@ -1228,6 +1369,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.6],
+          ["office_chair",0,1.38,2],
+          ["chair",-0.4,-0.2],
+          ["chair",0.4,-0.2],
+          ["bookshelf",1.385,0.6,3],
+          ["plant",-1.33,-1.6]
         ]
       },
       {
@@ -1244,6 +1393,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.6],
+          ["office_chair",0,1.38,2],
+          ["chair",-0.4,-0.2],
+          ["chair",0.4,-0.2],
+          ["bookshelf",1.385,0.6,3],
+          ["plant",-1.33,-1.6]
         ]
       },
       {
@@ -1260,6 +1417,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.6],
+          ["office_chair",0,1.38,2],
+          ["chair",-0.4,-0.2],
+          ["chair",0.4,-0.2],
+          ["bookshelf",1.385,0.6,3],
+          ["plant",-1.33,-1.6]
         ]
       },
       {
@@ -1276,6 +1441,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.45,0.73,2],
+          ["basin",-0.56,0,1]
         ]
       }
     ]
@@ -1294,8 +1463,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "cream",
         "floorCol": "oak",
         "doors": [
-          [2,0.267,"ext_glass",1.8,2.3],
-          [0,0.817,"int_hard",0.85,2.05]
+          [2,0.267,"ext_glass",1.8,2.3]
         ],
         "wins": [
           [2,0.767,"pano"],
@@ -1306,15 +1474,15 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           ["coffee",-1.5,-0.2],
           ["desk",1.6,-1.1],
           ["chair",1.6,-0.2,2],
-          ["plant",2.3,1.6]
+          ["plant",-2.6,1.9]
         ]
       },
       {
         "type": "bedroom",
-        "cx": 7.8,
+        "cx": 7.5,
         "cz": 2.4,
         "w": 4.8,
-        "len": 3.6,
+        "len": 3,
         "name": "Partner cabin",
         "paint": "beige",
         "floorCol": "walnut",
@@ -1323,6 +1491,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [2,0.5,"pano"]
+        ],
+        "furniture": [
+          ["desk",0,-0.6,2],
+          ["office_chair",0,-1.38],
+          ["chair",-0.4,0.2,2],
+          ["chair",0.4,0.2,2],
+          ["bookshelf",-1.185,0.9,1],
+          ["plant",1.13,2]
         ]
       },
       {
@@ -1335,8 +1511,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [1,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.21,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -1349,7 +1526,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "gtile",
         "doors": [
           [3,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "hall",
@@ -1369,17 +1547,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "furniture": [
           ["desk",-2.2,-1.15],
-          ["chair",-2.2,-0.37,2],
+          ["office_chair",-2.2,-0.37,2],
           ["desk",0,-1.15],
-          ["chair",0,-0.37,2],
+          ["office_chair",0,-0.37,2],
           ["desk",2.2,-1.15],
-          ["chair",2.2,-0.37,2],
+          ["office_chair",2.2,-0.37,2],
           ["desk",-2.2,1.15],
-          ["chair",-2.2,1.93,2],
+          ["office_chair",-2.2,1.93,2],
           ["desk",0,1.15],
-          ["chair",0,1.93,2],
+          ["office_chair",0,1.93,2],
           ["desk",2.2,1.15],
-          ["chair",2.2,1.93,2],
+          ["office_chair",2.2,1.93,2],
           ["plant",3,-2]
         ]
       },
@@ -1396,9 +1574,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5,"int_hard",0.85,2.05]
         ],
         "furniture": [
-          ["wardrobe",-0.7,-0.5,1],
-          ["wardrobe",-0.7,0.5,1],
-          ["wardrobe",0.7,-0.5,1]
+          ["wardrobe",-0.76,0.4,1],
+          ["wardrobe",0.76,0.4,3],
+          ["bookshelf",0,1.285,2]
         ]
       },
       {
@@ -1415,14 +1593,18 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.45,0.73,2],
+          ["basin",-0.56,0,1]
         ]
       },
       {
         "type": "kitchen",
-        "cx": 10.6,
-        "cz": 3.6,
-        "w": 2.4,
-        "len": 2,
+        "cx": 10.3,
+        "cz": 2.4,
+        "w": 4.8,
+        "len": 2.6,
         "name": "Pantry",
         "paint": "mint",
         "floorCol": "wtile",
@@ -1430,7 +1612,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [0,0.5,"int_hard",0.85,2.05]
         ],
         "wins": [
-          [2,0.5]
+          [2,0.5],
+          [1,0.5]
+        ],
+        "furniture": [
+          ["kunit",0,-1.96],
+          ["fridge",0.81,-1.2,3],
+          ["table",-0.1,0.2],
+          ["chair",-0.45,-0.55],
+          ["chair",0.25,-0.55],
+          ["chair",-0.45,0.95,2],
+          ["chair",0.25,0.95,2]
         ]
       }
     ]
@@ -1457,14 +1649,15 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [3,0.5,"pano"]
         ],
         "furniture": [
-          ["wardrobe",-2.8,-3],
-          ["wardrobe",-0.9,-3],
-          ["wardrobe",1,-3],
-          ["table",-2,0.4],
-          ["table",1.2,0.4],
-          ["sofa",-2,2.6],
-          ["plant",3.2,2.8],
-          ["plant",3.2,-3]
+          ["wardrobe",-2.8,3.36,2],
+          ["wardrobe",-0.9,3.36,2],
+          ["wardrobe",1,3.36,2],
+          ["table",-2,0.6],
+          ["table",1.2,0.6],
+          ["sofa",-3.31,-1.2,1],
+          ["coffee",-2.3,-1.2,1],
+          ["plant",3.5,-1.2],
+          ["plant",-3.5,-3.3]
         ]
       },
       {
@@ -1483,9 +1676,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [1,0.5,"pano"]
         ],
         "furniture": [
-          ["desk",-0.9,-0.5],
-          ["chair",-0.9,0.3,2],
-          ["desk",0.7,-0.5]
+          ["desk",0,-0.4,1],
+          ["office_chair",0.78,-0.4,3],
+          ["chair",-0.7,-0.4,1],
+          ["plant",1.43,0.8]
         ]
       },
       {
@@ -1500,7 +1694,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "slate",
         "doors": [
           [2,0.719,"int_hard",0.9,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -1516,6 +1711,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["desk",0.4,-0.55],
+          ["office_chair",0.4,0.23,2],
+          ["chair",0.4,-1.13],
+          ["bookshelf",0.4,1.185,2],
+          ["plant",-1.2,1.1]
         ]
       },
       {
@@ -1534,10 +1736,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [1,0.5]
         ],
         "furniture": [
-          ["wardrobe",-1.1,-0.6,1],
-          ["wardrobe",1.1,-0.6,1],
-          ["wardrobe",-1.1,0.6,1],
-          ["wardrobe",1.1,0.6,1]
+          ["wardrobe",-0.5,-1.26],
+          ["bookshelf",0.95,-1.385],
+          ["wardrobe",-0.5,1.26,2],
+          ["bookshelf",0.95,1.385,2],
+          ["table",0.4,0,1]
         ]
       },
       {
@@ -1554,6 +1757,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["toilet",0.5,0.73,2],
+          ["basin",-0.56,0.1,1]
         ]
       }
     ]
@@ -1574,6 +1781,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "slate",
         "doors": [
           [1,0.5,"ext_glass",1.8,2.3]
+        ],
+        "furniture": [
+          ["plant",-0.935,0.835]
         ]
       },
       {
@@ -1593,24 +1803,24 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5,"pano"]
         ],
         "furniture": [
-          ["desk",-2,-2.2],
-          ["chair",-2,-1.42,2],
-          ["desk",0,-2.2],
-          ["chair",0,-1.42,2],
-          ["desk",2,-2.2],
-          ["chair",2,-1.42,2],
-          ["desk",-2,0],
-          ["chair",-2,0.78,2],
-          ["desk",0,0],
-          ["chair",0,0.78,2],
-          ["desk",2,0],
-          ["chair",2,0.78,2],
-          ["desk",-2,2.2],
-          ["chair",-2,2.98,2],
-          ["desk",0,2.2],
-          ["chair",0,2.98,2],
-          ["desk",2,2.2],
-          ["chair",2,2.98,2]
+          ["desk",-1.9,-2.7],
+          ["office_chair",-1.9,-1.92,2],
+          ["desk",0,-2.7],
+          ["office_chair",0,-1.92,2],
+          ["desk",1.9,-2.7],
+          ["office_chair",1.9,-1.92,2],
+          ["desk",-1.9,-0.5],
+          ["office_chair",-1.9,0.28,2],
+          ["desk",0,-0.5],
+          ["office_chair",0,0.28,2],
+          ["desk",1.9,-0.5],
+          ["office_chair",1.9,0.28,2],
+          ["desk",-1.9,1.7],
+          ["office_chair",-1.9,2.48,2],
+          ["desk",0,1.7],
+          ["office_chair",0,2.48,2],
+          ["desk",1.9,1.7],
+          ["office_chair",1.9,2.48,2]
         ]
       },
       {
@@ -1630,24 +1840,24 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5,"pano"]
         ],
         "furniture": [
-          ["desk",-2,-2.2],
-          ["chair",-2,-1.42,2],
-          ["desk",0,-2.2],
-          ["chair",0,-1.42,2],
-          ["desk",2,-2.2],
-          ["chair",2,-1.42,2],
-          ["desk",-2,0],
-          ["chair",-2,0.78,2],
-          ["desk",0,0],
-          ["chair",0,0.78,2],
-          ["desk",2,0],
-          ["chair",2,0.78,2],
-          ["desk",-2,2.2],
-          ["chair",-2,2.98,2],
-          ["desk",0,2.2],
-          ["chair",0,2.98,2],
-          ["desk",2,2.2],
-          ["chair",2,2.98,2]
+          ["desk",-1.9,-2.7],
+          ["office_chair",-1.9,-1.92,2],
+          ["desk",0,-2.7],
+          ["office_chair",0,-1.92,2],
+          ["desk",1.9,-2.7],
+          ["office_chair",1.9,-1.92,2],
+          ["desk",-1.9,-0.5],
+          ["office_chair",-1.9,0.28,2],
+          ["desk",0,-0.5],
+          ["office_chair",0,0.28,2],
+          ["desk",1.9,-0.5],
+          ["office_chair",1.9,0.28,2],
+          ["desk",-1.9,1.7],
+          ["office_chair",-1.9,2.48,2],
+          ["desk",0,1.7],
+          ["office_chair",0,2.48,2],
+          ["desk",1.9,1.7],
+          ["office_chair",1.9,2.48,2]
         ]
       },
       {
@@ -1661,8 +1871,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "slate",
         "doors": [
-          [1,0.5,"int_hard",1,2.05]
-        ]
+          [1,0.5,"int_hard",1,2.05],
+          [2,0.5,"int_hard",0.9,2.05],
+          [0,0.5,"int_hard",0.9,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -1679,6 +1892,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5],
           [3,0.5]
+        ],
+        "furniture": [
+          ["desk",0,0.5],
+          ["office_chair",0,1.28,2],
+          ["chair",-0.4,-0.25],
+          ["chair",0.4,-0.25],
+          ["bookshelf",-1.485,-1.1,1],
+          ["plant",1.435,-1.435]
         ]
       },
       {
@@ -1695,6 +1916,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["table",-0.95,0.3],
+          ["table",0.45,0.3],
+          ["chair",-1.25,-0.65],
+          ["chair",-1.25,1.25,2],
+          ["chair",-0.25,-0.65],
+          ["chair",-0.25,1.25,2],
+          ["chair",0.75,-0.65],
+          ["chair",0.75,1.25,2],
+          ["tv",1.46,0.3,3]
         ]
       },
       {
@@ -1715,12 +1947,16 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["kunit",-1.3,-1.5],
           ["fridge",1.9,-1.5],
-          ["table",-1.05,0.8],
-          ["chair",-2,0.8,1],
-          ["chair",-0.1,0.8,3],
-          ["table",1.05,0.8],
-          ["chair",0.1,0.8,1],
-          ["chair",2,0.8,3]
+          ["table",-1.1,0.6],
+          ["chair",-1.45,-0.05],
+          ["chair",-0.75,-0.05],
+          ["chair",-1.45,1.25,2],
+          ["chair",-0.75,1.25,2],
+          ["table",1.1,0.6],
+          ["chair",0.75,-0.05],
+          ["chair",1.45,-0.05],
+          ["chair",0.75,1.25,2],
+          ["chair",1.45,1.25,2]
         ]
       },
       {
@@ -1734,6 +1970,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "wtile",
         "doors": [
           [2,0.5,"int_pvc",0.8,2.05]
+        ],
+        "furniture": [
+          ["toilet",-0.55,0.735,2],
+          ["basin",0.5,0.86,2],
+          ["mirror_cab",0.5,0.985,2]
         ]
       },
       {
@@ -1750,6 +1991,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.45,0.735,2],
+          ["basin",0.4,0.86,2],
+          ["mirror_cab",0.4,0.985,2]
         ]
       }
     ]
@@ -1768,9 +2014,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [2,0.28,"ext_glass",2,2.4],
-          [0,0.5,"int_hard",0.85,2.05],
-          [1,0.565,"int_hard",1,2.05]
+          [2,0.28,"ext_glass",2,2.4]
         ],
         "wins": [
           [2,0.76,"pano"],
@@ -1793,7 +2037,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "greige",
         "floorCol": "walnut",
         "doors": [
-          [0,0.429,"int_hard",0.85,2.05]
+          [3,0.435,"int_hard",1,2.05]
         ],
         "wins": [
           [2,0.5,"pano"],
@@ -1803,11 +2047,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           ["sofa",-2.2,-1.3],
           ["sofa",0.2,-1.3],
           ["coffee",-1,-0.2],
-          ["tv",-1,1.5],
-          ["table",1.5,0.2],
+          ["tv",-1,1.96,2],
+          ["table",2,0.2],
           ["chair",1.5,-0.75],
           ["chair",1.5,1.15,2],
-          ["table",2.5,0.2],
           ["chair",2.5,-0.75],
           ["chair",2.5,1.15,2]
         ]
@@ -1822,8 +2065,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "ash",
         "doors": [
+          [2,0.597,"int_hard",0.85,2.05],
           [1,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -1835,8 +2080,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "ash",
         "doors": [
-          [3,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.172,"int_hard",0.85,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -1853,6 +2099,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5],
           [3,0.5]
+        ],
+        "furniture": [
+          ["table",0,0.5],
+          ["chair",-0.35,-0.15],
+          ["chair",0.35,-0.15],
+          ["chair",-0.35,1.15,2],
+          ["chair",0.35,1.15,2],
+          ["plant",1.235,-1.435]
         ]
       },
       {
@@ -1869,6 +2123,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["table",0,0.5],
+          ["chair",-0.35,-0.15],
+          ["chair",0.35,-0.15],
+          ["chair",-0.35,1.15,2],
+          ["chair",0.35,1.15,2],
+          ["plant",1.235,-1.435]
         ]
       },
       {
@@ -1885,6 +2147,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["table",0,0.5],
+          ["chair",-0.35,-0.15],
+          ["chair",0.35,-0.15],
+          ["chair",-0.35,1.15,2],
+          ["chair",0.35,1.15,2],
+          ["plant",-1.235,-1.435]
         ]
       },
       {
@@ -1897,10 +2167,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "mint",
         "floorCol": "wtile",
         "doors": [
-          [2,0.5,"int_hard",0.85,2.05]
+          [2,0.75,"int_hard",0.85,2.05]
         ],
         "wins": [
-          [1,0.5]
+          [1,0.364]
+        ],
+        "furniture": [
+          ["kunit",0,0.66,2],
+          ["fridge",0.71,-0.61]
         ]
       }
     ]
@@ -1919,8 +2193,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "cream",
         "floorCol": "oak",
         "doors": [
-          [2,0.222,"ext_glass",1.8,2.3],
-          [1,0.524,"int_hard",0.9,2.05]
+          [2,0.222,"ext_glass",1.8,2.3]
         ],
         "wins": [
           [2,0.741,"pano"],
@@ -1929,10 +2202,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["sofa",-1.2,-1.1],
           ["coffee",-1.2,-0.1],
-          ["kunit",1.4,-1.2],
-          ["table",1,1],
-          ["chair",1,0.3],
-          ["plant",2.1,1.3]
+          ["kunit",1.2,1.66,2],
+          ["table",0.9,0.3],
+          ["chair",0.55,-0.35],
+          ["chair",1.25,-0.35],
+          ["chair",0.55,0.95,2],
+          ["chair",1.25,0.95,2],
+          ["plant",-2.335,1.635]
         ]
       },
       {
@@ -1946,8 +2222,9 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "ash",
         "doors": [
-          [3,0.5,"int_hard",0.85,2.05]
-        ]
+          [2,0.357,"int_hard",0.9,2.05]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -1961,7 +2238,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "ash",
         "doors": [
           [1,0.5,"int_hard",0.85,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -1978,6 +2256,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [1,0.5],
           [2,0.5]
+        ],
+        "furniture": [
+          ["desk",0.3,0.2],
+          ["office_chair",0.3,0.98,2],
+          ["chair",0,-0.5],
+          ["chair",0.6,-0.5],
+          ["plant",1.335,-1.235]
         ]
       },
       {
@@ -1994,6 +2279,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["desk",0.3,0.2],
+          ["office_chair",0.3,0.98,2],
+          ["chair",0,-0.5],
+          ["chair",0.6,-0.5],
+          ["plant",1.335,-1.235]
         ]
       },
       {
@@ -2010,6 +2302,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [3,0.5]
+        ],
+        "furniture": [
+          ["desk",-0.3,0.2],
+          ["office_chair",-0.3,0.98,2],
+          ["chair",-0.6,-0.5],
+          ["chair",0,-0.5],
+          ["plant",-1.335,-1.235]
         ]
       },
       {
@@ -2027,6 +2326,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [3,0.5],
           [0,0.5]
+        ],
+        "furniture": [
+          ["desk",-0.3,0.2],
+          ["office_chair",-0.3,0.98,2],
+          ["chair",-0.6,-0.5],
+          ["chair",0,-0.5],
+          ["plant",-1.335,-1.235]
         ]
       },
       {
@@ -2046,16 +2352,15 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [0,0.5,"pano"]
         ],
         "furniture": [
-          ["table",-1,0],
-          ["chair",-1,-0.95],
-          ["chair",-1,0.95,2],
-          ["table",0,0],
-          ["chair",0,-0.95],
-          ["chair",0,0.95,2],
-          ["table",1,0],
-          ["chair",1,-0.95],
-          ["chair",1,0.95,2],
-          ["tv",-1.1,1.5]
+          ["table",-0.45,0],
+          ["table",0.95,0],
+          ["chair",-0.75,-0.95],
+          ["chair",-0.75,0.95,2],
+          ["chair",0.25,-0.95],
+          ["chair",0.25,0.95,2],
+          ["chair",1.25,-0.95],
+          ["chair",1.25,0.95,2],
+          ["tv",-1.66,0.5,1]
         ]
       },
       {
@@ -2072,6 +2377,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["toilet",0.5,0.735,2],
+          ["basin",-0.66,0.4,1],
+          ["mirror_cab",-0.785,0.4,1]
         ]
       }
     ]
@@ -2087,7 +2397,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "w": 2.6,
         "len": 6,
         "name": "Engawa veranda",
-        "floorCol": "oak"
+        "floorCol": "oak",
+        "furniture": [
+          ["armchair",-2.3,-0.3],
+          ["side_table",-1.575,-0.3],
+          ["armchair",-0.85,-0.3],
+          ["plant",2.6,0.9]
+        ]
       },
       {
         "type": "hall",
@@ -2109,11 +2425,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["sofa",-1.9,-1.2],
           ["coffee",-1.9,-0.1],
-          ["tv",-1.9,1.4],
+          ["tv",-1.9,2.36,2],
+          ["rug",-1.9,-0.3],
           ["table",1.9,0.4],
-          ["chair",1.2,0.4,1],
-          ["chair",2.6,0.4,3],
-          ["plant",3.2,-1.9]
+          ["chair",1.55,-0.25],
+          ["chair",2.25,-0.25],
+          ["chair",1.55,1.05,2],
+          ["chair",2.25,1.05,2],
+          ["plant",3.335,-2.335]
         ]
       },
       {
@@ -2131,6 +2450,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [1,0.5],
           [2,0.5]
+        ],
+        "furniture": [
+          ["kunit",0.3,1.26,2],
+          ["kunit",1.06,-0.3,3],
+          ["fridge",-1.01,-1.21]
         ]
       },
       {
@@ -2143,11 +2467,19 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "beige",
         "floorCol": "oak",
         "doors": [
-          [2,0.5,"int_panel",0.85,2.05]
+          [2,0.217,"int_panel",0.85,2.05]
         ],
         "wins": [
           [0,0.5,"pano"],
           [3,0.5]
+        ],
+        "furniture": [
+          ["bed",-0.4,0.86,2],
+          ["nightstand",-1.45,1.66,2],
+          ["nightstand",0.65,1.66,2],
+          ["wardrobe",-1.2,-1.56],
+          ["rug",-0.4,-0.4],
+          ["plant",1.935,1.635]
         ]
       },
       {
@@ -2166,9 +2498,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [1,0.5]
         ],
         "furniture": [
-          ["bath",-0.2,0.6],
-          ["toilet",-0.7,-0.6],
-          ["basin",0.6,-0.6]
+          ["bath",0.685,0.31,3],
+          ["toilet",0,-0.835],
+          ["basin",-0.5,0.86,2],
+          ["mirror_cab",-0.5,0.985,2]
         ]
       }
     ]
@@ -2184,7 +2517,12 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "w": 2.4,
         "len": 5.4,
         "name": "Deck",
-        "floorCol": "walnut"
+        "floorCol": "walnut",
+        "furniture": [
+          ["armchair",-1.8,-0.2],
+          ["armchair",-0.7,-0.2],
+          ["plant",2.2,0.7]
+        ]
       },
       {
         "type": "hall",
@@ -2205,11 +2543,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["sofa",-1.6,-1.6],
           ["coffee",-1.6,-0.5],
-          ["tv",-1.6,1.4],
+          ["armchair",-0.1,-0.5,3],
+          ["rug",-1.6,-0.7],
           ["table",1.7,-0.6],
-          ["chair",1,-0.6,1],
-          ["chair",2.4,-0.6,3],
-          ["plant",2.5,2.2]
+          ["chair",1.35,-1.25],
+          ["chair",2.05,-1.25],
+          ["chair",1.35,0.05,2],
+          ["chair",2.05,0.05,2],
+          ["bed",-2.36,1.86,2],
+          ["nightstand",-1.335,2.66,2],
+          ["wardrobe",2,2.56,2],
+          ["plant",2.935,-2.635]
         ]
       },
       {
@@ -2226,7 +2570,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5],
-          [2,0.5]
+          [2,0.654]
+        ],
+        "furniture": [
+          ["kunit",0.2,0.96,2],
+          ["fridge",0.81,-0.91]
         ]
       },
       {
@@ -2242,7 +2590,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [3,0.5,"int_pvc",0.8,2.05]
         ],
         "wins": [
-          [1,0.5]
+          [0,0.5]
+        ],
+        "furniture": [
+          ["toilet",0.5,0.635,2],
+          ["basin",-0.3,0.76,2],
+          ["mirror_cab",-0.3,0.885,2],
+          ["shower",0.41,-0.51]
         ]
       }
     ]
@@ -2261,7 +2615,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "gray",
         "floorCol": "slate",
         "doors": [
-          [2,0.5,"ext_glass",2.4,2.4]
+          [2,0.5,"ext_glass",2.4,2.4],
+          [1,0.25,"ext_glass",1.2,2.3]
         ],
         "wins": [
           [2,0.821,"pano"],
@@ -2269,13 +2624,16 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.179,"pano"]
         ],
         "furniture": [
-          ["sofa",-2.2,-1.9],
-          ["sofa",0.4,-1.9],
-          ["coffee",-0.9,-0.7],
-          ["tv",-0.9,1.6],
-          ["table",2.4,1.6],
-          ["chair",1.7,1.6,1],
-          ["chair",3.1,1.6,3],
+          ["sofa",-1.65,-1.9],
+          ["sofa",0.45,-1.9],
+          ["coffee",-0.6,-0.7],
+          ["rug",-0.6,-0.6],
+          ["tv",-0.1,2.86,2],
+          ["table",2.3,1.6],
+          ["chair",1.95,0.95],
+          ["chair",2.65,0.95],
+          ["chair",1.95,2.25,2],
+          ["chair",2.65,2.25,2],
           ["plant",3.2,-2.4]
         ]
       },
@@ -2294,6 +2652,14 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [1,0.5,"pano"],
           [2,0.5]
+        ],
+        "furniture": [
+          ["kunit",0.3,1.36,2],
+          ["kunit",1.36,-0.4,3],
+          ["fridge",-1.31,-1.31],
+          ["table",-0.2,0],
+          ["bar_stool",-0.5,-0.6],
+          ["bar_stool",0.1,-0.6]
         ]
       },
       {
@@ -2303,7 +2669,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "w": 2.4,
         "len": 3.6,
         "name": "Terrace",
-        "floorCol": "slate"
+        "floorCol": "slate",
+        "furniture": [
+          ["armchair",-0.3,0.1],
+          ["side_table",0.45,0.1],
+          ["armchair",1.2,0.1],
+          ["plant",1.435,-0.835]
+        ]
       },
       {
         "type": "bedroom",
@@ -2315,11 +2687,19 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "greige",
         "floorCol": "walnut",
         "doors": [
-          [2,0.5,"int_panel",0.85,2.05]
+          [2,0.469,"int_panel",0.85,2.05]
         ],
         "wins": [
           [0,0.5,"pano"],
           [3,0.5]
+        ],
+        "furniture": [
+          ["bed",-0.6,0.86,2],
+          ["nightstand",-1.65,1.66,2],
+          ["nightstand",0.45,1.66,2],
+          ["wardrobe",-1.36,-1.56],
+          ["dresser",2.01,1,3],
+          ["rug",-0.6,-0.5]
         ]
       },
       {
@@ -2339,10 +2719,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [0,0.5]
         ],
         "furniture": [
-          ["bath",0.4,0.9],
-          ["shower",-0.9,0.9],
-          ["toilet",-0.9,-0.9],
-          ["basin",0.6,-1]
+          ["bath",0.5,1.185,2],
+          ["shower",0.91,-1.11],
+          ["toilet",-0.2,-1.235],
+          ["basin",-1,-1.36],
+          ["mirror_cab",-1,-1.485]
         ]
       }
     ]
@@ -2361,10 +2742,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "sage",
         "floorCol": "oak",
         "doors": [
-          [2,0.232,"ext_glass",1.8,2.3],
-          [0,0.357,"int_hard",0.9,2.05],
-          [1,0.659,"int_hard",0.9,2.05],
-          [1,0.159,"int_pvc",0.8,2.05]
+          [2,0.232,"ext_glass",1.8,2.3]
         ],
         "wins": [
           [2,0.75,"pano"],
@@ -2373,9 +2751,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "furniture": [
           ["sofa",-1.4,-1.2],
           ["coffee",-1.4,-0.2],
-          ["desk",1.4,-1.2],
-          ["chair",1.4,-0.3,2],
-          ["plant",2.2,1.4]
+          ["desk",1,0.3],
+          ["office_chair",1,1.08,2],
+          ["chair",1,-0.45],
+          ["plant",-2.4,1.8]
         ]
       },
       {
@@ -2388,8 +2767,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "oak",
         "doors": [
-          [2,0.75,"int_hard",0.9,2.05],
-          [1,0.771,"int_hard",0.9,2.05]
+          [2,0.75,"int_hard",0.9,2.05]
         ],
         "wins": [
           [0,0.5,"pano"],
@@ -2400,7 +2778,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           ["plant",-3.4,-3],
           ["plant",3.4,-3],
           ["plant",-3.4,3],
-          ["walllamp",0,3.2]
+          ["walllamp",0,3.2],
+          ["rug",-2,-0.8,1],
+          ["rug",0,-0.8,1],
+          ["rug",2,-0.8,1],
+          ["rug",-2,1.2,1],
+          ["rug",0,1.2,1],
+          ["rug",2,1.2,1]
         ]
       },
       {
@@ -2420,9 +2804,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.5]
         ],
         "furniture": [
-          ["wardrobe",-0.9,-0.4,1],
-          ["wardrobe",0.9,-0.4,1],
-          ["chair",0,0.7]
+          ["wardrobe",0.4,1.06,2],
+          ["dresser",1.11,-0.6,3],
+          ["chair",-0.2,-0.9],
+          ["chair",0.4,-0.9],
+          ["mirror_cab",-1.285,-1,1]
         ]
       },
       {
@@ -2438,8 +2824,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [3,0.5,"int_pvc",0.8,2.05]
         ],
         "furniture": [
-          ["toilet",-0.6,-0.2],
-          ["basin",0.6,-0.3]
+          ["toilet",0.635,0.1,3],
+          ["basin",0,0.36,2]
         ]
       },
       {
@@ -2457,6 +2843,12 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [1,0.5],
           [2,0.5]
+        ],
+        "furniture": [
+          ["bed_single",0.3,0.46,2],
+          ["chair",-0.55,1.1],
+          ["dresser",1.21,-0.8,3],
+          ["plant",-1.235,-1.235]
         ]
       }
     ]
@@ -2475,18 +2867,17 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "gtile",
         "doors": [
-          [2,0.68,"ext_glass",2,2.4],
-          [0,0.5,"int_hard",0.9,2.05],
-          [1,0.5,"int_hard",1,2.05]
+          [2,0.68,"ext_glass",2,2.4]
         ],
         "wins": [
           [2,0.24,"pano"]
         ],
         "furniture": [
-          ["desk",-1.2,-0.8],
-          ["chair",-1.2,0,2],
-          ["plant",1.9,1.1],
-          ["sofa",0.6,-1.1]
+          ["desk",-1.4,0.3],
+          ["office_chair",-1.4,1.08,2],
+          ["plant",2.135,1.435],
+          ["sofa",1.2,-1.21],
+          ["coffee",1.2,-0.3]
         ]
       },
       {
@@ -2532,7 +2923,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           ["chair",1.2,2.1,2],
           ["chair",2,2.1,2],
           ["desk",0,-2.6],
-          ["tv",-2.4,-2.9]
+          ["tv",-2.4,-3.16]
         ]
       },
       {
@@ -2547,7 +2938,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "doors": [
           [2,0.5,"int_hard",0.9,2.05],
           [1,0.5,"int_hard",0.9,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "hallway",
@@ -2561,7 +2953,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "gtile",
         "doors": [
           [1,0.5,"int_hard",0.9,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bedroom",
@@ -2577,6 +2970,18 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [3,0.5]
+        ],
+        "furniture": [
+          ["chair",-1.1,-0.75,2],
+          ["chair",-0.3,-0.75,2],
+          ["chair",0.5,-0.75,2],
+          ["chair",-1.1,0.2,2],
+          ["chair",-0.3,0.2,2],
+          ["chair",0.5,0.2,2],
+          ["chair",-1.1,1.15,2],
+          ["chair",-0.3,1.15,2],
+          ["chair",0.5,1.15,2],
+          ["tv",-0.4,-1.36]
         ]
       },
       {
@@ -2594,6 +2999,18 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [3,0.5],
           [0,0.5]
+        ],
+        "furniture": [
+          ["chair",-1.1,-0.75,2],
+          ["chair",-0.3,-0.75,2],
+          ["chair",0.5,-0.75,2],
+          ["chair",-1.1,0.2,2],
+          ["chair",-0.3,0.2,2],
+          ["chair",0.5,0.2,2],
+          ["chair",-1.1,1.15,2],
+          ["chair",-0.3,1.15,2],
+          ["chair",0.5,1.15,2],
+          ["tv",-0.4,-1.36]
         ]
       },
       {
@@ -2611,6 +3028,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [1,0.5],
           [0,0.5]
+        ],
+        "furniture": [
+          ["desk",0.1,-0.96],
+          ["office_chair",0.1,-0.18,2],
+          ["desk",0.96,0.96,2],
+          ["office_chair",0.96,0.18],
+          ["plant",-1.335,-1.035]
         ]
       },
       {
@@ -2627,6 +3051,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.3,0.735,2],
+          ["basin",0.46,0.3,3]
         ]
       }
     ]
@@ -2646,9 +3074,7 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "honey",
         "doors": [
           [2,0.526,"ext_glass",2,2.3],
-          [1,0.286,"int_hard",1,2.05],
-          [0,0.289,"int_hard",0.9,2.05],
-          [0,0.908,"int_pvc",0.8,2.05]
+          [1,0.857,"ext_glass",1,2.3]
         ],
         "wins": [
           [2,0.842,"pano"],
@@ -2656,24 +3082,28 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [3,0.5,"pano"]
         ],
         "furniture": [
-          ["table",-2.2,-1.3],
-          ["chair",-3.15,-1.3,1],
-          ["chair",-1.25,-1.3,3],
-          ["table",0,-1.3],
-          ["chair",-0.95,-1.3,1],
-          ["chair",0.95,-1.3,3],
-          ["table",2.2,-1.3],
-          ["chair",1.25,-1.3,1],
-          ["chair",3.15,-1.3,3],
-          ["table",-2.2,1.3],
-          ["chair",-3.15,1.3,1],
-          ["chair",-1.25,1.3,3],
-          ["table",0,1.3],
-          ["chair",-0.95,1.3,1],
-          ["chair",0.95,1.3,3],
-          ["table",2.2,1.3],
-          ["chair",1.25,1.3,1],
-          ["chair",3.15,1.3,3]
+          ["table",-2.625,-0.7,1],
+          ["chair",-3.275,-0.7,1],
+          ["chair",-1.975,-0.7,3],
+          ["table",-0.875,-0.7,1],
+          ["chair",-1.525,-0.7,1],
+          ["chair",-0.225,-0.7,3],
+          ["table",0.875,-0.7,1],
+          ["chair",0.225,-0.7,1],
+          ["chair",1.525,-0.7,3],
+          ["table",2.625,-0.7,1],
+          ["chair",1.975,-0.7,1],
+          ["chair",3.275,-0.7,3],
+          ["table",-2.625,1.25,1],
+          ["chair",-3.275,1.25,1],
+          ["chair",-1.975,1.25,3],
+          ["table",-0.875,1.25,1],
+          ["chair",-1.525,1.25,1],
+          ["chair",-0.225,1.25,3],
+          ["table",0.875,1.25,1],
+          ["chair",0.225,1.25,1],
+          ["chair",1.525,1.25,3],
+          ["plant",-3.435,2.435]
         ]
       },
       {
@@ -2683,7 +3113,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "w": 2.4,
         "len": 3.4,
         "name": "Terrace seating",
-        "floorCol": "terra"
+        "floorCol": "terra",
+        "furniture": [
+          ["table",0.3,0],
+          ["chair",-0.65,0,1],
+          ["chair",1.25,0,3],
+          ["plant",-1.335,0.835]
+        ]
       },
       {
         "type": "hall",
@@ -2701,11 +3137,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [1,0.5,"pano"]
         ],
         "furniture": [
-          ["kunit",0,-1.1],
-          ["kunit",-1.2,0,1],
-          ["fridge",1.2,1],
-          ["chair",-0.2,0.9],
-          ["chair",0.8,0.9]
+          ["kunit",-0.4,1.16,2],
+          ["fridge",0.9,1.11,2],
+          ["table",0.2,-0.3],
+          ["bar_stool",-0.1,-0.95],
+          ["bar_stool",0.5,-0.95]
         ]
       },
       {
@@ -2718,18 +3154,18 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "white",
         "floorCol": "wtile",
         "doors": [
-          [2,0.45,"int_hard",0.9,2.05],
-          [1,0.618,"int_hard",0.9,2.05]
+          [2,0.45,"int_hard",0.9,2.05]
         ],
         "wins": [
           [0,0.5],
           [3,0.5]
         ],
         "furniture": [
-          ["kunit",-0.9,-1.1],
-          ["kunit",0.6,-1.1],
-          ["fridge",1.5,1.1],
-          ["table",-0.8,0.9]
+          ["kunit",-0.9,1.26,2],
+          ["kunit",0.9,1.26,2],
+          ["kunit",-1.56,-0.1,1],
+          ["fridge",-0.9,-1.21],
+          ["table",0.4,0.1]
         ]
       },
       {
@@ -2746,6 +3182,10 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.5]
+        ],
+        "furniture": [
+          ["kunit",0.56,0,3],
+          ["bookshelf",-0.3,-0.985]
         ]
       },
       {
@@ -2762,6 +3202,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [1,0.5]
+        ],
+        "furniture": [
+          ["toilet",-0.45,0.735,2],
+          ["basin",0.4,0.86,2],
+          ["mirror_cab",0.4,0.985,2]
         ]
       }
     ]
@@ -2777,7 +3222,12 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "w": 1.8,
         "len": 4,
         "name": "Front deck",
-        "floorCol": "walnut"
+        "floorCol": "walnut",
+        "furniture": [
+          ["armchair",-1.3,-0.2],
+          ["side_table",-0.6,-0.2],
+          ["plant",1.5,0.4]
+        ]
       },
       {
         "type": "hall",
@@ -2796,13 +3246,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [0,0.5,"pano"]
         ],
         "furniture": [
-          ["sofa",-1.1,-1.6],
-          ["coffee",-1.1,-0.6],
-          ["kunit",1.1,-1.7],
-          ["fridge",1.7,-0.6],
-          ["table",0.4,1.4],
-          ["chair",-0.3,1.4,1],
-          ["chair",1.1,1.4,3]
+          ["sofa",-1.71,-0.5,1],
+          ["coffee",-0.8,-0.5,1],
+          ["kunit",0.5,2.16,2],
+          ["fridge",1.81,2.11,2],
+          ["table",-0.8,1.2],
+          ["chair",-1.75,1.2,1],
+          ["chair",0.15,1.2,3]
         ]
       },
       {
@@ -2815,10 +3265,16 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "mint",
         "floorCol": "wtile",
         "doors": [
-          [3,0.5,"int_pvc",0.8,2.05]
+          [3,0.273,"int_pvc",0.8,2.05]
         ],
         "wins": [
-          [1,0.5]
+          [2,0.5]
+        ],
+        "furniture": [
+          ["shower",0.31,0.51],
+          ["toilet",0.5,-0.635],
+          ["basin",-0.45,0.76,2],
+          ["mirror_cab",-0.45,0.885,2]
         ]
       },
       {
@@ -2833,7 +3289,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "walnut",
         "doors": [
           [2,0.5,"int_hard",0.8,2.05]
-        ]
+        ],
+        "furniture": []
       }
     ]
   },
@@ -2853,7 +3310,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "slate",
         "doors": [
           [1,0.5,"ext_hard",0.9,2.1]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "hall",
@@ -2865,21 +3323,22 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "paint": "cream",
         "floorCol": "oak",
         "doors": [
-          [3,0.32,"int_hard",0.9,2.05],
-          [0,0.269,"int_hard",0.9,2.05],
-          [0,0.846,"int_pvc",0.8,2.05]
+          [3,0.32,"int_hard",0.9,2.05]
         ],
         "wins": [
           [2,0.5,"pano"],
           [1,0.5,"pano"]
         ],
         "furniture": [
-          ["sofa",-1.3,-1.4],
-          ["coffee",-1.3,-0.3],
-          ["tv",-1.3,1.5],
-          ["table",1.5,0.2],
-          ["chair",0.8,0.2,1],
-          ["chair",2.2,0.2,3]
+          ["sofa",0,-1.4],
+          ["coffee",0,-0.3],
+          ["tv",0.05,2.16,2],
+          ["rug",0,-0.5],
+          ["table",1.6,0.3],
+          ["chair",1.25,-0.35],
+          ["chair",1.95,-0.35],
+          ["chair",1.25,0.95,2],
+          ["chair",1.95,0.95,2]
         ]
       },
       {
@@ -2896,6 +3355,11 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         ],
         "wins": [
           [0,0.778]
+        ],
+        "furniture": [
+          ["kunit",-0.7,0.86,2],
+          ["kunit",1.36,-0.2,3],
+          ["fridge",-1.31,-0.81]
         ]
       },
       {
@@ -2910,7 +3374,8 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "floorCol": "slate",
         "doors": [
           [1,0.5,"int_hard",0.8,2.05]
-        ]
+        ],
+        "furniture": []
       },
       {
         "type": "bath",
@@ -2925,7 +3390,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
           [2,0.556,"int_pvc",0.8,2.05]
         ],
         "wins": [
-          [1,0.5]
+          [1,0.688]
+        ],
+        "furniture": [
+          ["shower",0.31,0.61],
+          ["toilet",-0.45,0.735,2],
+          ["basin",-0.56,-0.1,1],
+          ["mirror_cab",-0.685,-0.1,1]
         ]
       },
       {
@@ -2943,6 +3414,13 @@ const PAID_TEMPLATE_GEOMETRY: Record<string, TemplateGeometry> = {
         "wins": [
           [0,0.5,"pano"],
           [3,0.5]
+        ],
+        "furniture": [
+          ["bed",0.2,0.66,2],
+          ["nightstand",-0.85,1.46,2],
+          ["nightstand",1.25,1.46,2],
+          ["wardrobe",0.75,-1.36],
+          ["rug",0.2,-0.6]
         ]
       }
     ]

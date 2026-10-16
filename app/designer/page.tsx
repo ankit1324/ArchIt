@@ -29,6 +29,17 @@ interface Setup {
 const FT_PER_M = 3.28084;
 const toM = (v: number, unit: "m" | "ft") => (unit === "ft" ? v / FT_PER_M : v);
 
+// Decode a base64 data: URL locally — fetch(dataUrl) is blocked by the CSP's
+// connect-src, which doesn't (and shouldn't) allow data:.
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [head, b64 = ""] = dataUrl.split(",", 2);
+  const mime = /^data:([^;,]+)/.exec(head)?.[1] ?? "application/octet-stream";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 /** blueprint-grid + colour-wash stage behind the designer's card screens */
 function Backdrop({
   className,
@@ -359,11 +370,16 @@ export default function DesignerPage() {
     savingRef.current = true;
     try {
       let snapshotUrl = current?.snapshot;
-      const blob = await (await fetch(snapshot)).blob();
-      const fd = new FormData();
-      fd.append("file", new File([blob], "snapshot.png", { type: "image/png" }));
-      const up = await fetch("/api/upload", { method: "POST", body: fd });
-      if (up.ok) snapshotUrl = ((await up.json()) as { url: string }).url;
+      // Thumbnail is best-effort: a failed upload keeps the old snapshot
+      // instead of failing the whole save.
+      try {
+        const fd = new FormData();
+        fd.append("file", new File([dataUrlToBlob(snapshot)], "snapshot.png", { type: "image/png" }));
+        const up = await fetch("/api/upload", { method: "POST", body: fd });
+        if (up.ok) snapshotUrl = ((await up.json()) as { url: string }).url;
+      } catch (err) {
+        console.warn("Snapshot upload failed", err);
+      }
 
       const body = {
         name: setup?.name ?? current?.name ?? "My design",
