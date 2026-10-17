@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   SHOWCASE_COLUMNS,
   hasLocation,
+  isLngLat,
+  isLngLatPair,
   parsePublishBody,
   parseShowcaseQuery,
   toPublishedDesign,
@@ -114,4 +116,46 @@ test("parsePublishBody trims place to 120 chars", () => {
     parsePublishBody({ published: true, location: { lng: 76.7, lat: 30.7, place: "   " } }).location,
     { lng: 76.7, lat: 30.7, place: null },
   );
+});
+
+test("isLngLat accepts finite in-range coordinates only", () => {
+  assert.equal(isLngLat(76.7, 30.7), true);
+  assert.equal(isLngLat(0, 0), true);
+  assert.equal(isLngLat(-180, -90), true);
+  assert.equal(isLngLat(180, 90), true);
+  assert.equal(isLngLat(10, 95), false);
+  assert.equal(isLngLat(10, -90.01), false);
+  assert.equal(isLngLat(180.5, 0), false);
+  assert.equal(isLngLat(-181, 0), false);
+  assert.equal(isLngLat(Number.NaN, 0), false);
+  assert.equal(isLngLat(0, Number.POSITIVE_INFINITY), false);
+  assert.equal(isLngLat("76", 30), false);
+  assert.equal(isLngLat(76, null), false);
+});
+
+test("isLngLatPair checks a [lng, lat] tuple", () => {
+  assert.equal(isLngLatPair([76.7, 30.7]), true);
+  assert.equal(isLngLatPair([0, 0]), true);
+  assert.equal(isLngLatPair([10, 95]), false);
+  assert.equal(isLngLatPair([76.7]), false);
+  assert.equal(isLngLatPair([76.7, 30.7, 1]), false);
+  assert.equal(isLngLatPair("76.7,30.7"), false);
+  assert.equal(isLngLatPair(null), false);
+  assert.equal(isLngLatPair(undefined), false);
+});
+
+test("toPublishedDesign drops an out-of-range or non-finite plot centre", () => {
+  assert.equal(toPublishedDesign({ ...row, plot_lng: 10, plot_lat: 95 }, null).plotCenter, null);
+  assert.equal(toPublishedDesign({ ...row, plot_lng: 200, plot_lat: 30 }, null).plotCenter, null);
+  assert.equal(toPublishedDesign({ ...row, plot_lng: Number.NaN, plot_lat: 30 }, null).plotCenter, null);
+  assert.equal(toPublishedDesign({ ...row, plot_lng: 0, plot_lat: 0 }, null).plotCenter, null);
+  assert.deepEqual(toPublishedDesign({ ...row, plot_lng: 180, plot_lat: -90 }, null).plotCenter, [180, -90]);
+});
+
+test("toPublishedDesign passes only a compass facing", () => {
+  for (const f of ["N", "E", "S", "W"]) {
+    assert.equal(toPublishedDesign({ ...row, meta: { facing: f } }, null).facing, f);
+  }
+  assert.equal(toPublishedDesign({ ...row, meta: { facing: "<b>x</b>" } }, null).facing, undefined);
+  assert.equal(toPublishedDesign({ ...row, meta: { facing: 3 } }, null).facing, undefined);
 });

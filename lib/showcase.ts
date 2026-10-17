@@ -20,6 +20,31 @@ export function hasLocation(lng: number, lat: number): boolean {
 }
 
 /**
+ * True for a finite longitude in [-180, 180] and latitude in [-90, 90]: what
+ * maplibre accepts (setLngLat throws on anything else). [0, 0] passes; callers
+ * that need a real spot also check hasLocation.
+ */
+export function isLngLat(lng: unknown, lat: unknown): boolean {
+  return (
+    typeof lng === "number" &&
+    typeof lat === "number" &&
+    Number.isFinite(lng) &&
+    Number.isFinite(lat) &&
+    lng >= -180 &&
+    lng <= 180 &&
+    lat >= -90 &&
+    lat <= 90
+  );
+}
+
+/** isLngLat for a `[lng, lat]` tuple (listing coords, design plotCenter). */
+export function isLngLatPair(v: unknown): boolean {
+  return Array.isArray(v) && v.length === 2 && isLngLat(v[0], v[1]);
+}
+
+const FACINGS: readonly string[] = ["N", "E", "S", "W"];
+
+/**
  * Row → what other users may see. Only whitelisted fields are copied: never
  * user_id, and from meta only `facing` (budget/notes stay private).
  */
@@ -31,11 +56,16 @@ export function toPublishedDesign(
   const p: PublishedDesign = {
     id: row.id,
     name: row.name,
-    plotCenter: hasLocation(row.plot_lng, row.plot_lat) ? [row.plot_lng, row.plot_lat] : null,
+    // an out-of-range centre (unchecked legacy writes) would make maplibre
+    // throw for every /find visitor, so it is dropped here, at the one exit
+    plotCenter:
+      hasLocation(row.plot_lng, row.plot_lat) && isLngLat(row.plot_lng, row.plot_lat)
+        ? [row.plot_lng, row.plot_lat]
+        : null,
     plotW: row.plot_w,
     plotD: row.plot_d,
     place: row.place ?? undefined,
-    facing: row.meta?.facing,
+    facing: FACINGS.includes(row.meta?.facing as string) ? row.meta?.facing : undefined,
     // the author controls this URL; only allowlisted https hosts reach viewers
     snapshot: safeImageUrl(row.snapshot) ?? undefined,
     authorName: row.author_name || "ArchIt user",
@@ -80,22 +110,12 @@ export function parsePublishBody(body: unknown): PublishBody {
   if (typeof location !== "object") return { ok: false, error: "Invalid location" };
 
   const { lng, lat, place } = location as { lng?: unknown; lat?: unknown; place?: unknown };
-  if (
-    typeof lng !== "number" ||
-    typeof lat !== "number" ||
-    !Number.isFinite(lng) ||
-    !Number.isFinite(lat) ||
-    lng < -180 ||
-    lng > 180 ||
-    lat < -90 ||
-    lat > 90 ||
-    !hasLocation(lng, lat)
-  ) {
+  if (!isLngLat(lng, lat) || !hasLocation(lng as number, lat as number)) {
     return { ok: false, error: "Invalid location" };
   }
   if (place !== undefined && place !== null && typeof place !== "string") {
     return { ok: false, error: "Invalid place" };
   }
   const trimmed = typeof place === "string" ? place.trim().slice(0, MAX_PLACE).trim() : "";
-  return { ok: true, published, location: { lng, lat, place: trimmed || null } };
+  return { ok: true, published, location: { lng: lng as number, lat: lat as number, place: trimmed || null } };
 }

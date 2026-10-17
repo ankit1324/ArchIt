@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
 import { presentListing, validateListingWrite } from "@/lib/listing-presentation";
+import { isLngLatPair } from "@/lib/showcase";
 import type { Listing, ListingView } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
@@ -148,6 +149,11 @@ export async function PUT(
     return rateLimitedResponse();
   }
   const l = (await request.json()) as Omit<Listing, "id">;
+  // listingToRow writes coords unconditionally, and maplibre throws on an
+  // out-of-range marker, which would break /find for everyone
+  if (!isLngLatPair(l.coords)) {
+    return Response.json({ error: "coords must be a valid [lng, lat]" }, { status: 400 });
+  }
   if (
     (l.photo && !safeImageUrl(l.photo)) ||
     (l.photos && l.photos.some((p) => !safeImageUrl(p)))

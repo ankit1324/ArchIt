@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
 import { presentListing, validateListingWrite } from "@/lib/listing-presentation";
+import { isLngLatPair } from "@/lib/showcase";
 import type { Listing } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
@@ -49,6 +50,10 @@ export async function POST(request: Request) {
   // price is checked by validateListingWrite below (showcase listings store 0)
   if (!l.address || !l.coords) {
     return Response.json({ error: "address, coords required" }, { status: 400 });
+  }
+  // maplibre throws on an out-of-range marker, which would break /find for everyone
+  if (!isLngLatPair(l.coords)) {
+    return Response.json({ error: "coords must be a valid [lng, lat]" }, { status: 400 });
   }
   if (
     (l.photo && !safeImageUrl(l.photo)) ||
