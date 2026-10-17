@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { round1 } from "@/lib/showcase";
 import { safeImageUrl } from "@/lib/url";
 import type { PublishedDesign } from "@/lib/types";
 
@@ -18,8 +19,6 @@ function snapshotSrc(url: string | undefined): string | null {
   const u = new URL(safe);
   return u.pathname.startsWith("/storage/v1/object/public/") && !u.search ? safe : null;
 }
-
-const round1 = (n: number) => Math.round(n * 10) / 10;
 
 function publishedOn(iso: string): string {
   const d = new Date(iso);

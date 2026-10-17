@@ -8,6 +8,7 @@ import {
   parsePublishBody,
   parseShowcaseQuery,
   publishUpdate,
+  round1,
   toPublishedDesign,
 } from "../lib/showcase.ts";
 
@@ -159,6 +160,12 @@ test("toPublishedDesign passes only a compass facing", () => {
   }
   assert.equal(toPublishedDesign({ ...row, meta: { facing: "<b>x</b>" } }, null).facing, undefined);
   assert.equal(toPublishedDesign({ ...row, meta: { facing: 3 } }, null).facing, undefined);
+});
+
+test("round1 rounds to one decimal place", () => {
+  assert.equal(round1(12.345), 12.3);
+  assert.equal(round1(12.35), 12.4);
+  assert.equal(round1(20), 20);
 });
 
 const NOW = "2026-10-17T12:00:00.000Z";

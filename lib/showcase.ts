@@ -42,6 +42,9 @@ export function isLngLatPair(v: unknown): boolean {
   return Array.isArray(v) && v.length === 2 && isLngLat(v[0], v[1]);
 }
 
+/** One decimal place, for plot dimensions in metres. */
+export const round1 = (n: number) => Math.round(n * 10) / 10;
+
 const FACINGS: readonly string[] = ["N", "E", "S", "W"];
 
 /**
