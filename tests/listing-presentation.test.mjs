@@ -6,51 +6,57 @@ const sale = { type: "sale", price: 5000000 };
 const ownedPublished = { owned: true, published: true };
 
 test("absent designId keeps the stored design even when it is unpublished", () => {
-  const r = validateListingWrite(sale, "d1", null);
+  const r = validateListingWrite(sale, "d1", null, null);
   assert.deepEqual(r, { ok: true, price: 5000000, designId: "d1", defaultView: "photos" });
 });
 
 test("re-sending the stored id is allowed without any checks", () => {
-  const r = validateListingWrite({ ...sale, designId: "d1" }, "d1", { owned: true, published: false });
+  const r = validateListingWrite({ ...sale, designId: "d1" }, "d1", { owned: true, published: false }, null);
   assert.equal(r.ok, true);
   assert.equal(r.designId, "d1");
-  assert.equal(validateListingWrite({ ...sale, designId: "d1" }, "d1", null).ok, true);
+  assert.equal(validateListingWrite({ ...sale, designId: "d1" }, "d1", null, null).ok, true);
 });
 
 test("a newly attached design must be owned and published", () => {
-  const notOwned = validateListingWrite({ ...sale, designId: "d2" }, "d1", { owned: false, published: true });
+  const notOwned = validateListingWrite({ ...sale, designId: "d2" }, "d1", { owned: false, published: true }, null);
   assert.equal(notOwned.ok, false);
   assert.equal(notOwned.status, 400);
-  const unpublished = validateListingWrite({ ...sale, designId: "d2" }, null, { owned: true, published: false });
+  const unpublished = validateListingWrite({ ...sale, designId: "d2" }, null, { owned: true, published: false }, null);
   assert.equal(unpublished.ok, false);
   assert.equal(unpublished.status, 400);
-  assert.equal(validateListingWrite({ ...sale, designId: "d2" }, null, null).ok, false);
-  const ok = validateListingWrite({ ...sale, designId: "d2" }, "d1", ownedPublished);
+  assert.equal(validateListingWrite({ ...sale, designId: "d2" }, null, null, null).ok, false);
+  const ok = validateListingWrite({ ...sale, designId: "d2" }, "d1", ownedPublished, null);
   assert.equal(ok.ok, true);
   assert.equal(ok.designId, "d2");
 });
 
 test("null designId detaches", () => {
-  const r = validateListingWrite({ ...sale, designId: null }, "d1", null);
+  const r = validateListingWrite({ ...sale, designId: null }, "d1", null, null);
   assert.equal(r.ok, true);
   assert.equal(r.designId, null);
 });
 
 test("showcase listings are stored at price 0; others need a positive price", () => {
-  const r = validateListingWrite({ type: "showcase", price: 5000 }, null, null);
+  const r = validateListingWrite({ type: "showcase", price: 5000 }, null, null, null);
   assert.equal(r.ok, true);
   assert.equal(r.price, 0);
   for (const price of [0, -1, Number.NaN]) {
-    const bad = validateListingWrite({ type: "sale", price }, null, null);
+    const bad = validateListingWrite({ type: "sale", price }, null, null, null);
     assert.equal(bad.ok, false);
     assert.equal(bad.status, 400);
   }
-  assert.equal(validateListingWrite({ type: "rent", price: 18000 }, null, null).price, 18000);
+  assert.equal(validateListingWrite({ type: "rent", price: 18000 }, null, null, null).price, 18000);
+});
+
+test("absent defaultView keeps the stored view; a new listing gets photos", () => {
+  assert.equal(validateListingWrite(sale, "d1", null, "3d").defaultView, "3d");
+  assert.equal(validateListingWrite(sale, null, null, null).defaultView, "photos");
+  assert.equal(validateListingWrite({ ...sale, defaultView: "photos" }, "d1", null, "3d").defaultView, "photos");
 });
 
 test("defaultView defaults to photos and must be a known view", () => {
-  assert.equal(validateListingWrite({ ...sale, defaultView: "3d" }, null, null).defaultView, "3d");
-  const bad = validateListingWrite({ ...sale, defaultView: "video" }, null, null);
+  assert.equal(validateListingWrite({ ...sale, defaultView: "3d" }, null, null, null).defaultView, "3d");
+  const bad = validateListingWrite({ ...sale, defaultView: "video" }, null, null, null);
   assert.equal(bad.ok, false);
   assert.equal(bad.status, 400);
 });

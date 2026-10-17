@@ -10,7 +10,7 @@ import {
 } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
 import { presentListing, validateListingWrite } from "@/lib/listing-presentation";
-import type { Listing } from "@/lib/types";
+import type { Listing, ListingView } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 
@@ -83,18 +83,18 @@ export async function GET(
 /**
  * Only the authenticated lister may edit or delete. Row existence returns 404
  * regardless. Returns a Response error when denied, otherwise the stored
- * design_id (PUT needs it to tell "keep" from "attach").
+ * design_id and default_view (PUT keeps them when the body omits them).
  */
 async function ownedListing(
   id: string,
-): Promise<Response | { storedDesignId: string | null }> {
+): Promise<Response | { storedDesignId: string | null; storedDefaultView: ListingView }> {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
   const { data, error } = await db
     .from("properties")
-    .select("user_id, design_id")
+    .select("user_id, design_id, default_view")
     .eq("id", id)
-    .maybeSingle<Pick<PropertyRow, "user_id" | "design_id">>();
+    .maybeSingle<Pick<PropertyRow, "user_id" | "design_id" | "default_view">>();
   if (error) {
     console.error(`ownership check failed for property ${id}:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
@@ -106,7 +106,7 @@ async function ownedListing(
       { status: 403 },
     );
   }
-  return { storedDesignId: data.design_id };
+  return { storedDesignId: data.design_id, storedDefaultView: data.default_view };
 }
 
 /*
@@ -171,7 +171,7 @@ export async function PUT(
       return Response.json({ error: "internal error" }, { status: 500 });
     }
   }
-  const v = validateListingWrite(l, owned.storedDesignId, newDesign);
+  const v = validateListingWrite(l, owned.storedDesignId, newDesign, owned.storedDefaultView);
   if (!v.ok) return Response.json({ error: v.error }, { status: v.status });
 
   const { data, error } = await db

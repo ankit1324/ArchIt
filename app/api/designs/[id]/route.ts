@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db, designUpdateRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
+import { safeImageUrl } from "@/lib/url";
 
 // Updates/deletes are owner-only — the user_id filter makes other users' ids a 404.
 // [PAYWALL DISABLED — free for now] These routes also used to require the paid
@@ -29,6 +30,10 @@ export async function PUT(
       { error: "plotCenter and a non-empty v3 design required" },
       { status: 400 },
     );
+  }
+  // snapshots are shown to other users once published: same allowlist as photos
+  if (d.snapshot && !safeImageUrl(d.snapshot)) {
+    return Response.json({ error: "invalid snapshot url" }, { status: 400 });
   }
   // designUpdateRow drops plot_lng/plot_lat: the picked location moves only via
   // the publish route (the designer sends [0, 0] for standalone designs).

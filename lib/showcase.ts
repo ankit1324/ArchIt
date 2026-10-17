@@ -1,7 +1,8 @@
 // Public projection and input parsing for the multi-user showcase.
-// Pure (type-only imports) so `node --test` can import it directly.
+// Pure (type-only imports plus lib/url.ts) so `node --test` can import it directly.
 import type { DesignRow } from "./db";
 import type { PublishedDesign } from "./types";
+import { safeImageUrl } from "./url.ts";
 
 const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 200;
@@ -35,7 +36,8 @@ export function toPublishedDesign(
     plotD: row.plot_d,
     place: row.place ?? undefined,
     facing: row.meta?.facing,
-    snapshot: row.snapshot ?? undefined,
+    // the author controls this URL; only allowlisted https hosts reach viewers
+    snapshot: safeImageUrl(row.snapshot) ?? undefined,
     authorName: row.author_name || "ArchIt user",
     publishedAt: row.published_at ?? "",
     mine: !!viewerId && row.user_id === viewerId,

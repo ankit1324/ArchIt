@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "internal error" }, { status: 500 });
     }
   }
-  const v = validateListingWrite(l, null, newDesign);
+  const v = validateListingWrite(l, null, newDesign, null);
   if (!v.ok) return Response.json({ error: v.error }, { status: v.status });
   // [PAYWALL DISABLED — free for now] featuring is a free toggle, so the flag
   // is trusted from the client body on create. Original paid-boost behaviour

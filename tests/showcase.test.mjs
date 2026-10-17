@@ -63,6 +63,13 @@ test("toPublishedDesign keeps a real location and falls back on author name", ()
   assert.equal(p.facing, undefined);
 });
 
+test("toPublishedDesign only passes allowlisted snapshot URLs", () => {
+  assert.equal(toPublishedDesign({ ...row, snapshot: "javascript:alert(1)" }, null).snapshot, undefined);
+  assert.equal(toPublishedDesign({ ...row, snapshot: "https://evil.example.com/x.png" }, null).snapshot, undefined);
+  assert.equal(toPublishedDesign({ ...row, snapshot: null }, null).snapshot, undefined);
+  assert.equal(toPublishedDesign(row, null).snapshot, row.snapshot);
+});
+
 test("SHOWCASE_COLUMNS lists the projection columns but never design", () => {
   const cols = SHOWCASE_COLUMNS.split(",").map((c) => c.trim());
   assert.ok(!cols.includes("design"));

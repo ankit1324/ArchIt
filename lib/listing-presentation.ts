@@ -16,6 +16,8 @@ export type ListingWriteResult =
  * = keep (no checks, so an edit never silently drops an attachment whose
  * design was since unpublished), any other id = attach, which needs
  * `newDesign` (the server's lookup of that id) to be owned and published.
+ * `defaultView` follows the same "absent = keep" rule: undefined keeps
+ * `storedDefaultView` (null for a new listing, which then gets "photos").
  */
 export function validateListingWrite(
   input: {
@@ -26,6 +28,7 @@ export function validateListingWrite(
   },
   storedDesignId: string | null,
   newDesign: { owned: boolean; published: boolean } | null,
+  storedDefaultView: ListingView | null,
 ): ListingWriteResult {
   let price: number;
   if (input.type === "showcase") {
@@ -36,7 +39,7 @@ export function validateListingWrite(
     return { ok: false, error: "Price must be greater than 0", status: 400 };
   }
 
-  const defaultView = input.defaultView ?? "photos";
+  const defaultView = input.defaultView ?? storedDefaultView ?? "photos";
   if (!VIEWS.includes(defaultView)) {
     return { ok: false, error: "defaultView must be 'photos' or '3d'", status: 400 };
   }
