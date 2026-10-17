@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { safeImageUrl } from "@/lib/url";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay from "@/components/DesignerOverlay";
+import PublishDialog from "@/components/PublishDialog";
 import { CloseIcon } from "@/components/icons";
 // [PAYWALL DISABLED — free for now]
 // import { payFee } from "@/lib/checkout";
@@ -320,6 +322,8 @@ export default function DesignerPage() {
   const [setup, setSetup] = useState<Setup | null>(null);
   const [session, setSession] = useState(0); // bump to remount the builder
   const [listOpen, setListOpen] = useState(true);
+  const [publishing, setPublishing] = useState<Design | null>(null); // dialog open for
+  const [unpublishingId, setUnpublishingId] = useState<string | null>(null);
   // [PAYWALL DISABLED — free for now] everyone is unlocked while the builder
   // paywall is off, so the builder renders immediately.
   // was: const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
@@ -457,6 +461,37 @@ export default function DesignerPage() {
     }
   };
 
+  const replaceDesign = (saved: Design) =>
+    setDesigns((prev) => prev.map((d) => (d.id === saved.id ? saved : d)));
+
+  const unpublishDesign = async (d: Design) => {
+    if (unpublishingId) return;
+    if (
+      !window.confirm(
+        `Unpublish “${d.name}”? It leaves the showcase and the map, and listings stop showing it.`,
+      )
+    )
+      return;
+    setUnpublishingId(d.id);
+    try {
+      // exactly { published: false } — the route rejects a location here
+      const res = await fetch(`/api/designs/${encodeURIComponent(d.id)}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: false }),
+      });
+      if (!res.ok) {
+        window.alert("Could not unpublish the design — try again.");
+        return;
+      }
+      replaceDesign((await res.json()) as Design);
+    } catch {
+      window.alert("Could not unpublish the design — try again.");
+    } finally {
+      setUnpublishingId(null);
+    }
+  };
+
   if (false) {
     // [PAYWALL DISABLED — free for now] was: unlocked !== true — sales card kept for easy restore
     return (
@@ -544,12 +579,20 @@ export default function DesignerPage() {
         <div className="glass flex flex-col gap-2 rounded-3xl p-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-bold text-plum">My designs</span>
-            <button
-              onClick={() => setListOpen((o) => !o)}
-              className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5"
-            >
-              {listOpen ? "Hide" : "Show"}
-            </button>
+            <span className="flex items-center gap-0.5">
+              <Link
+                href="/showcase"
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5 hover:text-plum"
+              >
+                Showcase
+              </Link>
+              <button
+                onClick={() => setListOpen((o) => !o)}
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5"
+              >
+                {listOpen ? "Hide" : "Show"}
+              </button>
+            </span>
           </div>
 
           {listOpen && (
@@ -574,43 +617,74 @@ export default function DesignerPage() {
                 {designs.map((d) => (
                   <div
                     key={d.id}
-                    className={`flex items-center gap-2 rounded-2xl p-1.5 transition-colors ${
+                    className={`flex flex-col gap-1 rounded-2xl p-1.5 transition-colors ${
                       d.id === currentId ? "bg-plum/10" : "hover:bg-white/55"
                     }`}
                   >
-                    <button
-                      onClick={() => openDesign(d)}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    >
-                      <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-white/60">
-                        {safeImageUrl(d.snapshot) && (
-                          <Image
-                            src={safeImageUrl(d.snapshot)!}
-                            alt=""
-                            fill
-                            sizes="48px"
-                            className="object-cover"
-                          />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-semibold text-plum">
-                          {d.name}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openDesign(d)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      >
+                        <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-white/60">
+                          {safeImageUrl(d.snapshot) && (
+                            <Image
+                              src={safeImageUrl(d.snapshot)!}
+                              alt=""
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          )}
                         </span>
-                        {d.meta?.budget ? (
-                          <span className="block text-[10.5px] font-medium text-plum-soft">
-                            ₹{d.meta.budget.toLocaleString("en-IN")}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12px] font-semibold text-plum">
+                            {d.name}
                           </span>
-                        ) : null}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => deleteDesign(d.id)}
-                      aria-label={`Delete ${d.name}`}
-                      className="shrink-0 rounded-full p-1 text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral"
-                    >
-                      <CloseIcon width={12} height={12} />
-                    </button>
+                          {d.meta?.budget ? (
+                            <span className="block text-[10.5px] font-medium text-plum-soft">
+                              ₹{d.meta.budget.toLocaleString("en-IN")}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => deleteDesign(d.id)}
+                        aria-label={`Delete ${d.name}`}
+                        className="shrink-0 rounded-full p-1 text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral"
+                      >
+                        <CloseIcon width={12} height={12} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 pl-14">
+                      {d.publishedAt ? (
+                        <>
+                          <span className="rounded-full bg-lime/70 px-1.5 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider text-plum">
+                            Published
+                          </span>
+                          <button
+                            onClick={() => setPublishing(d)}
+                            className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum"
+                          >
+                            Move pin
+                          </button>
+                          <button
+                            onClick={() => unpublishDesign(d)}
+                            disabled={unpublishingId === d.id}
+                            className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral disabled:opacity-50"
+                          >
+                            {unpublishingId === d.id ? "Unpublishing…" : "Unpublish"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setPublishing(d)}
+                          className="rounded-full bg-white/70 px-2 py-0.5 text-[10.5px] font-bold text-plum transition-colors hover:bg-white"
+                        >
+                          Publish
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -618,6 +692,19 @@ export default function DesignerPage() {
           )}
         </div>
       </div>
+
+      {publishing && (
+        <PublishDialog
+          key={publishing.id}
+          design={publishing}
+          onDone={(saved) => {
+            replaceDesign(saved);
+            setPublishing(null);
+            celebrate(publishing.publishedAt ? "Pin moved!" : "Published to the showcase!");
+          }}
+          onCancel={() => setPublishing(null)}
+        />
+      )}
     </div>
   );
 }
