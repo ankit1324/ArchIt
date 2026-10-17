@@ -12,7 +12,15 @@ export default function PropertyCard({
   onClick?: () => void;
   selected?: boolean;
 }) {
-  const sale = listing.type === "sale";
+  // badge colours follow the map pins (Map3D PRISM_COLORS): showcase is violet
+  const tone =
+    listing.type === "showcase"
+      ? "bg-violet-500 text-white"
+      : listing.type === "sale"
+        ? "bg-lime text-plum"
+        : "bg-magenta text-white";
+  const label =
+    listing.type === "showcase" ? "Showcase" : listing.type === "sale" ? "For Sale" : "For Rent";
   return (
     <button
       onClick={onClick}
@@ -40,22 +48,15 @@ export default function PropertyCard({
           <br />
           {listing.buildingName ? listing.address : listing.city}
         </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-            sale ? "bg-lime text-plum" : "bg-magenta text-white"
-          }`}
-        >
-          {sale ? "For Sale" : "For Rent"}
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${tone}`}>
+          {label}
         </span>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-start gap-2 p-3">
-        <span
-          className={`px-1.5 py-0.5 text-[17px] font-extrabold ${
-            sale ? "bg-lime text-plum" : "bg-magenta text-white"
-          }`}
-        >
-          {formatPrice(listing)}
+        {/* showcase listings have no price: say so, as PropertyDetailPanel does */}
+        <span className={`px-1.5 py-0.5 text-[17px] font-extrabold ${tone}`}>
+          {listing.type === "showcase" ? "Not for sale/rent" : formatPrice(listing)}
         </span>
         <div className="flex flex-wrap gap-1.5">
           {[
