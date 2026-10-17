@@ -33,6 +33,11 @@ const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
 type AddStage = "idle" | "picking" | "form";
 
+// stable empties for the hidden layer: a fresh [] each render would make
+// Map3D rebuild every marker (and drop pin focus) on every keystroke
+const NO_LISTINGS: Listing[] = [];
+const NO_DESIGNS: PublishedDesign[] = [];
+
 export default function Home() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [query, setQuery] = useState("");
@@ -396,8 +401,8 @@ export default function Home() {
 
       <main className={`${styles.canvas} relative mx-2 mb-2 min-h-0 flex-1 overflow-hidden rounded-[22px] bg-cream-soft sm:mx-3 sm:mb-3`}>
         <Map3D
-          listings={layer === "designs" ? [] : filtered}
-          designs={layer === "listings" ? [] : matchingDesigns}
+          listings={layer === "designs" ? NO_LISTINGS : filtered}
+          designs={layer === "listings" ? NO_DESIGNS : matchingDesigns}
           pois={POIS}
           mapRef={mapRef}
           onSelect={flyToListing}
