@@ -3,9 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import type { Filters, Listing } from "@/lib/types";
+import type { Filters, Listing, PublishedDesign } from "@/lib/types";
 import { POIS } from "@/lib/listings";
-import { DEFAULT_FILTERS, countFilters, findListings, type ListingSort } from "@/lib/find";
+import {
+  DEFAULT_FILTERS,
+  countFilters,
+  findListings,
+  matchesDesignQuery,
+  type ListingSort,
+  type MapLayer,
+} from "@/lib/find";
 import styles from "./find.module.css";
 import Navbar from "@/components/Navbar";
 import FilterSidebar from "@/components/FilterSidebar";
@@ -13,6 +20,8 @@ import SearchBar from "@/components/SearchBar";
 import MapControls from "@/components/MapControls";
 import PropertyCarousel from "@/components/PropertyCarousel";
 import PropertyDetailPanel from "@/components/PropertyDetailPanel";
+import DesignPinCard from "@/components/DesignPinCard";
+import DesignViewer from "@/components/DesignViewer";
 import AddPropertyForm, {
   type PropertyDraft,
 } from "@/components/AddPropertyForm";
@@ -23,6 +32,11 @@ import { celebrate } from "@/components/Celebration";
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
 type AddStage = "idle" | "picking" | "form";
+
+// stable empties for the hidden layer: a fresh [] each render would make
+// Map3D rebuild every marker (and drop pin focus) on every keystroke
+const NO_LISTINGS: Listing[] = [];
+const NO_DESIGNS: PublishedDesign[] = [];
 
 export default function Home() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -43,8 +57,15 @@ export default function Home() {
   const [geocoding, setGeocoding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [designs, setDesigns] = useState<PublishedDesign[]>([]);
+  const [layer, setLayer] = useState<MapLayer>("both");
+  const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
+  const [viewerDesignId, setViewerDesignId] = useState<string | null>(null);
   const geocodeSeq = useRef(0);
   const mapRef = useRef<MapLibreMap | null>(null);
+  // `?design=<id>` deep link: flown to once both the map and designs are ready
+  const mapLoadedRef = useRef(false);
+  const pendingDesignRef = useRef<PublishedDesign | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,9 +85,35 @@ export default function Home() {
     return () => controller.abort();
   }, [loadAttempt]);
 
+  // published designs with a map spot; a failure just leaves the layer empty
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/showcase?limit=200&located=1", { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data: unknown) => {
+        if (controller.signal.aborted || !Array.isArray(data)) return;
+        const located = (data as PublishedDesign[]).filter((d) => d.plotCenter);
+        setDesigns(located);
+        const wanted = new URLSearchParams(window.location.search).get("design");
+        const target = wanted ? located.find((d) => d.id === wanted) : undefined;
+        if (!target) return;
+        setLayer((l) => (l === "listings" ? "both" : l));
+        setSelectedId(null);
+        setSelectedDesignId(target.id);
+        if (mapLoadedRef.current) flyToDesign(target);
+        else pendingDesignRef.current = target;
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
   const filtered = useMemo(
     () => findListings(listings, filters, query, sort),
     [filters, listings, query, sort],
+  );
+  const matchingDesigns = useMemo(
+    () => designs.filter((d) => matchesDesignQuery(d, query)),
+    [designs, query],
   );
 
   const resetSearch = () => {
@@ -76,10 +123,17 @@ export default function Home() {
 
   const showResults = () => {
     const map = mapRef.current;
-    if (!map || !filtered.length) return;
+    if (!map) return;
+    const targets =
+      layer === "designs"
+        ? matchingDesigns
+            .map((d) => d.plotCenter)
+            .filter((c): c is [number, number] => c !== null)
+        : filtered.map((l) => l.coords);
+    if (!targets.length) return;
     const height = map.getContainer().clientHeight;
-    const lngs = filtered.map((l) => l.coords[0]);
-    const lats = filtered.map((l) => l.coords[1]);
+    const lngs = targets.map((c) => c[0]);
+    const lats = targets.map((c) => c[1]);
     map.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
       { padding: { top: Math.min(140, height * 0.2), bottom: Math.min(260, height * 0.4), left: window.innerWidth >= 1024 ? 300 : 40, right: 60 }, maxZoom: 16, duration: 1000 },
@@ -88,13 +142,39 @@ export default function Home() {
 
   const selected = filtered.find((l) => l.id === selectedId) ?? null;
   const editing = listings.find((l) => l.id === editingId) ?? null;
+  const selectedDesign =
+    layer !== "listings"
+      ? (matchingDesigns.find((d) => d.id === selectedDesignId) ?? null)
+      : null;
 
   const flyToListing = (id: string) => {
     const l = listings.find((x) => x.id === id);
     if (!l) return;
     setFiltersOpen(false);
+    setSelectedDesignId(null);
     setSelectedId(id);
     mapRef.current?.flyTo({ center: l.coords, zoom: 16.4, duration: 1600 });
+  };
+
+  function flyToDesign(d: PublishedDesign) {
+    if (!d.plotCenter) return;
+    mapRef.current?.flyTo({ center: d.plotCenter, zoom: 16.4, duration: 1600 });
+  }
+
+  const selectDesign = (id: string) => {
+    const d = designs.find((x) => x.id === id);
+    if (!d) return;
+    setFiltersOpen(false);
+    setSelectedId(null);
+    setSelectedDesignId(id);
+    flyToDesign(d);
+  };
+
+  const handleMapLoad = () => {
+    mapLoadedRef.current = true;
+    const pending = pendingDesignRef.current;
+    pendingDesignRef.current = null;
+    if (pending) flyToDesign(pending);
   };
 
   const searchPlace = async (query: string, signal: AbortSignal): Promise<boolean> => {
@@ -237,6 +317,9 @@ export default function Home() {
         photo: photos[0],
         photos,
         featured: d.featured,
+        // sent explicitly on edit too: null detaches, the stored id keeps it
+        designId: d.designId,
+        defaultView: d.defaultView,
       };
 
       const res = editing
@@ -325,10 +408,13 @@ export default function Home() {
 
       <main className={`${styles.canvas} relative mx-2 mb-2 min-h-0 flex-1 overflow-hidden rounded-[22px] bg-cream-soft sm:mx-3 sm:mb-3`}>
         <Map3D
-          listings={filtered}
+          listings={layer === "designs" ? NO_LISTINGS : filtered}
+          designs={layer === "listings" ? NO_DESIGNS : matchingDesigns}
           pois={POIS}
           mapRef={mapRef}
           onSelect={flyToListing}
+          onSelectDesign={selectDesign}
+          onLoad={handleMapLoad}
           onMapClick={handleMapClick}
           pickMode={addStage === "picking"}
           draftCoords={addStage === "form" ? draftCoords : null}
@@ -379,14 +465,32 @@ export default function Home() {
               onZoomIn={() => mapRef.current?.zoomIn()}
               onZoomOut={() => mapRef.current?.zoomOut()}
               onToggleDimension={toggleDimension}
+              layer={layer}
+              onLayerChange={setLayer}
             />
           </div>
 
           <div className={styles.results}>
             <div className={styles.resultBar}>
-              <div aria-live="polite"><strong>{loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}` : "Explore properties"}</strong><span>{query ? `Matching “${query}”` : "Find your next place"}</span></div>
+              <div aria-live="polite">
+                <strong>
+                  {loadState !== "ready"
+                    ? "Explore properties"
+                    : layer === "designs"
+                      ? `${matchingDesigns.length} ${matchingDesigns.length === 1 ? "design" : "designs"}`
+                      : layer === "both" && matchingDesigns.length > 0
+                        ? `${filtered.length} properties · ${matchingDesigns.length} designs`
+                        : `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}`}
+                </strong>
+                <span>{query ? `Matching “${query}”` : "Find your next place"}</span>
+              </div>
               <div className={styles.resultActions}>
-                <button onClick={showResults} disabled={!filtered.length}>Show on map ↗</button>
+                <button
+                  onClick={showResults}
+                  disabled={layer === "designs" ? !matchingDesigns.length : !filtered.length}
+                >
+                  Show on map ↗
+                </button>
                 <select aria-label="Sort properties" value={sort} onChange={(e) => setSort(e.target.value as ListingSort)}>
                   <option value="recommended">Featured first</option>
                   <option value="price-asc">Price: low to high</option>
@@ -395,15 +499,24 @@ export default function Home() {
                 </select>
               </div>
             </div>
-            <PropertyCarousel
-              listings={filtered}
-              onSelect={flyToListing}
-              hasAny={listings.length > 0}
-              status={loadState}
-              selectedId={selectedId}
-              onReset={resetSearch}
-              onRetry={() => { setLoadState("loading"); setLoadAttempt((n) => n + 1); }}
-            />
+            {layer === "designs" ? (
+              <div className="rounded-2xl border border-white/60 bg-white/80 p-4 text-center text-[13px] font-semibold text-plum shadow-sm backdrop-blur-md">
+                Showing community design pins on the map. Click any pin to view the design and explore it in 3D.
+              </div>
+            ) : (
+              <PropertyCarousel
+                listings={filtered}
+                onSelect={flyToListing}
+                hasAny={listings.length > 0}
+                status={loadState}
+                selectedId={selectedId}
+                onReset={resetSearch}
+                onRetry={() => {
+                  setLoadState("loading");
+                  setLoadAttempt((n) => n + 1);
+                }}
+              />
+            )}
           </div>
 
           {/* panels render last so they paint above the carousel strip and
@@ -432,11 +545,28 @@ export default function Home() {
                 onEdit={() => openEdit(selected)}
                 onDelete={() => deleteProperty(selected.id)}
                 deleting={deleting}
+                onOpen3D={setViewerDesignId}
+              />
+            </div>
+          )}
+
+          {addStage === "idle" && !selected && selectedDesign && (
+            <div className={styles.detailPanel}>
+              <DesignPinCard
+                design={selectedDesign}
+                onClose={() => setSelectedDesignId(null)}
+                onOpen3D={() => setViewerDesignId(selectedDesign.id)}
               />
             </div>
           )}
         </div>
       </main>
+
+      {/* outside <main>: its overflow and the glass panels' backdrop-filter
+          would otherwise clip this fixed, full-screen overlay */}
+      {viewerDesignId && (
+        <DesignViewer designId={viewerDesignId} onClose={() => setViewerDesignId(null)} />
+      )}
     </div>
   );
 }

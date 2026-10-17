@@ -2,8 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { buildCsp } from "@/lib/csp";
 
-// Landing (/), sign-in/up and the free lite link stay public;
-// Find, the Designer and all data/payment APIs require a session.
+// Landing (/), sign-in/up, the free lite link and the read-only showcase
+// (/showcase + GET /api/showcase, published designs only) stay public;
+// Find, the Designer and all other data/payment APIs require a session.
 const isProtected = createRouteMatcher([
   "/find(.*)",
   "/designer(.*)",

@@ -2,6 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
+import { isLngLatPair } from "@/lib/showcase";
+import { safeImageUrl } from "@/lib/url";
 
 // Designs are private: every query is scoped to the signed-in user.
 // [PAYWALL DISABLED — free for now] The builder used to be a paid product
@@ -43,6 +45,15 @@ export async function POST(request: Request) {
       { error: "plotCenter and a non-empty v3 design required" },
       { status: 400 },
     );
+  }
+  // stored as-is and later shown on the map once published; [0, 0] (no spot
+  // picked, which the designer sends) is in range and stays allowed
+  if (!isLngLatPair(d.plotCenter)) {
+    return Response.json({ error: "plotCenter must be a valid [lng, lat]" }, { status: 400 });
+  }
+  // snapshots are shown to other users once published: same allowlist as photos
+  if (d.snapshot && !safeImageUrl(d.snapshot)) {
+    return Response.json({ error: "invalid snapshot url" }, { status: 400 });
   }
   const { data, error } = await db
     .from("designs")

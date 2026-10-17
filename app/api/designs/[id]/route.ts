@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, designToRow, rowToDesign } from "@/lib/db";
+import { db, designUpdateRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
+import { safeImageUrl } from "@/lib/url";
 
 // Updates/deletes are owner-only — the user_id filter makes other users' ids a 404.
 // [PAYWALL DISABLED — free for now] These routes also used to require the paid
@@ -30,9 +31,17 @@ export async function PUT(
       { status: 400 },
     );
   }
+  // snapshots are shown to other users once published: same allowlist as
+  // photos. A non-allowlisted one is dropped rather than rejected: when the
+  // thumbnail upload fails the designer re-sends the stored snapshot, and a
+  // legacy row's URL must not block every later save of that design.
+  const snapshot = safeImageUrl(d.snapshot) ?? undefined;
+  // designUpdateRow drops plot_lng/plot_lat: the picked location moves only via
+  // the publish route (the designer sends [0, 0] for standalone designs).
+  // Editing a published design keeps it published.
   const { data, error } = await db
     .from("designs")
-    .update(designToRow(d))
+    .update(designUpdateRow({ ...d, snapshot }))
     .eq("id", id)
     .eq("user_id", userId)
     .select()

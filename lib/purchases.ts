@@ -20,10 +20,22 @@ export type {
   PurchaseFailure,
 } from "./payment-validation";
 
-// one SDK client for every server-side Razorpay call
-export const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+let _razorpay: Razorpay | null = null;
+function getRazorpay(): Razorpay {
+  if (!_razorpay) {
+    _razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID || "",
+      key_secret: process.env.RAZORPAY_KEY_SECRET || "",
+    });
+  }
+  return _razorpay;
+}
+
+// Lazy SDK client for server-side Razorpay calls (avoids evaluating missing env at build time)
+export const razorpay = new Proxy({} as Razorpay, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getRazorpay(), prop, receiver);
+  },
 });
 
 /**

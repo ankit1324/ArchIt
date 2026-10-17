@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import type { Listing } from "@/lib/types";
+import type { Listing, ListingView } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 // [PAYWALL DISABLED — free for now]
 // import { payFee } from "@/lib/checkout";
@@ -11,7 +11,7 @@ import { formatPrice } from "@/lib/types";
 // import { celebrate } from "@/components/Celebration";
 // [PAYWALL DISABLED — free for now]
 // import { feeLabel } from "@/lib/fees";
-import { safeImageUrl } from "@/lib/url";
+import { nextImageUrl, safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 interface PropertyDetailPanelProps {
@@ -20,6 +20,8 @@ interface PropertyDetailPanelProps {
   onEdit: () => void;
   onDelete: () => void;
   deleting?: boolean;
+  /** opens the attached design in the full-screen viewer */
+  onOpen3D?: (designId: string) => void;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -39,17 +41,27 @@ export default function PropertyDetailPanel({
   onEdit,
   onDelete,
   deleting = false,
+  onOpen3D,
 }: PropertyDetailPanelProps) {
   // reset fetched detail state per listing (adjust-state-during-render —
   // avoids a setState-in-effect cascade)
   const [listing, setListingRaw] = useState(propListing);
   const setListing = setListingRaw;
   const [prevId, setPrevId] = useState(propListing.id);
+  const [view, setView] = useState<ListingView>(propListing.defaultView ?? "photos");
   if (prevId !== propListing.id) {
     setPrevId(propListing.id);
     setListingRaw(propListing);
+    setView(propListing.defaultView ?? "photos");
   }
   const sale = listing.type === "sale";
+  const showcase = listing.type === "showcase";
+  // the owner also gets designId for an unpublished design, which visitors
+  // (and the viewer route) can't open — show the 3D tab only while published
+  const designId =
+    listing.designId && listing.designPublished !== false ? listing.designId : null;
+  const photo = safeImageUrl(listing.photo);
+  const designSnapshot = nextImageUrl(listing.designSnapshot);
   // only the lister manages a property; the server tells us via `mine`
   // (the raw lister id is never sent to the client)
   const { userId } = useAuth();
@@ -130,34 +142,92 @@ export default function PropertyDetailPanel({
         </button>
       </header>
 
-      {safeImageUrl(listing.photo) && (
+      {designId && (
+        <div role="tablist" aria-label="Listing view" className="grid grid-cols-2 gap-1 rounded-full bg-plum/5 p-1">
+          {(["photos", "3d"] as const).map((v) => (
+            <button
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={`rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${
+                view === v ? "bg-plum text-cream" : "text-plum hover:bg-white/70"
+              }`}
+            >
+              {v === "photos" ? "Photos" : "3D design"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {listing.mine && listing.designId && listing.designPublished === false && (
+        <div className="rounded-xl border border-coral/30 bg-coral/10 p-2.5 text-[11.5px] font-semibold text-coral">
+          Attached 3D design is unpublished. Publish it in Designer to show 3D to visitors.
+        </div>
+      )}
+
+      {designId && view === "3d" ? (
+        <div className="flex flex-col gap-2">
+          <div className="relative grid h-[140px] place-items-center overflow-hidden rounded-2xl bg-white/55 ring-2 ring-violet-500">
+            {designSnapshot ? (
+              <Image
+                src={designSnapshot}
+                alt={`3D design of ${listing.buildingName || listing.address}`}
+                fill
+                sizes="268px"
+                className="object-cover"
+              />
+            ) : (
+              <span className="text-[13px] font-bold text-violet-600">3D</span>
+            )}
+          </div>
+          <button
+            onClick={() => onOpen3D?.(designId)}
+            className="rounded-full bg-violet-500 py-2 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
+          >
+            Open 3D
+          </button>
+        </div>
+      ) : photo ? (
         <div className="relative h-[140px] overflow-hidden rounded-2xl">
           <Image
-            src={safeImageUrl(listing.photo)!}
+            src={photo}
             alt={listing.address}
             fill
             sizes="268px"
             className="object-cover"
           />
         </div>
-      )}
+      ) : designId ? (
+        <p className="rounded-2xl bg-white/55 px-3 py-6 text-center text-[12px] font-medium text-plum-soft">
+          No photos yet
+        </p>
+      ) : null}
 
-      <div className="flex items-center gap-2">
-        <span
-          className={`px-1.5 py-0.5 text-[16px] font-extrabold ${
-            sale ? "bg-lime text-plum" : "bg-magenta text-white"
-          }`}
-        >
-          {formatPrice(listing)}
-        </span>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-            sale ? "bg-lime text-plum" : "bg-magenta text-white"
-          }`}
-        >
-          {sale ? "For Sale" : "For Rent"}
-        </span>
-      </div>
+      {showcase ? (
+        <div className="flex items-center gap-2">
+          <span className="bg-violet-500 px-1.5 py-0.5 text-[14px] font-extrabold text-white">
+            Showcase · not for sale/rent
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span
+            className={`px-1.5 py-0.5 text-[16px] font-extrabold ${
+              sale ? "bg-lime text-plum" : "bg-magenta text-white"
+            }`}
+          >
+            {formatPrice(listing)}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+              sale ? "bg-lime text-plum" : "bg-magenta text-white"
+            }`}
+          >
+            {sale ? "For Sale" : "For Rent"}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-1.5">
         {/* [PAYWALL DISABLED — free for now] was: {listing.owner && ownerUnlocked && ( */}

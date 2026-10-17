@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — ArchIt",
+  title: "Privacy Policy",
   description: "How ArchIt collects, uses, and protects your data.",
 };
 
