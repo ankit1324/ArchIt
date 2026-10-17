@@ -2746,9 +2746,13 @@ canvas.addEventListener('pointercancel', ()=>{
 /* -------- resize / loop -------- */
 function resize(){
   const r = stage.getBoundingClientRect();
+  // a hidden or not-yet-laid-out frame is 0x0: 0/0 would make the aspect (and
+  // then the framed camera) NaN, so wait for a real size
+  if(r.width === 0 || r.height === 0) return;
   renderer.setSize(r.width, r.height, false);
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   camera.aspect = r.width/r.height; camera.updateProjectionMatrix();
+  if(!Number.isFinite(camera.position.x)) resetCam();
   if(ui.view==='2d') render2D();
 }
 addEventListener('resize', resize);
@@ -4130,7 +4134,8 @@ function resetCam(){
   // +1.2 m for eaves overhang, +2.5 m headroom for a pitched roof
   const R = Math.hypot(bb.w + 1.2, bb.d + 1.2, FLH()*floors.length + 2.5) / 2;
   const vHalf = camera.fov * Math.PI / 360;
-  const half = Math.min(vHalf, Math.atan(Math.tan(vHalf) * camera.aspect));
+  const aspect = camera.aspect > 0 && Number.isFinite(camera.aspect) ? camera.aspect : 1;
+  const half = Math.min(vHalf, Math.atan(Math.tan(vHalf) * aspect));
   const offset = new THREE.Vector3(10.5, 6.4, 12.5);   // camera (10.5, 7.5, 12.5) around target y 1.1
   const dist = Math.max(offset.length(), R / Math.sin(half) * 1.1);
   controls.maxDistance = Math.max(40, dist * 1.5);
