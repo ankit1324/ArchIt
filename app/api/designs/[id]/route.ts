@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, designToRow, rowToDesign } from "@/lib/db";
+import { db, designUpdateRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
 import type { Design } from "@/lib/types";
 
@@ -30,9 +30,12 @@ export async function PUT(
       { status: 400 },
     );
   }
+  // designUpdateRow drops plot_lng/plot_lat: the picked location moves only via
+  // the publish route (the designer sends [0, 0] for standalone designs).
+  // Editing a published design keeps it published.
   const { data, error } = await db
     .from("designs")
-    .update(designToRow(d))
+    .update(designUpdateRow(d))
     .eq("id", id)
     .eq("user_id", userId)
     .select()

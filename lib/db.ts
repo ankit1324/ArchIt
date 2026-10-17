@@ -196,6 +196,45 @@ export function rowToListing(r: PublicPropertyRow): Listing {
   };
 }
 
+/**
+ * Publish state + snapshot of the designs attached to listings, keyed by id —
+ * one query for the whole page (see presentListing). Throws on a DB error.
+ */
+export async function attachedDesigns(
+  ids: (string | null)[],
+): Promise<Map<string, { published: boolean; snapshot: string | null }>> {
+  const unique = [...new Set(ids.filter((id): id is string => !!id))];
+  const out = new Map<string, { published: boolean; snapshot: string | null }>();
+  if (!unique.length) return out;
+  const { data, error } = await db
+    .from("designs")
+    .select("id,published_at,snapshot")
+    .in("id", unique);
+  if (error) throw new Error(error.message);
+  for (const d of data as Pick<DesignRow, "id" | "published_at" | "snapshot">[]) {
+    out.set(d.id, { published: !!d.published_at, snapshot: d.snapshot });
+  }
+  return out;
+}
+
+/**
+ * What validateListingWrite needs to know about a design being attached:
+ * null when it does not exist. Throws on a DB error.
+ */
+export async function designAttachCheck(
+  designId: string,
+  userId: string,
+): Promise<{ owned: boolean; published: boolean } | null> {
+  const { data, error } = await db
+    .from("designs")
+    .select("id,user_id,published_at")
+    .eq("id", designId)
+    .maybeSingle<Pick<DesignRow, "id" | "user_id" | "published_at">>();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { owned: ownsRow(data, userId), published: !!data.published_at };
+}
+
 /** True when `row` belongs to the given session user. Server-side only. */
 export function ownsRow(
   row: { user_id?: string | null },

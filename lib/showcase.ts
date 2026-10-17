@@ -51,8 +51,13 @@ export function parseShowcaseQuery(params: URLSearchParams): {
 } {
   const n = Number.parseInt(params.get("limit") ?? "", 10);
   const limit = Number.isNaN(n) ? DEFAULT_LIMIT : Math.min(MAX_LIMIT, Math.max(1, n));
+  // kept verbatim (Postgres timestamps carry microseconds a JS Date would drop);
+  // the date-prefix check keeps odd Date.parse inputs like "1" from reaching SQL
   const rawBefore = params.get("before");
-  const before = rawBefore && !Number.isNaN(Date.parse(rawBefore)) ? rawBefore : null;
+  const before =
+    rawBefore && /^\d{4}-\d{2}-\d{2}/.test(rawBefore) && !Number.isNaN(Date.parse(rawBefore))
+      ? rawBefore
+      : null;
   return { limit, before, located: params.get("located") === "1" };
 }
 

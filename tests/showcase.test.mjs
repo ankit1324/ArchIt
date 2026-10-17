@@ -78,6 +78,8 @@ test("parseShowcaseQuery defaults, clamps and validates", () => {
   assert.equal(q("limit=0").limit, 1);
   assert.equal(q("limit=abc").limit, 60);
   assert.equal(q("before=nope").before, null);
+  assert.equal(q("before=1").before, null);
+  assert.equal(q("before=2026-10-17T10:00:00.123456%2B00:00").before, "2026-10-17T10:00:00.123456+00:00");
   assert.equal(q("before=2026-10-17T10:00:00.000Z").before, "2026-10-17T10:00:00.000Z");
   assert.equal(q("located=1").located, true);
 });

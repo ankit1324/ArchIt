@@ -7,6 +7,8 @@ import { buildCsp } from "@/lib/csp";
 const isProtected = createRouteMatcher([
   "/find(.*)",
   "/designer(.*)",
+  "/showcase(.*)",
+  "/api/showcase(.*)",
   "/api/properties(.*)",
   "/api/designs(.*)",
   "/api/create-order(.*)",
