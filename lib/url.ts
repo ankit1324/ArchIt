@@ -22,3 +22,22 @@ export function safeImageUrl(url: string | null | undefined): string | null {
   if (!ALLOWED_IMAGE_HOSTS.includes(u.hostname)) return null;
   return url;
 }
+
+// the Supabase host only serves public Storage objects to next/image
+// (next.config.ts remotePatterns pins its pathname)
+const STORAGE_HOST = "tdbnwismmyllpufurqus.supabase.co";
+const STORAGE_PUBLIC_PATH = "/storage/v1/object/public/";
+
+/**
+ * safeImageUrl, narrowed to what next.config.ts remotePatterns lets
+ * next/image load: on the Supabase host only public Storage objects with no
+ * query string. Use it for author-controlled URLs passed to <Image> (design
+ * snapshots), which would otherwise throw in dev and 400 in prod.
+ */
+export function nextImageUrl(url: string | null | undefined): string | null {
+  const safe = safeImageUrl(url);
+  if (!safe) return null;
+  const u = new URL(safe);
+  if (u.hostname !== STORAGE_HOST) return safe;
+  return u.pathname.startsWith(STORAGE_PUBLIC_PATH) && !u.search ? safe : null;
+}

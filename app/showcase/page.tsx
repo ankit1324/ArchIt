@@ -5,20 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { round1 } from "@/lib/showcase";
-import { safeImageUrl } from "@/lib/url";
+import { nextImageUrl } from "@/lib/url";
 import type { PublishedDesign } from "@/lib/types";
 
 const PAGE_SIZE = 24;
-
-// next/image only accepts what next.config.ts remotePatterns allows: public
-// Storage objects, no query string. Anything else (the author controls this
-// URL) gets the placeholder instead of a broken or rejected image.
-function snapshotSrc(url: string | undefined): string | null {
-  const safe = safeImageUrl(url);
-  if (!safe) return null;
-  const u = new URL(safe);
-  return u.pathname.startsWith("/storage/v1/object/public/") && !u.search ? safe : null;
-}
 
 function publishedOn(iso: string): string {
   const d = new Date(iso);
@@ -28,7 +18,9 @@ function publishedOn(iso: string): string {
 }
 
 function DesignCard({ d }: { d: PublishedDesign }) {
-  const src = snapshotSrc(d.snapshot);
+  // the author controls this URL: anything next/image would reject gets the
+  // placeholder instead of a broken image
+  const src = nextImageUrl(d.snapshot);
   const date = publishedOn(d.publishedAt);
   return (
     <Link

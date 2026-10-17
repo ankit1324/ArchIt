@@ -11,7 +11,7 @@ import { formatPrice } from "@/lib/types";
 // import { celebrate } from "@/components/Celebration";
 // [PAYWALL DISABLED — free for now]
 // import { feeLabel } from "@/lib/fees";
-import { safeImageUrl } from "@/lib/url";
+import { nextImageUrl, safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 interface PropertyDetailPanelProps {
@@ -61,7 +61,7 @@ export default function PropertyDetailPanel({
   const designId =
     listing.designId && listing.designPublished !== false ? listing.designId : null;
   const photo = safeImageUrl(listing.photo);
-  const designSnapshot = safeImageUrl(listing.designSnapshot);
+  const designSnapshot = nextImageUrl(listing.designSnapshot);
   // only the lister manages a property; the server tells us via `mine`
   // (the raw lister id is never sent to the client)
   const { userId } = useAuth();

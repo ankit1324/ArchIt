@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import type { PublishedDesign } from "@/lib/types";
-import { safeImageUrl } from "@/lib/url";
+import { nextImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 const metres = (n: number) => `${Math.round(n * 10) / 10}`;
@@ -17,7 +17,7 @@ export default function DesignPinCard({
   onClose: () => void;
   onOpen3D: () => void;
 }) {
-  const snapshot = safeImageUrl(design.snapshot);
+  const snapshot = nextImageUrl(design.snapshot);
   return (
     <section
       aria-label={`${design.name} — published design`}
