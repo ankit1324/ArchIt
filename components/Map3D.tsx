@@ -12,6 +12,7 @@ const CENTER: [number, number] = [76.7794, 30.741];
 const PRISM_COLORS: Record<Listing["type"], string> = {
   rent: "#a06ae8",
   sale: "#ccdb2a",
+  showcase: "#8b5cf6",
 };
 
 const POI_SVGS: Record<Poi["icon"], string> = {
