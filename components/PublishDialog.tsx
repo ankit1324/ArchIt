@@ -156,7 +156,7 @@ export default function PublishDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-plum/25 p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-plum/35 p-4 backdrop-blur-md"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel();
       }}
