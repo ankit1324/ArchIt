@@ -66,8 +66,7 @@ a new listing type needs no Lite compatibility work.
 - Real-time co-editing, collaborators/roles, teams/Clerk Organizations.
 - Remixing or copying someone else's design.
 - Likes, comments, follows, notifications.
-- Public (signed-out) access or SEO for the showcase — everything stays
-  Clerk-gated like the rest of the app.
+- (Changed 2026-10-17 by the user: the showcase IS public — `/showcase` and GET `/api/showcase` are open to signed-out visitors, indexed, and rate-limited per IP.)
 - Moderation tooling (beyond the owner being able to unpublish).
 - Switching Clerk to a production instance (dashboard work for the user; see
   Launch note).
@@ -280,7 +279,7 @@ migration to the production Supabase project.
 
 ## Calls made by the designer of this spec (not discussed with the user)
 
-- Showcase is signed-in only (consistent with the rest of the app).
+- Showcase was signed-in only; the user later chose to make it public (see Non-goals note).
 - Viewer is the builder in a view mode rather than a separate three.js viewer.
 - Author shown by first name; budget/notes (`meta`) stay private.
 - Only published designs can be newly attached to a listing; unpublishing

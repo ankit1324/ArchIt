@@ -224,7 +224,7 @@ export default function PublishDialog({
         </label>
 
         <p className="px-1 text-[12px] font-medium text-plum-soft">
-          Anyone signed in to ArchIt can see this design and the spot you pick.
+          Anyone, including people who are not signed in, can see this design and the spot you pick.
         </p>
 
         {error && <p className="px-1 text-[12px] font-semibold text-coral">{error}</p>}

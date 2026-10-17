@@ -1,12 +1,17 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import type { DesignRow } from "@/lib/db";
+import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { SHOWCASE_COLUMNS, parseShowcaseQuery, toPublishedDesign } from "@/lib/showcase";
 
 // Published designs from every user, newest first. Everything leaves through
 // the PublishedDesign projection (no user_id, no budget/notes, no design JSON).
 export async function GET(request: Request) {
+  // public endpoint: bound anonymous scraping per IP (signed-in users per id)
   const { userId } = await auth();
+  if (!(await checkRateLimit(ipKey(request, "showcase-list", userId), 120, 60_000))) {
+    return rateLimitedResponse();
+  }
   const { limit, before, located } = parseShowcaseQuery(new URL(request.url).searchParams);
   let query = db
     .from("designs")

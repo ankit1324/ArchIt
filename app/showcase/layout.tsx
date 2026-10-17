@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Showcase",
   description: "Homes designed by the ArchIt community, in 3D.",
-  // Gated behind sign-in (proxy.ts): nothing for crawlers to index.
-  robots: { index: false, follow: false },
+  // Public (proxy.ts leaves /showcase open), so let crawlers index it.
+  robots: { index: true, follow: true },
 };
 
 export default function ShowcaseLayout({
