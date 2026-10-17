@@ -7,6 +7,7 @@ import {
   isLngLatPair,
   parsePublishBody,
   parseShowcaseQuery,
+  publishUpdate,
   toPublishedDesign,
 } from "../lib/showcase.ts";
 
@@ -158,4 +159,48 @@ test("toPublishedDesign passes only a compass facing", () => {
   }
   assert.equal(toPublishedDesign({ ...row, meta: { facing: "<b>x</b>" } }, null).facing, undefined);
   assert.equal(toPublishedDesign({ ...row, meta: { facing: 3 } }, null).facing, undefined);
+});
+
+const NOW = "2026-10-17T12:00:00.000Z";
+const EARLIER = "2026-10-01T09:00:00.000Z";
+
+test("publishUpdate sets published_at on the first publish", () => {
+  assert.deepEqual(publishUpdate({ published: true, location: null }, null, "Ankit", NOW), {
+    published_at: NOW,
+    author_name: "Ankit",
+  });
+});
+
+test("publishUpdate keeps published_at when moving the pin of a published design", () => {
+  const patch = publishUpdate(
+    { published: true, location: { lng: 76.7, lat: 30.7, place: "Sector 8" } },
+    EARLIER,
+    "Ankit",
+    NOW,
+  );
+  assert.ok(!("published_at" in patch), "must not touch published_at");
+  assert.deepEqual(patch, { author_name: "Ankit", plot_lng: 76.7, plot_lat: 30.7, place: "Sector 8" });
+});
+
+test("publishUpdate refreshes author_name on every publish call", () => {
+  assert.equal(publishUpdate({ published: true, location: null }, EARLIER, "New Name", NOW).author_name, "New Name");
+});
+
+test("publishUpdate clears published_at and author_name on unpublish", () => {
+  assert.deepEqual(publishUpdate({ published: false, location: null }, EARLIER, null, NOW), {
+    published_at: null,
+    author_name: null,
+  });
+});
+
+test("publishUpdate sets a new published_at when re-publishing after unpublish", () => {
+  const off = publishUpdate({ published: false, location: null }, EARLIER, null, NOW);
+  const later = "2026-10-20T08:00:00.000Z";
+  const on = publishUpdate({ published: true, location: null }, off.published_at, "Ankit", later);
+  assert.equal(on.published_at, later);
+});
+
+test("publishUpdate falls back to a generic author name", () => {
+  assert.equal(publishUpdate({ published: true, location: null }, null, null, NOW).author_name, "ArchIt user");
+  assert.equal(publishUpdate({ published: true, location: null }, null, "", NOW).author_name, "ArchIt user");
 });

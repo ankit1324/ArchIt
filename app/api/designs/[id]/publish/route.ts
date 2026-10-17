@@ -1,7 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db, rowToDesign } from "@/lib/db";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
-import { parsePublishBody } from "@/lib/showcase";
+import { parsePublishBody, publishUpdate } from "@/lib/showcase";
 
 /**
  * Display name stored on publish: first name, else username, else a generic
@@ -21,10 +21,11 @@ async function authorName(userId: string): Promise<string> {
   }
 }
 
-// Owner-only: the user_id filter makes other users' ids a 404.
-// Publishing sets published_at = now() and author_name, and moves the pin when
-// a location is given. Unpublishing clears both but keeps the location/place
-// so re-publishing can pre-fill them.
+// Owner-only: the user_id filter makes other users' ids a 404, checked before
+// any Clerk lookup. Publishing sets author_name, sets published_at only when
+// the design is not already published (moving a pin keeps its date), and
+// moves the pin when a location is given. Unpublishing clears both but keeps
+// the location/place so re-publishing can pre-fill them. See publishUpdate.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -44,14 +45,24 @@ export async function POST(
   const parsed = parsePublishBody(body);
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
-  const update: Record<string, string | number | null> = parsed.published
-    ? { published_at: new Date().toISOString(), author_name: await authorName(userId) }
-    : { published_at: null, author_name: null };
-  if (parsed.location) {
-    update.plot_lng = parsed.location.lng;
-    update.plot_lat = parsed.location.lat;
-    update.place = parsed.location.place;
+  const { data: current, error: readError } = await db
+    .from("designs")
+    .select("published_at")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle<{ published_at: string | null }>();
+  if (readError) {
+    console.error(`POST /api/designs/${id}/publish read failed:`, readError.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
+  if (!current) return Response.json({ error: "not found" }, { status: 404 });
+
+  const update = publishUpdate(
+    parsed,
+    current.published_at,
+    parsed.published ? await authorName(userId) : null,
+    new Date().toISOString(),
+  );
 
   const { data, error } = await db
     .from("designs")

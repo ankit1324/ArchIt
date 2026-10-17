@@ -119,3 +119,35 @@ export function parsePublishBody(body: unknown): PublishBody {
   const trimmed = typeof place === "string" ? place.trim().slice(0, MAX_PLACE).trim() : "";
   return { ok: true, published, location: { lng: lng as number, lat: lat as number, place: trimmed || null } };
 }
+
+export type PublishPatch = {
+  published_at?: string | null;
+  author_name: string | null;
+  plot_lng?: number;
+  plot_lat?: number;
+  place?: string | null;
+};
+
+/**
+ * The designs-row patch for a publish call. `currentPublishedAt` is the
+ * stored value (read with the owner check). published_at is set only when the
+ * design is not yet published, so moving the pin of a published design keeps
+ * its place in the showcase order; unpublishing clears it, and publishing
+ * again later gets a new date. author_name is refreshed on every publish.
+ */
+export function publishUpdate(
+  parsed: Extract<PublishBody, { ok: true }>,
+  currentPublishedAt: string | null,
+  authorName: string | null,
+  now: string,
+): PublishPatch {
+  if (!parsed.published) return { published_at: null, author_name: null };
+  const patch: PublishPatch = { author_name: authorName || "ArchIt user" };
+  if (!currentPublishedAt) patch.published_at = now;
+  if (parsed.location) {
+    patch.plot_lng = parsed.location.lng;
+    patch.plot_lat = parsed.location.lat;
+    patch.place = parsed.location.place;
+  }
+  return patch;
+}
