@@ -29,9 +29,6 @@ svg{display:block}
 /* ---------- header ---------- */
 header{grid-column:1/3;display:flex;align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--line2);position:relative;z-index:40;background:var(--panel)}
 .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:.2px}
-.contact{line-height:1.3}
-.contact b{font-size:13.5px;font-weight:700;display:block}
-.contact span{font-size:11.5px;color:var(--ink2)}
 .viewtoggle{position:absolute;left:50%;transform:translateX(-50%);display:flex;background:var(--canvas);border-radius:999px;padding:4px}
 .viewtoggle button{width:64px;height:36px;border-radius:999px;font-weight:700;font-size:13px;color:var(--ink2);transition:.2s}
 .viewtoggle button.on{background:var(--blue);color:#fff;box-shadow:0 4px 10px rgba(29,91,180,.35)}
@@ -340,7 +337,7 @@ textarea.cmt:focus{border-color:var(--blue)}
 .embed-only{display:none}
 body.embed .embed-only{display:inline-flex;align-items:center}
 body.embed #saveMapB{background:#e5476f;border-color:#e5476f;color:#fff}
-body.embed .contact, body.embed #resetB{display:none}
+body.embed #resetB{display:none}
 body.embed [data-export="share"], body.embed [data-export="openp"]{display:none}
 </style>
 
@@ -369,10 +366,6 @@ setTimeout(()=>{ const l = document.getElementById('loader'); if(l) l.classList.
       <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M4 11.5 13 4l9 7.5V22a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8.5z" stroke="#e5476f" stroke-width="2.4" stroke-linejoin="round"/><path d="M17 3.5h4M19 1.5v4" stroke="#e5476f" stroke-width="2.4" stroke-linecap="round"/></svg>
       ArchIt
     </div>
-    <div class="contact">
-      <b>+7 (495) 540 49 92</b>
-      <span>Mon–Fri 8:00–19:00, Sat 9:00–17:00</span>
-    </div>
     <div class="viewtoggle">
       <button id="btn3d" class="on">3D</button>
       <button id="btn2d">2D</button>
@@ -388,9 +381,6 @@ setTimeout(()=>{ const l = document.getElementById('loader'); if(l) l.classList.
       </button>
       <button class="iconbtn" id="helpB" title="Tutorial">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.2a2.7 2.7 0 0 1 5.3.7c0 1.8-2.7 2.2-2.7 3.6"/><path d="M12 17v.3"/></svg>
-      </button>
-      <button class="iconbtn" title="Menu">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
       </button>
     </div>
   </header>
@@ -666,8 +656,37 @@ function ensureExteriorState(){
   if(!C.roofStyle[state.roofStyle]) state.roofStyle = 'flat';
   if(!C.roofCol[state.roofCol]) state.roofCol = 'light';
 }
+// Share links (#d=), project files, localStorage and saved designs are all
+// untrusted, and the sidebar interpolates ids/names into innerHTML. Coerce every
+// field to the type the renderer expects and drop catalog keys it doesn't know.
+function sanitizeState(){
+  const num = (v, d=0)=>{ v = Number(v); return isFinite(v) ? v : d; };
+  const int = v=>Math.trunc(num(v));
+  const key = (cat, v, d=null)=>(typeof v === 'string' && Object.hasOwn(cat, v)) ? v : d;
+  const arr = v=>Array.isArray(v) ? v.filter(x=>x && typeof x === 'object') : [];
+  const name = v=>v == null || v === '' ? undefined : String(v).slice(0, 40);
+  const block = b=>({
+    ...b, id:int(b.id), type:b.type, name:name(b.name),
+    cx:num(b.cx), cz:num(b.cz), w:num(b.w, C.rooms[b.type].w), len:num(b.len, C.rooms[b.type].len), rot:clampRot(b.rot),
+    paint:key(C.paint, b.paint), floorCol:key(C.floorCol, b.floorCol),
+    floorMat:key(C.floorMat, b.floorMat), wallMat:key(C.wallMat, b.wallMat),
+    doors:arr(b.doors).map(d=>({...d, id:int(d.id), wall:clampRot(d.wall), t:num(d.t, .5),
+      type:key(C.doors, d.type, 'int_hard'), w:num(d.w, .8), h:num(d.h, 2), color:String(d.color ?? 'blue')})),
+    windows:arr(b.windows).map(w=>({...w, id:int(w.id), wall:clampRot(w.wall), t:num(w.t, .5),
+      kind:w.kind === 'pano' ? 'pano' : 'std'})),
+    partitions:arr(b.partitions).map(p=>({...p, id:int(p.id), t:num(p.t, .5)})),
+    furniture:arr(b.furniture).filter(f=>key(C.furniture, f.key)).map(f=>({...f, id:int(f.id),
+      lx:num(f.lx), lz:num(f.lz), rot:clampRot(f.rot)})),
+  });
+  const floors = arr(state.floors).length ? arr(state.floors) : [{blocks:state.blocks}];
+  state.floors = floors.slice(0, 3).map(fl=>({...fl, blocks:arr(fl.blocks).filter(b=>key(C.rooms, b.type)).map(block)}));
+  state.floor = Math.max(0, int(state.floor));
+  const seq = state.seq && typeof state.seq === 'object' ? state.seq : {};
+  state.seq = {block:int(seq.block), door:int(seq.door), win:int(seq.win), part:int(seq.part), furn:int(seq.furn)};
+}
 // after JSON round-trips (undo/restore/load) the alias breaks — re-link it
 function linkFloor(){
+  sanitizeState();
   if(!state.floors){ state.floors = [{blocks:state.blocks}]; state.floor = 0; }
   state.floor = Math.min(state.floor||0, state.floors.length-1);
   state.blocks = state.floors[state.floor].blocks;
@@ -3563,7 +3582,7 @@ function renderSidebar(){
     ['windows','Windows', ()=>{
       let rows = '';
       state.blocks.forEach((bl,i)=>bl.windows.forEach((w,j)=>{
-        rows += `<div class="optrow"><span class="nm">Window ${j+1} · ${(bl.name||C.rooms[bl.type].name).toLowerCase()} ${i+1}</span>
+        rows += `<div class="optrow"><span class="nm">Window ${j+1} · ${escapeMarkup((bl.name||C.rooms[bl.type].name).toLowerCase())} ${i+1}</span>
           <button class="end iconbtn" data-act="delwin" data-b="${bl.id}" data-w="${w.id}" title="Remove">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg></button></div>`;
       }));
@@ -3575,7 +3594,7 @@ function renderSidebar(){
         rows += `<button class="itemrow" data-act="seldoor" data-b="${bl.id}" data-d="${d.id}">
           <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3.5" width="12" height="17" rx="1.2"/><circle cx="14.6" cy="12" r="1" fill="currentColor"/></svg></span>
           <span><span class="nm" style="font-size:13px;font-weight:700">${C.doors[d.type].name}</span>
-          <span style="display:block;font-size:11.5px;color:#8b96ab">${bl.name||C.rooms[bl.type].name+" "+(i+1)}</span></span></button>`;
+          <span style="display:block;font-size:11.5px;color:#8b96ab">${escapeMarkup(bl.name||C.rooms[bl.type].name+" "+(i+1))}</span></span></button>`;
       }));
       return rows + `<button class="addbtn" data-act="opendoors">+ Add door</button>`;
     }],
@@ -3583,7 +3602,7 @@ function renderSidebar(){
       let rows = '';
       state.blocks.forEach((bl,i)=>(bl.furniture||[]).forEach(f=>{
         rows += `<div class="optrow"><span class="nm">${C.furniture[f.key].name}
-          <span style="display:block;font-size:11.5px;color:#8b96ab;font-weight:600">${bl.name||C.rooms[bl.type].name+" "+(i+1)}</span></span>
+          <span style="display:block;font-size:11.5px;color:#8b96ab;font-weight:600">${escapeMarkup(bl.name||C.rooms[bl.type].name+" "+(i+1))}</span></span>
           <button class="end iconbtn" data-act="delfurn" data-b="${bl.id}" data-f="${f.id}" title="Remove">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg></button></div>`;
       }));
@@ -3633,12 +3652,12 @@ function renderBlockPanel(b){
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5 12 11l8-4.5M12 11v9"/></svg></span>
-      <div><h2>${b.name || spec.name+' '+i}</h2><div class="pr" style="color:#8b96ab">${round1(b.w*b.len)} m²</div></div>
+      <div><h2>${escapeMarkup(b.name || spec.name+' '+i)}</h2><div class="pr" style="color:#8b96ab">${round1(b.w*b.len)} m²</div></div>
       <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Name</div>
-    <input class="inp" data-act="rname" type="text" maxlength="24" value="${(b.name||'').replace(/"/g,'&quot;')}" placeholder="${spec.name} ${i}">
+    <input class="inp" data-act="rname" type="text" maxlength="24" value="${escapeMarkup(b.name||'')}" placeholder="${spec.name} ${i}">
     <div class="f-label">Room type</div>
     ${selectHTML('rtype', typeOpts, `<span>${spec.name}</span>`)}
     <div class="grid2" style="margin-top:12px">
@@ -4331,7 +4350,7 @@ function designSheet(){
     const furn = b.furniture.map(f=>C.furniture[f.key].name).join(', ') || '—';
     roomCards += `<div class="card room">
       <img src="${shot}" alt="">
-      <div class="rb"><h3>${i+1}. ${b.name || spec.name}</h3><table>
+      <div class="rb"><h3>${i+1}. ${escapeMarkup(b.name || spec.name)}</h3><table>
         <tr><td>Size</td><td>${b.len} × ${b.w} m — ${round1(b.w*b.len)} m²</td></tr>
         <tr><td>Walls</td><td>${wallN}</td></tr>
         <tr><td>Floor</td><td>${floorN}</td></tr>
@@ -4497,19 +4516,19 @@ function renderAll(){
 /* ============================== tutorial ============================== */
 const TUT_STEPS = [
   {title:'Welcome to ArchIt!',
-   body:'Design a single-floor house in real time — compose rooms like a hall, kitchen, bedroom, balcony or veranda, add doors, windows and utilities, and watch the price update instantly. Here’s a quick tour.'},
+   body:'Plan your home room by room — compose a hall, kitchen, bedrooms, baths, balcony or veranda, add doors, windows and furniture, and see it in 3D as you go. Here’s a quick tour.'},
   {el:'.viewtoggle', title:'3D and 2D modes',
    body:'Switch between a 3D view of your house and a 2D floor plan. Both stay in sync — edit wherever it’s easier.'},
   {el:'#toolbar', pad:10, title:'Catalogs',
-   body:'Rooms, partitions, doors, plumbing, heating and interior finish live here. Open the Rooms catalog to add a bedroom, kitchen, bathroom, balcony, veranda or stairs — each has its own size and price.'},
+   body:'Layout templates, rooms, partitions, doors, windows and furniture live here. Open the Rooms catalog to add a bedroom, kitchen, bathroom, balcony, veranda or stairs.'},
   {el:'.hs', fallback:'#stage', pad:14, title:'Add and arrange',
    body:'The white “+” buttons around a room add a new one on that side. Click a room to select it, then drag it to move it (it snaps to neighbours), or duplicate, rotate and delete it with the chips above it. Doors and windows drag along walls too — in 2D, and in 3D once selected.'},
   {el:'#side', title:'Configuration panel',
-   body:'Every part of the house is configured here — wall paint, finish, windows, doors, plumbing and extras. Amounts shown in red are added to the price.'},
-  {el:'#bottombar', pad:10, title:'Live cost',
-   body:'The total price and production time update with every change you make. Happy with the result? Press “Order”.'},
+   body:'Every part of the house is configured here — exterior presets, facade, roof, wall paint, floors, windows and doors. Select a room to edit its name, size and finishes.'},
+  {el:'#bottombar', pad:10, title:'Area and checks',
+   body:'Total area and room count update with every change. Checks flags rooms without a door or windows that open into another room — click it to see what needs fixing.'},
   {el:'#undoB', pad:8, title:'Made a mistake?',
-   body:'Undo and redo any step here (Ctrl+Z / Ctrl+Shift+Z). The camera button in the header saves a screenshot of your project, and “?” replays this tour.'},
+   body:'Undo and redo any step here (Ctrl+Z / Ctrl+Shift+Z). The camera button in the header exports 3D and 2D images, a printable design sheet, a project file or a share link, and “?” replays this tour.'},
 ];
 const tut = $('#tut'), tutHole = $('#tutHole'), tutCard = $('#tutCard');
 let tutI = -1;
