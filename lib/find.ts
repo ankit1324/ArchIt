@@ -24,9 +24,9 @@ export function matchesQuery(listing: Listing, query: string): boolean {
   return matchesWords([listing.buildingName, listing.address, listing.city], query);
 }
 
-/** search over a published design's name and place */
+/** search over a published design's name, place and author */
 export function matchesDesignQuery(design: PublishedDesign, query: string): boolean {
-  return matchesWords([design.name, design.place], query);
+  return matchesWords([design.name, design.place, design.authorName], query);
 }
 
 export function findListings(listings: Listing[], filters: Filters, query: string, sort: ListingSort): Listing[] {

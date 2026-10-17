@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Gated app surfaces and auth screens: nothing useful to crawl.
-      disallow: ["/api/", "/find", "/designer", "/sign-in", "/sign-up"],
+      disallow: ["/api/", "/find", "/designer", "/showcase", "/sign-in", "/sign-up"],
     },
     sitemap: `${SITE}/sitemap.xml`,
   };

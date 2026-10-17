@@ -57,6 +57,7 @@ test("design search matches name and place regardless of case", () => {
   assert.equal(matchesDesignQuery(design, ""), true);
   assert.equal(matchesDesignQuery(design, "courtyard"), true);
   assert.equal(matchesDesignQuery(design, " CHANDIGARH home "), true);
+  assert.equal(matchesDesignQuery(design, "asha"), true);
   assert.equal(matchesDesignQuery(design, "mohali"), false);
   assert.equal(matchesDesignQuery({ ...design, place: undefined }, "sector"), false);
 });

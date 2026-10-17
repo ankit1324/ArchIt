@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useDesignViewerBridge } from "@/components/useDesignViewerBridge";
 
 /**
@@ -17,6 +17,14 @@ export default function DesignViewer({
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const state = useDesignViewerBridge(designId, iframeRef, onClose);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 bg-cream" role="dialog" aria-modal="true" aria-label="Design viewer">

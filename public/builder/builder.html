@@ -683,7 +683,7 @@ function sanitizeState(){
     paint:key(C.paint, b.paint), floorCol:key(C.floorCol, b.floorCol),
     floorMat:key(C.floorMat, b.floorMat), wallMat:key(C.wallMat, b.wallMat),
     doors:arr(b.doors).map(d=>({...d, id:int(d.id), wall:clampRot(d.wall), t:num(d.t, .5),
-      type:key(C.doors, d.type, 'int_hard'), w:num(d.w, .8), h:num(d.h, 2), color:String(d.color ?? 'blue')})),
+      type:key(C.doors, d.type, 'int_hard'), w:num(d.w, .8), h:num(d.h, 2), color:key({blue:1, white:1, gray:1}, d.color, 'blue')})),
     windows:arr(b.windows).map(w=>({...w, id:int(w.id), wall:clampRot(w.wall), t:num(w.t, .5),
       kind:w.kind === 'pano' ? 'pano' : 'std'})),
     partitions:arr(b.partitions).map(p=>({...p, id:int(p.id), t:num(p.t, .5)})),
@@ -3937,7 +3937,7 @@ function furnGridHTML(){
 function furnCatalogHTML(X){
   const tabs = FURN_CATS.map(([k,n]) => `<button class="fcat${k===furnCat?' on':''}" data-fcat="${k}">${n}</button>`).join('');
   return `<h3>Furniture ${X}</h3>
-    <input class="fsearch" placeholder="Search furniture…" value="${furnQuery}">
+    <input class="fsearch" placeholder="Search furniture…" value="${escapeMarkup(furnQuery)}">
     <div class="fcats">${tabs}</div>
     <div class="fgrid">${furnGridHTML()}</div>`;
 }

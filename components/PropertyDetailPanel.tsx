@@ -160,6 +160,12 @@ export default function PropertyDetailPanel({
         </div>
       )}
 
+      {listing.mine && listing.designId && listing.designPublished === false && (
+        <div className="rounded-xl border border-coral/30 bg-coral/10 p-2.5 text-[11.5px] font-semibold text-coral">
+          Attached 3D design is unpublished. Publish it in Designer to show 3D to visitors.
+        </div>
+      )}
+
       {designId && view === "3d" ? (
         <div className="flex flex-col gap-2">
           <div className="relative grid h-[140px] place-items-center overflow-hidden rounded-2xl bg-white/55 ring-2 ring-violet-500">

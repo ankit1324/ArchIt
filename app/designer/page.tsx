@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { nextImageUrl } from "@/lib/url";
+import { hasLocation } from "@/lib/showcase";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay from "@/components/DesignerOverlay";
 import PublishDialog from "@/components/PublishDialog";
@@ -670,7 +671,7 @@ export default function DesignerPage() {
                             onClick={() => setPublishing(d)}
                             className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum"
                           >
-                            Move pin
+                            {hasLocation(d.plotCenter[0], d.plotCenter[1]) ? "Move pin" : "Add pin"}
                           </button>
                           <button
                             onClick={() => unpublishDesign(d)}

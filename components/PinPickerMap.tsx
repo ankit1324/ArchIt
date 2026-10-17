@@ -58,7 +58,7 @@ export default function PinPickerMap({
       .setLngLat(coords)
       .addTo(map);
     marker.on("dragend", () => {
-      const p = marker.getLngLat();
+      const p = marker.getLngLat().wrap();
       onChangeRef.current([p.lng, p.lat]);
     });
     markerRef.current = marker;

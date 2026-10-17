@@ -123,10 +123,17 @@ export default function Home() {
 
   const showResults = () => {
     const map = mapRef.current;
-    if (!map || !filtered.length) return;
+    if (!map) return;
+    const targets =
+      layer === "designs"
+        ? matchingDesigns
+            .map((d) => d.plotCenter)
+            .filter((c): c is [number, number] => c !== null)
+        : filtered.map((l) => l.coords);
+    if (!targets.length) return;
     const height = map.getContainer().clientHeight;
-    const lngs = filtered.map((l) => l.coords[0]);
-    const lats = filtered.map((l) => l.coords[1]);
+    const lngs = targets.map((c) => c[0]);
+    const lats = targets.map((c) => c[1]);
     map.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
       { padding: { top: Math.min(140, height * 0.2), bottom: Math.min(260, height * 0.4), left: window.innerWidth >= 1024 ? 300 : 40, right: 60 }, maxZoom: 16, duration: 1000 },
@@ -465,9 +472,25 @@ export default function Home() {
 
           <div className={styles.results}>
             <div className={styles.resultBar}>
-              <div aria-live="polite"><strong>{loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}` : "Explore properties"}</strong><span>{query ? `Matching “${query}”` : "Find your next place"}</span></div>
+              <div aria-live="polite">
+                <strong>
+                  {loadState !== "ready"
+                    ? "Explore properties"
+                    : layer === "designs"
+                      ? `${matchingDesigns.length} ${matchingDesigns.length === 1 ? "design" : "designs"}`
+                      : layer === "both" && matchingDesigns.length > 0
+                        ? `${filtered.length} properties · ${matchingDesigns.length} designs`
+                        : `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}`}
+                </strong>
+                <span>{query ? `Matching “${query}”` : "Find your next place"}</span>
+              </div>
               <div className={styles.resultActions}>
-                <button onClick={showResults} disabled={!filtered.length}>Show on map ↗</button>
+                <button
+                  onClick={showResults}
+                  disabled={layer === "designs" ? !matchingDesigns.length : !filtered.length}
+                >
+                  Show on map ↗
+                </button>
                 <select aria-label="Sort properties" value={sort} onChange={(e) => setSort(e.target.value as ListingSort)}>
                   <option value="recommended">Featured first</option>
                   <option value="price-asc">Price: low to high</option>
@@ -476,15 +499,24 @@ export default function Home() {
                 </select>
               </div>
             </div>
-            <PropertyCarousel
-              listings={filtered}
-              onSelect={flyToListing}
-              hasAny={listings.length > 0}
-              status={loadState}
-              selectedId={selectedId}
-              onReset={resetSearch}
-              onRetry={() => { setLoadState("loading"); setLoadAttempt((n) => n + 1); }}
-            />
+            {layer === "designs" ? (
+              <div className="rounded-2xl border border-white/60 bg-white/80 p-4 text-center text-[13px] font-semibold text-plum shadow-sm backdrop-blur-md">
+                Showing community design pins on the map. Click any pin to view the design and explore it in 3D.
+              </div>
+            ) : (
+              <PropertyCarousel
+                listings={filtered}
+                onSelect={flyToListing}
+                hasAny={listings.length > 0}
+                status={loadState}
+                selectedId={selectedId}
+                onReset={resetSearch}
+                onRetry={() => {
+                  setLoadState("loading");
+                  setLoadAttempt((n) => n + 1);
+                }}
+              />
+            )}
           </div>
 
           {/* panels render last so they paint above the carousel strip and

@@ -37,10 +37,10 @@ export default function PublishDialog({
   onDone: (d: Design) => void;
   onCancel: () => void;
 }) {
-  const movingPin = !!design.publishedAt;
   const stored = hasLocation(design.plotCenter[0], design.plotCenter[1])
     ? design.plotCenter
     : null;
+  const movingPin = Boolean(design.publishedAt && stored);
 
   const [pin, setPin] = useState<[number, number] | null>(stored);
   const [place, setPlace] = useState(stored ? (design.place ?? "") : "");
@@ -169,7 +169,7 @@ export default function PublishDialog({
       >
         <div>
           <span className="text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-coral">
-            {movingPin ? "Move pin" : "Publish to showcase"}
+            {movingPin ? "Move pin" : design.publishedAt ? "Add map pin" : "Publish to showcase"}
           </span>
           <h2
             id="publish-dialog-title"
@@ -236,7 +236,7 @@ export default function PublishDialog({
             disabled={busy || !pin}
             className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream shadow-[0_12px_28px_-10px_rgba(61,24,48,.55)] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
           >
-            {busy ? "Saving…" : movingPin ? "Save pin" : "Publish"}
+            {busy ? "Saving…" : movingPin ? "Save pin" : design.publishedAt ? "Add pin" : "Publish"}
           </button>
           {/* The publish route has no way to clear a stored spot (a missing
               location keeps it), so this only shows when there is none —

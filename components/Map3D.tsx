@@ -279,7 +279,8 @@ export default function Map3D({
       refreshMarkers(map);
 
       map.on("click", (e) => {
-        onMapClickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
+        const p = e.lngLat.wrap();
+        onMapClickRef.current?.([p.lng, p.lat]);
       });
 
       map.on("load", () => {
