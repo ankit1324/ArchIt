@@ -16,10 +16,32 @@ const jakarta = localFont({
   variable: "--font-jakarta",
 });
 
+const SITE_DESCRIPTION =
+  "Plan your plot, lay out rooms and explore your home in 3D, right in the browser. Free to start; sign in to save your designs.";
+
+// Neutral suite-wide defaults. Pages refine title/description; the OG image
+// comes from app/opengraph-image.tsx. Note: nested fields (openGraph, robots,
+// alternates) are replaced, not merged, by any segment that sets them.
 export const metadata: Metadata = {
-  title: "ArchIt Find — Real Estate 3D Map",
-  description:
-    "Find homes on a living 3D map of Chandigarh — buy, rent, explore neighborhoods in three dimensions.",
+  metadataBase: new URL("https://archit.chaudharyankit.in"),
+  title: {
+    default: "ArchIt — Plan your home in 3D",
+    template: "%s · ArchIt",
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: "ArchIt",
+  openGraph: {
+    siteName: "ArchIt",
+    type: "website",
+    locale: "en_IN",
+    title: "ArchIt — Plan your home in 3D",
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ArchIt — Plan your home in 3D",
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default async function RootLayout({

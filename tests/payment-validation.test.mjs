@@ -6,6 +6,7 @@ import test from "node:test";
 // is testable without standing up any of it.
 import {
   checkPayment,
+  FEE_PURPOSES,
   isFeePurpose,
   isSamePaymentConflict,
 } from "../lib/payment-validation.ts";
@@ -171,10 +172,18 @@ test("tolerates a conflict error with no details", () => {
   assert.equal(isSamePaymentConflict({ message: "duplicate key value" }), false);
 });
 
-test("accepts the three real fee purposes", () => {
+test("accepts the four real fee purposes", () => {
   assert.equal(isFeePurpose("contact_owner"), true);
   assert.equal(isFeePurpose("featured_property"), true);
   assert.equal(isFeePurpose("builder_unlock"), true);
+  assert.equal(isFeePurpose("template_unlock"), true);
+});
+
+test("every priced fee is an accepted purpose, and nothing else is", () => {
+  // A purpose missing from FEE_PURPOSES charges the user and then fails to
+  // record the purchase ("unknown purchase purpose"), so the lists must match.
+  assert.deepEqual([...FEE_PURPOSES].sort(), Object.keys(FEES).sort());
+  for (const purpose of Object.keys(FEES)) assert.equal(isFeePurpose(purpose), true, purpose);
 });
 
 test("rejects anything that is not a fee purpose", () => {
