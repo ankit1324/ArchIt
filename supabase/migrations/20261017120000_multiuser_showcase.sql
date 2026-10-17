@@ -22,6 +22,11 @@ ALTER TABLE properties
 ALTER TABLE properties
   ADD COLUMN IF NOT EXISTS design_id TEXT NULL REFERENCES designs(id) ON DELETE SET NULL;
 
+-- ON DELETE SET NULL looks up referencing rows on every design delete
+CREATE INDEX IF NOT EXISTS properties_design_idx
+  ON properties (design_id)
+  WHERE design_id IS NOT NULL;
+
 ALTER TABLE properties
   ADD COLUMN IF NOT EXISTS default_view TEXT NOT NULL DEFAULT 'photos'
   CHECK (default_view IN ('photos', '3d'));
