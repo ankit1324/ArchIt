@@ -122,13 +122,19 @@ export default function PinPickerMap({
       map.on("load", () => {
         loaded = true;
         clearTimeout(timer);
+        // a late load (slow hidden tab, a timeout that fired first) means the
+        // map works after all
+        if (!cancelled) setFailed(false);
       });
-      // errors before load (style/TileJSON fetch) leave the map blank for good
+      // errors before load (style/TileJSON fetch) leave the map blank for good;
+      // a single failed tile (the event carries `tile`) does not
       map.on("error", (e) => {
-        if (!loaded) fail(e.error);
+        if (!loaded && !(e as { tile?: unknown }).tile) fail(e.error);
       });
       map.on("click", (e) => {
-        onChangeRef.current([e.lngLat.lng, e.lngLat.lat]);
+        // wrap: on a world-copy past the antimeridian lng can leave [-180, 180]
+        const p = e.lngLat.wrap();
+        onChangeRef.current([p.lng, p.lat]);
       });
 
       placeMarker(map, start);
