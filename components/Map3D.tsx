@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import maplibregl from "maplibre-gl";
-import type { Listing, Poi } from "@/lib/types";
+import type { Listing, Poi, PublishedDesign } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const CENTER: [number, number] = [76.7794, 30.741];
+
+/** outline colour of published-design pins */
+const DESIGN_ACCENT = "#8b5cf6";
 
 const PRISM_COLORS: Record<Listing["type"], string> = {
   rent: "#a06ae8",
@@ -84,6 +87,54 @@ function priceMarkerEl(l: Listing, withThumb: boolean): HTMLElement {
   return el;
 }
 
+/** design pin: the design's snapshot in an accent ring, no price */
+function designMarkerEl(d: PublishedDesign): HTMLElement {
+  const el = document.createElement("div");
+  el.tabIndex = 0;
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", `${d.name}, 3D design by ${d.authorName}`);
+  el.title = d.name;
+  Object.assign(el.style, {
+    width: "44px",
+    height: "44px",
+    borderRadius: "14px",
+    border: `3px solid ${DESIGN_ACCENT}`,
+    background: "#f5f1ea",
+    boxShadow: "0 6px 16px rgb(139 92 246 / 0.45)",
+    overflow: "hidden",
+    cursor: "pointer",
+    display: "grid",
+    placeItems: "center",
+    color: DESIGN_ACCENT,
+    font: "800 11px var(--font-jakarta), sans-serif",
+  });
+  const thumb = safeImageUrl(d.snapshot);
+  if (thumb) {
+    const img = document.createElement("img");
+    img.src = thumb;
+    img.alt = "";
+    Object.assign(img.style, { width: "100%", height: "100%", objectFit: "cover" });
+    el.appendChild(img);
+  } else {
+    el.textContent = "3D";
+  }
+  return el;
+}
+
+/** Enter/Space/click on a marker element calls `select` */
+function onActivate(el: HTMLElement, select: () => void) {
+  el.addEventListener("click", (event) => {
+    event.stopPropagation();
+    select();
+  });
+  el.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      select();
+    }
+  });
+}
+
 function poiMarkerEl(p: Poi): HTMLElement {
   const el = document.createElement("div");
   el.className = "poi-marker";
@@ -100,11 +151,18 @@ function poiMarkerEl(p: Poi): HTMLElement {
   return el;
 }
 
+const NO_DESIGNS: PublishedDesign[] = [];
+
 interface Map3DProps {
   listings: Listing[];
   pois: Poi[];
   mapRef: RefObject<maplibregl.Map | null>;
   onSelect?: (id: string) => void;
+  /** published designs to pin; those without a plotCenter are skipped */
+  designs?: PublishedDesign[];
+  onSelectDesign?: (id: string) => void;
+  /** fires once the map has loaded and started its intro flight */
+  onLoad?: () => void;
   onMapClick?: (coords: [number, number]) => void;
   pickMode?: boolean;
   draftCoords?: [number, number] | null;
@@ -115,6 +173,9 @@ export default function Map3D({
   pois,
   mapRef,
   onSelect,
+  designs = NO_DESIGNS,
+  onSelectDesign,
+  onLoad,
   onMapClick,
   pickMode = false,
   draftCoords = null,
@@ -125,6 +186,9 @@ export default function Map3D({
   const loadedRef = useRef(false);
   const listingsRef = useRef(listings);
   const onSelectRef = useRef(onSelect);
+  const designsRef = useRef(designs);
+  const onSelectDesignRef = useRef(onSelectDesign);
+  const onLoadRef = useRef(onLoad);
   const onMapClickRef = useRef(onMapClick);
   const refreshRef = useRef<((m: maplibregl.Map) => void) | null>(null);
 
@@ -133,6 +197,9 @@ export default function Map3D({
   useEffect(() => {
     listingsRef.current = listings;
     onSelectRef.current = onSelect;
+    designsRef.current = designs;
+    onSelectDesignRef.current = onSelectDesign;
+    onLoadRef.current = onLoad;
     onMapClickRef.current = onMapClick;
   });
 
@@ -148,19 +215,20 @@ export default function Map3D({
 
       listingsRef.current.forEach((l, i) => {
         const el = priceMarkerEl(l, i % 3 === 0);
-        el.addEventListener("click", (event) => {
-          event.stopPropagation();
-          onSelectRef.current?.(l.id);
-        });
-        el.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelectRef.current?.(l.id);
-          }
-        });
+        onActivate(el, () => onSelectRef.current?.(l.id));
         markersRef.current.push(
           new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -18] })
             .setLngLat(l.coords)
+            .addTo(m),
+        );
+      });
+      designsRef.current.forEach((d) => {
+        if (!d.plotCenter) return;
+        const el = designMarkerEl(d);
+        onActivate(el, () => onSelectDesignRef.current?.(d.id));
+        markersRef.current.push(
+          new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -6] })
+            .setLngLat(d.plotCenter)
             .addTo(m),
         );
       });
@@ -263,6 +331,7 @@ export default function Map3D({
           duration: 4200,
           essential: false,
         });
+        onLoadRef.current?.();
       });
     };
     init();
@@ -280,14 +349,14 @@ export default function Map3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // react to filtered listings
+  // react to filtered listings and design pins
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
     const src = map.getSource("listing-prisms") as maplibregl.GeoJSONSource | undefined;
     src?.setData(prismGeoJSON(listings));
     refreshRef.current?.(map);
-  }, [listings, mapRef]);
+  }, [listings, designs, mapRef]);
 
   // crosshair while picking a location
   useEffect(() => {
