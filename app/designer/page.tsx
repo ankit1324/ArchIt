@@ -453,7 +453,11 @@ export default function DesignerPage() {
   };
 
   const deleteDesign = async (id: string) => {
-    if (!window.confirm("Delete this design? This cannot be undone.")) return;
+    const published = designs.find((d) => d.id === id)?.publishedAt;
+    const warning = published
+      ? "Delete this design? It leaves the showcase and the map, listings stop showing it, and this cannot be undone."
+      : "Delete this design? This cannot be undone.";
+    if (!window.confirm(warning)) return;
     const res = await fetch(`/api/designs/${id}`, { method: "DELETE" });
     if (res.ok || res.status === 404) {
       setDesigns((prev) => prev.filter((d) => d.id !== id));
