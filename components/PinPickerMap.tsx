@@ -1,0 +1,199 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+
+// same basemap as components/Map3D.tsx
+const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+const DEFAULT_CENTER: [number, number] = [76.7794, 30.741]; // Chandigarh, as Map3D
+// a style that has not loaded by then is treated as a failure (retry offered)
+const LOAD_TIMEOUT_MS = 15_000;
+
+export interface FlyTarget {
+  center: [number, number];
+  bbox?: [[number, number], [number, number]];
+}
+
+/**
+ * Small 2D map for picking a design's spot: a click drops or moves the pin,
+ * and the pin can be dragged. `flyTo` moves the camera (a new object each time
+ * flies again). Load it with next/dynamic `ssr: false` — maplibre needs the DOM.
+ * If the basemap fails to load, it says so and offers a retry; the caller's
+ * search and "publish without pin" paths keep working without it.
+ */
+export default function PinPickerMap({
+  value,
+  onChange,
+  flyTo,
+}: {
+  value: [number, number] | null;
+  onChange: (coords: [number, number]) => void;
+  flyTo: FlyTarget | null;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  // Refreshed after every commit; maplibre callbacks read them at event time.
+  useEffect(() => {
+    valueRef.current = value;
+    onChangeRef.current = onChange;
+  });
+
+  const placeMarker = (map: maplibregl.Map, coords: [number, number] | null) => {
+    if (!coords) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    if (markerRef.current) {
+      markerRef.current.setLngLat(coords);
+      return;
+    }
+    const marker = new maplibregl.Marker({ color: "#3d1830", draggable: true })
+      .setLngLat(coords)
+      .addTo(map);
+    marker.on("dragend", () => {
+      const p = marker.getLngLat();
+      onChangeRef.current([p.lng, p.lat]);
+    });
+    markerRef.current = marker;
+  };
+
+  // init (and re-init on retry)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const fail = (why: unknown) => {
+      if (cancelled) return;
+      console.warn("[PinPickerMap] basemap failed to load", why);
+      setFailed(true);
+    };
+
+    const init = async () => {
+      // fetch the style ourselves (as Map3D does) so a dead tile host fails
+      // fast here instead of leaving a silently blank map
+      let style: maplibregl.StyleSpecification;
+      try {
+        const res = await fetch(STYLE_URL);
+        if (!res.ok) throw new Error(`style HTTP ${res.status}`);
+        style = (await res.json()) as maplibregl.StyleSpecification;
+        delete style.sources.ne2_shaded;
+        style.layers = style.layers.filter(
+          (l) => !("source" in l) || l.source !== "ne2_shaded",
+        );
+      } catch (e) {
+        return fail(e);
+      }
+      if (cancelled) return;
+
+      const start = valueRef.current;
+      let map: maplibregl.Map;
+      try {
+        map = new maplibregl.Map({
+          container,
+          style,
+          center: start ?? DEFAULT_CENTER,
+          zoom: start ? 15 : 11,
+          pitch: 0,
+          maxPitch: 0,
+          dragRotate: false,
+          attributionControl: { compact: true },
+        });
+      } catch (e) {
+        // e.g. WebGL unavailable
+        return fail(e);
+      }
+      mapRef.current = map;
+      map.touchZoomRotate.disableRotation();
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+      map.getCanvas().style.cursor = "crosshair";
+
+      let loaded = false;
+      timer = setTimeout(() => {
+        if (!loaded) fail("timeout");
+      }, LOAD_TIMEOUT_MS);
+      map.on("load", () => {
+        loaded = true;
+        clearTimeout(timer);
+      });
+      // errors before load (style/TileJSON fetch) leave the map blank for good
+      map.on("error", (e) => {
+        if (!loaded) fail(e.error);
+      });
+      map.on("click", (e) => {
+        onChangeRef.current([e.lngLat.lng, e.lngLat.lat]);
+      });
+
+      placeMarker(map, start);
+    };
+    init();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      markerRef.current?.remove();
+      markerRef.current = null;
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, [attempt]);
+
+  // keep the pin in sync with the value (search results set it too)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) placeMarker(map, value);
+  }, [value]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !flyTo) return;
+    const [[w, s], [e, n]] = flyTo.bbox ?? [flyTo.center, flyTo.center];
+    if (w !== e || s !== n) {
+      map.fitBounds(
+        [
+          [w, s],
+          [e, n],
+        ],
+        { padding: 40, maxZoom: 16, duration: 1200 },
+      );
+    } else {
+      map.flyTo({ center: flyTo.center, zoom: 15, duration: 1200 });
+    }
+  }, [flyTo]);
+
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded-2xl bg-white/60">
+      {/* maplibre forces position:relative on its container, so size it with
+          h/w-full inside the positioned wrapper (as Map3D does) */}
+      <div ref={containerRef} className="h-full w-full" />
+      {failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-cream/95 p-4 text-center">
+          <p className="text-[12.5px] font-semibold text-plum">
+            The map didn’t load.
+          </p>
+          <p className="text-[11.5px] font-medium text-plum-soft">
+            Search for a place above to drop the pin there, or publish without a
+            map pin.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setFailed(false);
+              setAttempt((a) => a + 1);
+            }}
+            className="rounded-full bg-white/80 px-3 py-1 text-[11.5px] font-bold text-plum hover:bg-white"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
