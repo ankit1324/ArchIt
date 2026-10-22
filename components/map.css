@@ -1,0 +1,112 @@
+/* ---------- map markers (DOM elements created by maplibre) ----------
+   Loaded with the lazy Map3D chunk, so only /find pays for it. Imported after
+   maplibre-gl.css in Map3D.tsx so the overrides below win the cascade.
+
+   MapLibre writes `style.transform` inline on the marker ROOT every frame to
+   keep it pinned to the map. The root therefore carries no transition or
+   transform of its own; everything visual lives on the inner element so that
+   hover scale / pulse don't fight (or lag) the map's positioning. */
+
+.price-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 999px;
+  background: var(--color-coral);
+  color: #fff;
+  font-family: var(--font-jakarta), sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgb(240 72 62 / 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.price-marker:hover {
+  transform: scale(1.07);
+}
+.price-marker.no-thumb {
+  padding-left: 12px;
+}
+.price-marker .thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgb(255 255 255 / 0.8);
+}
+
+/* ── Featured listing marker (paid ₹250 boost) ── */
+.price-marker.featured {
+  position: relative;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow:
+    0 0 0 2px rgb(251 191 36 / 0.5),
+    0 6px 20px rgb(245 158 11 / 0.55);
+}
+.price-marker.featured:hover {
+  transform: scale(1.1);
+}
+.price-marker .featured-star {
+  font-size: 13px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.2));
+}
+/* pulse ring: a composited pseudo-element animating opacity/transform instead
+   of re-rasterising box-shadow every frame */
+.price-marker.featured::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 3px solid rgb(251 191 36 / 0.45);
+  pointer-events: none;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .price-marker.featured::before {
+    animation: featured-pulse 2.4s ease-in-out infinite;
+  }
+}
+@keyframes featured-pulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.08); }
+}
+
+.poi-marker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-jakarta), sans-serif;
+  pointer-events: none;
+}
+.poi-marker .bubble {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+  color: var(--color-plum);
+  box-shadow: 0 4px 12px rgb(61 24 48 / 0.18);
+}
+.poi-marker .poi-label {
+  max-width: 110px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 6px rgb(61 24 48 / 0.55);
+}
+
+/* soften maplibre chrome */
+.maplibregl-ctrl-attrib {
+  background: rgb(245 241 234 / 0.6) !important;
+  border-radius: 8px 0 0 0;
+  font-size: 10px;
+}
+.maplibregl-canvas {
+  outline: none;
+}

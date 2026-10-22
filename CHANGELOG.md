@@ -10,6 +10,30 @@ each. Some history predating the branch ruleset came in as merge commits.
 
 ## [Unreleased]
 
+### Changed
+
+- **Payments moved from Razorpay to a self-hosted
+  [YouPI-PG](https://github.com/youpi-pg/YouPI-PG) UPI gateway.** The browser
+  embeds the gateway's `youpi.js` iframe checkout; `/api/create-order` opens a
+  session with purpose/userId/ref in gateway metadata, `/api/verify-payment`
+  re-reads the payment with the merchant key before recording it, and the
+  webhook moved to `/api/webhooks/youpi` (HMAC-SHA256 over the raw body). The
+  `razorpay` dependency and `RAZORPAY_*` env vars are gone; see `.env.example`
+  for the `YOUPI_*` replacements.
+- **Paywall re-enabled.** Every `[PAYWALL DISABLED]` block from the "make
+  everything free" period is restored: ₹50 contact unlock, ₹250 featured boost
+  (no longer trusted from the request body), ₹2000 builder unlock, ₹99 per
+  premium template. Builder and template unlocks remain separate purchases.
+
+### Fixed
+
+- "Contact owner" button never appeared for buyers — it was gated on the very
+  field the server strips before payment. The detail route now returns a
+  `hasOwner` flag instead.
+- Dashboard badge said "Paid" while the FAQ said free; it now shows the fee.
+- Terms omitted the ₹99 template unlock and linked to a `/refunds` page that
+  did not exist. Both fixed; refunds policy added to the footer and sitemap.
+
 ## [0.1.0] - 2026-08-13
 
 First tagged release. Everything below already exists in `main`; this entry

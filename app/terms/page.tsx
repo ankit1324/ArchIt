@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 import { FEES } from "@/lib/fees";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — ArchIt",
+  title: "Terms & Conditions",
   description: "The terms that govern your use of ArchIt.",
 };
 
@@ -81,15 +81,8 @@ export default function TermsPage() {
               4. Paid Features &amp; Payments
             </h2>
             <p className="mt-3">
-              ArchIt offers the following one-time, paid features, processed
-              securely through our payment gateway partner, Razorpay:
-            </p>
-            {/* [PAYWALL DISABLED — free for now] This notice is temporary; the
-                paid-feature list below resumes in full if payments are
-                re-enabled. */}
-            <p className="mt-3">
-              Payments are temporarily disabled — all features listed below are
-              currently provided free of charge.
+              ArchIt offers the following one-time, paid features, paid by
+              UPI through our self-hosted payment gateway:
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
@@ -107,12 +100,19 @@ export default function TermsPage() {
                 {FEES.builder_unlock / 100} one-time, per-account access to
                 the full house-design/builder suite.
               </li>
+              <li>
+                <strong className="text-plum">Template Unlock</strong> — ₹
+                {FEES.template_unlock / 100} one-time, per template, for each
+                premium floor-plan layout in the builder. Indian house layouts
+                are free. Template unlocks are sold separately from the
+                Builder Unlock.
+              </li>
             </ul>
             <p className="mt-3">
               All prices are quoted in Indian Rupees (INR) and are inclusive
-              of applicable taxes unless stated otherwise. Payments are
-              processed by Razorpay in accordance with their own terms; we
-              never store your card, UPI, or bank details. See our{" "}
+              of applicable taxes unless stated otherwise. Payments are made
+              directly from your UPI app to our account; we never store your
+              card, UPI PIN, or bank details. See our{" "}
               <a href="/refunds" className="underline hover:text-plum">
                 Refund &amp; Cancellation Policy
               </a>{" "}
@@ -169,7 +169,7 @@ export default function TermsPage() {
             </h2>
             <p className="mt-3">
               The Services rely on third-party providers, including Clerk
-              (authentication), Razorpay (payments), Supabase (data
+              (authentication), UPI (payments), Supabase (data
               storage), and map/tile providers. We are not responsible for
               outages, errors, or issues arising from these third-party
               services, though we will make reasonable efforts to address

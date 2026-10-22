@@ -1,13 +1,60 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import maplibregl from "maplibre-gl";
+import maplibregl, { type StyleSpecification } from "maplibre-gl";
+// maplibre's own css first so the overrides in map.css win the cascade. Both
+// ride this lazy (ssr:false) chunk, so only /find pays for them.
+import "maplibre-gl/dist/maplibre-gl.css";
+import "./map.css";
 import type { Listing, Poi } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { safeImageUrl } from "@/lib/url";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const CENTER: [number, number] = [76.7794, 30.741];
+
+const SATELLITE_SOURCE: maplibregl.RasterSourceSpecification = {
+  type: "raster",
+  tiles: [
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  ],
+  tileSize: 256,
+  maxzoom: 19,
+  attribution: "Imagery &copy; Esri",
+};
+
+/**
+ * The satellite raster is opaque, so every fill/line layer of the vector
+ * style underneath it would be fetched, tessellated and drawn for nothing.
+ * Keep only `background` (so there is never a transparent canvas before
+ * imagery arrives) and the symbol layers (place/road labels), slot the
+ * imagery directly above `background`, and drop the low-zoom shaded-relief
+ * source that is invisible at city zoom but delays first paint.
+ */
+const transformStyle: maplibregl.TransformStyleFunction = (_prev, next) => {
+  const sources: StyleSpecification["sources"] = { ...next.sources, satellite: SATELLITE_SOURCE };
+  delete sources.ne2_shaded;
+  const layers: maplibregl.LayerSpecification[] = [];
+  for (const layer of next.layers) {
+    if (layer.id === "background") {
+      layers.push(layer, { id: "satellite", type: "raster", source: "satellite" });
+    } else if (layer.type === "symbol") {
+      layers.push(layer);
+    }
+  }
+  // a style without a `background` layer still needs the imagery
+  if (!layers.some((l) => l.id === "satellite")) {
+    layers.unshift({ id: "satellite", type: "raster", source: "satellite" });
+  }
+  return { ...next, sources, layers };
+};
+
+/** small stable hash so a listing's thumbnail choice survives re-sorting */
+function hashOf(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
 const PRISM_COLORS: Record<Listing["type"], string> = {
   rent: "#a06ae8",
@@ -58,15 +105,25 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
   };
 }
 
-function priceMarkerEl(l: Listing, withThumb: boolean): HTMLElement {
+/** what a price marker's inner element depends on; re-rendered when it changes */
+function markerSignature(l: Listing): string {
+  const thumb = l.featured || hashOf(l.id) % 3 === 0 ? safeImageUrl(l.photo) ?? "" : "";
+  return `${formatPrice(l)}|${l.featured ? 1 : 0}|${thumb}|${l.buildingName || l.address}`;
+}
+
+/**
+ * The visual pill. Lives INSIDE the bare root that maplibre positions, so the
+ * hover scale / pulse / transition here never touch the root's inline
+ * `transform` that maplibre rewrites every frame.
+ */
+function priceMarkerInner(l: Listing): HTMLElement {
   const el = document.createElement("div");
-  const thumb = safeImageUrl(l.photo);
-  const showThumb = withThumb && !!thumb;
+  const thumb = l.featured || hashOf(l.id) % 3 === 0 ? safeImageUrl(l.photo) : null;
   el.tabIndex = 0;
   el.setAttribute("role", "button");
   el.setAttribute("aria-label", `${l.buildingName || l.address}, ${formatPrice(l)}`);
-  el.className = `price-marker${showThumb ? "" : " no-thumb"}${l.featured ? " featured" : ""}`;
-  if (showThumb && thumb) {
+  el.className = `price-marker${thumb ? "" : " no-thumb"}${l.featured ? " featured" : ""}`;
+  if (thumb) {
     const img = document.createElement("img");
     img.className = "thumb";
     img.src = thumb;
@@ -81,6 +138,14 @@ function priceMarkerEl(l: Listing, withThumb: boolean): HTMLElement {
   }
   el.appendChild(document.createTextNode(formatPrice(l)));
   return el;
+}
+
+interface MarkerEntry {
+  marker: maplibregl.Marker;
+  root: HTMLElement;
+  inner: HTMLElement;
+  signature: string;
+  coords: [number, number];
 }
 
 function poiMarkerEl(p: Poi): HTMLElement {
@@ -119,13 +184,13 @@ export default function Map3D({
   draftCoords = null,
 }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const markersRef = useRef<Map<string, MarkerEntry>>(new Map());
+  const poiMarkersRef = useRef<maplibregl.Marker[]>([]);
   const draftMarkerRef = useRef<maplibregl.Marker | null>(null);
   const loadedRef = useRef(false);
   const listingsRef = useRef(listings);
   const onSelectRef = useRef(onSelect);
   const onMapClickRef = useRef(onMapClick);
-  const refreshRef = useRef<((m: maplibregl.Map) => void) | null>(null);
 
   // Refreshed after every commit, not during render. The init effect below runs
   // once and reads these from maplibre callbacks, which always fire post-commit.
@@ -139,153 +204,139 @@ export default function Map3D({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    let cancelled = false;
 
-    const refreshMarkers = (m: maplibregl.Map) => {
-      markersRef.current.forEach((mk) => mk.remove());
-      markersRef.current = [];
+    const map = new maplibregl.Map({
+      container,
+      center: CENTER,
+      zoom: 16.6,
+      pitch: 63,
+      bearing: -32,
+      maxPitch: 70,
+      attributionControl: { compact: true },
+    });
+    // `transformStyle` is a setStyle option (not a MapOptions one in this
+    // maplibre version), so the style is attached right after construction
+    map.setStyle(STYLE_URL, { transformStyle });
+    mapRef.current = map;
+    if (process.env.NODE_ENV !== "production") {
+      (window as unknown as { __map?: maplibregl.Map }).__map = map;
+      map.on("error", (e) => console.error("[Map3D]", e.error));
+    }
 
-      listingsRef.current.forEach((l, i) => {
-        const el = priceMarkerEl(l, i % 3 === 0);
-        el.addEventListener("click", (event) => {
-          event.stopPropagation();
-          onSelectRef.current?.(l.id);
-        });
-        el.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelectRef.current?.(l.id);
-          }
-        });
-        markersRef.current.push(
-          new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -18] })
-            .setLngLat(l.coords)
-            .addTo(m),
-        );
+    // POIs are static: build their DOM overlays once and never again. Listing
+    // markers are synced by the effect below (it runs right after this one on
+    // mount, so they also show before any tile arrives).
+    poiMarkersRef.current = pois.map((p) =>
+      new maplibregl.Marker({ element: poiMarkerEl(p), anchor: "center" })
+        .setLngLat(p.coords)
+        .addTo(map),
+    );
+
+    map.on("click", (e) => {
+      onMapClickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
+    });
+
+    map.on("load", () => {
+      // translucent listing prisms
+      map.addSource("listing-prisms", {
+        type: "geojson",
+        data: prismGeoJSON(listingsRef.current),
       });
-      pois.forEach((p) => {
-        markersRef.current.push(
-          new maplibregl.Marker({ element: poiMarkerEl(p), anchor: "center" })
-            .setLngLat(p.coords)
-            .addTo(m),
-        );
+      map.addLayer({
+        id: "listing-prisms",
+        type: "fill-extrusion",
+        source: "listing-prisms",
+        paint: {
+          "fill-extrusion-color": ["get", "color"],
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-opacity": 0.55,
+          "fill-extrusion-vertical-gradient": false,
+        },
       });
-    };
-    refreshRef.current = refreshMarkers;
+      loadedRef.current = true;
 
-    const init = async () => {
-      // fetch the style ourselves so we can drop the low-zoom shaded-relief
-      // raster source: it is invisible at city zoom but delays first paint
-      let style: string | maplibregl.StyleSpecification = STYLE_URL;
-      try {
-        const res = await fetch(STYLE_URL);
-        const json = (await res.json()) as maplibregl.StyleSpecification;
-        delete json.sources.ne2_shaded;
-        json.layers = json.layers.filter(
-          (l) => !("source" in l) || l.source !== "ne2_shaded",
-        );
-        style = json;
-      } catch {
-        // fall back to the style URL; maplibre will fetch it itself
-      }
-      if (cancelled) return;
-
-      const map = new maplibregl.Map({
-        container,
-        style,
+      // cinematic settle, mirroring the video intro
+      map.flyTo({
         center: CENTER,
-        zoom: 16.6,
-        pitch: 63,
-        bearing: -32,
-        maxPitch: 70,
-        attributionControl: { compact: true },
+        zoom: 15.35,
+        pitch: 58,
+        bearing: -17,
+        duration: 4200,
+        essential: false,
       });
-      mapRef.current = map;
-      if (process.env.NODE_ENV !== "production") {
-        (window as unknown as { __map?: maplibregl.Map }).__map = map;
-        map.on("error", (e) => console.error("[Map3D]", e.error));
-      }
+    });
 
-      // markers are DOM overlays — show them immediately, before tiles arrive
-      refreshMarkers(map);
-
-      map.on("click", (e) => {
-        onMapClickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
-      });
-
-      map.on("load", () => {
-        // satellite imagery basemap, inserted below the first symbol layer
-        // so place/road labels stay readable on top of it
-        const firstSymbolId = map
-          .getStyle()
-          .layers.find((l) => l.type === "symbol")?.id;
-        map.addSource("satellite", {
-          type: "raster",
-          tiles: [
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-          ],
-          tileSize: 256,
-          maxzoom: 19,
-          attribution: "Imagery &copy; Esri",
-        });
-        map.addLayer(
-          { id: "satellite", type: "raster", source: "satellite" },
-          firstSymbolId,
-        );
-
-        // translucent listing prisms
-        map.addSource("listing-prisms", {
-          type: "geojson",
-          data: prismGeoJSON(listingsRef.current),
-        });
-        map.addLayer({
-          id: "listing-prisms",
-          type: "fill-extrusion",
-          source: "listing-prisms",
-          paint: {
-            "fill-extrusion-color": ["get", "color"],
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-opacity": 0.55,
-            "fill-extrusion-vertical-gradient": false,
-          },
-        });
-
-        loadedRef.current = true;
-        refreshMarkers(map);
-
-        // cinematic settle, mirroring the video intro
-        map.flyTo({
-          center: CENTER,
-          zoom: 15.35,
-          pitch: 58,
-          bearing: -17,
-          duration: 4200,
-          essential: false,
-        });
-      });
-    };
-    init();
-
+    const entries = markersRef.current;
+    const poiMarkers = poiMarkersRef.current;
     return () => {
-      cancelled = true;
-      markersRef.current.forEach((mk) => mk.remove());
-      markersRef.current = [];
+      entries.forEach((entry) => entry.marker.remove());
+      entries.clear();
+      poiMarkers.forEach((mk) => mk.remove());
+      poiMarkersRef.current = [];
       draftMarkerRef.current?.remove();
       draftMarkerRef.current = null;
-      mapRef.current?.remove();
+      map.remove();
       mapRef.current = null;
       loadedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // react to filtered listings
+  // react to filtered listings: diff the marker set instead of rebuilding it
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !loadedRef.current) return;
-    const src = map.getSource("listing-prisms") as maplibregl.GeoJSONSource | undefined;
-    src?.setData(prismGeoJSON(listings));
-    refreshRef.current?.(map);
+    if (!map) return;
+
+    const entries = markersRef.current;
+    const seen = new Set<string>();
+    for (const l of listings) {
+      seen.add(l.id);
+      const signature = markerSignature(l);
+      const existing = entries.get(l.id);
+      if (existing) {
+        if (existing.signature !== signature) {
+          const inner = priceMarkerInner(l);
+          existing.root.replaceChild(inner, existing.inner);
+          existing.inner = inner;
+          existing.signature = signature;
+        }
+        if (existing.coords[0] !== l.coords[0] || existing.coords[1] !== l.coords[1]) {
+          existing.coords = l.coords;
+          existing.marker.setLngLat(l.coords);
+        }
+        continue;
+      }
+      // bare root: maplibre owns its inline transform; no css of our own on it
+      const root = document.createElement("div");
+      const inner = priceMarkerInner(l);
+      root.appendChild(inner);
+      const id = l.id;
+      root.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onSelectRef.current?.(id);
+      });
+      root.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelectRef.current?.(id);
+        }
+      });
+      const marker = new maplibregl.Marker({ element: root, anchor: "bottom", offset: [0, -18] })
+        .setLngLat(l.coords)
+        .addTo(map);
+      entries.set(id, { marker, root, inner, signature, coords: l.coords });
+    }
+    for (const [id, entry] of entries) {
+      if (!seen.has(id)) {
+        entry.marker.remove();
+        entries.delete(id);
+      }
+    }
+
+    if (loadedRef.current) {
+      const src = map.getSource("listing-prisms") as maplibregl.GeoJSONSource | undefined;
+      src?.setData(prismGeoJSON(listings));
+    }
   }, [listings, mapRef]);
 
   // crosshair while picking a location

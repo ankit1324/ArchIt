@@ -1,12 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
-import type { Design } from "@/lib/types";
+import { parseJsonBody } from "@/lib/request";
+import { safeImageUrl } from "@/lib/url";
+import { MAX_DESIGN_BYTES, validateDesign } from "@/lib/validators";
 
 // Updates/deletes are owner-only — the user_id filter makes other users' ids a 404.
-// [PAYWALL DISABLED — free for now] These routes also used to require the paid
-// builder_unlock; the ledger check is commented out so designs are free.
-// Restore the calls to re-enable the paywall.
+// Like the collection route, these require the paid builder_unlock.
 
 export async function PUT(
   request: Request,
@@ -14,22 +14,14 @@ export async function PUT(
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  // [PAYWALL DISABLED — free for now]
-  // const locked = await builderUnlockError(userId);
-  // if (locked) return locked;
+  const locked = await builderUnlockError(userId);
+  if (locked) return locked;
   const { id } = await params;
-  const d = (await request.json()) as Omit<Design, "id">;
-  if (
-    !d.plotCenter ||
-    d.design?.v !== 3 ||
-    !(d.design.state.floors?.some((f) => f.blocks.length) ??
-      d.design.state.blocks?.length)
-  ) {
-    return Response.json(
-      { error: "plotCenter and a non-empty v3 design required" },
-      { status: 400 },
-    );
-  }
+  // designs carry the full block list; allow the 1 MB design cap plus envelope
+  const d = await parseJsonBody(request, (v) => validateDesign(v, safeImageUrl), {
+    maxBytes: MAX_DESIGN_BYTES + 64 * 1024,
+  });
+  if (d instanceof Response) return d;
   const { data, error } = await db
     .from("designs")
     .update(designToRow(d))
@@ -51,9 +43,8 @@ export async function DELETE(
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  // [PAYWALL DISABLED — free for now]
-  // const locked = await builderUnlockError(userId);
-  // if (locked) return locked;
+  const locked = await builderUnlockError(userId);
+  if (locked) return locked;
   const { id } = await params;
   const { count, error } = await db
     .from("designs")

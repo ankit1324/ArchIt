@@ -13,10 +13,10 @@ export default function NotFound() {
           or never existed.
         </p>
         <Link
-          href="/find"
+          href="/"
           className="mt-6 inline-block w-full rounded-full bg-plum py-2.5 text-[13px] font-bold text-cream transition-opacity hover:opacity-90"
         >
-          Go to the map
+          Back to home
         </Link>
       </div>
     </div>

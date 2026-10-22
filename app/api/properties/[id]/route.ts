@@ -1,148 +1,95 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
-import type { Listing } from "@/lib/types";
-import { safeImageUrl } from "@/lib/url";
+import { hasPurchase, type EntitlementResult } from "@/lib/entitlements";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
+import { parseJsonBody } from "@/lib/request";
+import { safeImageUrl, storageObjectName } from "@/lib/url";
+import { validateListing } from "@/lib/validators";
 
 /**
- * Public detail. The owner contact field used to be paywalled (#3): it was
- * only included for the lister themself or after a verified contact_owner
- * purchase for this listing.
- *
- * [PAYWALL DISABLED — free for now] Everyone gets the owner contact.
- * Restore the purchase check below to re-enable the paywall (plus the
- * "Contact owner" button in components/PropertyDetailPanel.tsx).
+ * Public detail. The owner contact field is paywalled (#3): it is only
+ * included for the lister themself or after a verified contact_owner
+ * purchase (₹50) for this listing.
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // session identity drives the `mine` flag (and, when restored, the
-  // owner-contact paid gate below)
+  // session identity drives the `mine` flag and the owner-contact paid gate
   const { userId } = await auth();
   const { id } = await params;
   // explicit column list (never select("*")): keeps `owner` under the gate
-  // below and derives `mine` from user_id without ever returning it raw
-  const { data, error } = await db
-    .from("properties")
-    .select(`${OWNED_COLUMNS}, owner`)
-    .eq("id", id)
-    .maybeSingle<PropertyRow>();
+  // below and derives `mine` from user_id without ever returning it raw.
+  // The ledger check runs alongside the select; it is only consulted when
+  // the caller turns out not to be the lister.
+  const [{ data, error }, purchase] = await Promise.all([
+    db
+      .from("properties")
+      .select(`${OWNED_COLUMNS}, owner`)
+      .eq("id", id)
+      .maybeSingle<PropertyRow>(),
+    userId
+      ? hasPurchase(userId, "contact_owner", id)
+      : Promise.resolve<EntitlementResult>({ ok: true, granted: false }),
+  ]);
   if (error) {
     console.error(`GET /api/properties/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
 
-  // [PAYWALL DISABLED — free for now] owner contact is included for everyone
-  // (was `let` while the paid gate below could reassign it)
-  const includeOwner = true;
-  // --- original paid gate (restore to re-enable the paywall) ---
-  // if (userId) {
-  //   if (data.user_id === userId) {
-  //     includeOwner = true;
-  //   } else {
-  //     const { count, error: purchaseError } = await db
-  //       .from("purchases")
-  //       .select("*", { count: "exact", head: true })
-  //       .eq("user_id", userId)
-  //       .eq("purpose", "contact_owner")
-  //       .eq("ref", id);
-  //     if (purchaseError) {
-  //       console.error(`contact purchase check failed for ${id}:`, purchaseError.message);
-  //       return Response.json({ error: "internal error" }, { status: 500 });
-  //     }
-  //     includeOwner = Boolean(count);
-  //   }
-  // }
+  let includeOwner = false;
+  if (userId) {
+    if (data.user_id === userId) {
+      includeOwner = true;
+    } else {
+      // fail closed with a 500 rather than silently denying a paid user
+      if (!purchase.ok) {
+        return Response.json({ error: purchase.error }, { status: 500 });
+      }
+      includeOwner = purchase.granted;
+    }
+  }
 
   const listing = rowToListing(data);
   listing.mine = ownsRow(data, userId);
+  // tells the panel whether there is anything to unlock, without leaking it
+  listing.hasOwner = Boolean(data.owner);
   if (!includeOwner || !listing.owner) delete listing.owner;
   return Response.json(listing);
 }
 
 /**
- * Only the authenticated lister may edit or delete. Row existence returns 404
- * regardless. Returns null when allowed, or a Response error.
+ * Only the authenticated lister may edit. The update is scoped to
+ * `user_id = session user`, so another user's listing (or a missing one) is a
+ * 404 — no pre-select, no ownership oracle.
  */
-async function ownershipError(id: string): Promise<Response | null> {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const { data, error } = await db
-    .from("properties")
-    .select("user_id")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) {
-    console.error(`ownership check failed for property ${id}:`, error.message);
-    return Response.json({ error: "internal error" }, { status: 500 });
-  }
-  if (!data) return Response.json({ error: "not found" }, { status: 404 });
-  if (data.user_id !== userId) {
-    return Response.json(
-      { error: "only the lister can change this property" },
-      { status: 403 },
-    );
-  }
-  return null;
-}
-
-/*
- * [PAYWALL DISABLED — free for now] Unused while featuring is free (PUT reads
- * the flag from the request body). Restore this ledger lookup together with
- * the paywall in app/find/page.tsx and lib/purchases.ts applyEntitlement.
- *
- * async function resolveFeatured(
- *   id: string,
- *   userId: string,
- * ): Promise<{ ok: true; featured: boolean } | { ok: false; response: Response }> {
- *   const { count, error } = await db
- *     .from("purchases")
- *     .select("*", { count: "exact", head: true })
- *     .eq("user_id", userId)
- *     .eq("purpose", "featured_property")
- *     .eq("ref", id);
- *   if (error) {
- *     console.error(`featured purchase check failed for ${id}:`, error.message);
- *     return {
- *       ok: false,
- *       response: Response.json({ error: "internal error" }, { status: 500 }),
- *     };
- *   }
- *   return { ok: true, featured: Boolean(count) };
- * }
- */
-
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const denied = await ownershipError(id);
-  if (denied) return denied;
-
   const { userId } = await auth();
-  if (!(await checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000))) {
-    return rateLimitedResponse();
-  }
-  const l = (await request.json()) as Omit<Listing, "id">;
-  if (
-    (l.photo && !safeImageUrl(l.photo)) ||
-    (l.photos && l.photos.some((p) => !safeImageUrl(p)))
-  ) {
-    return Response.json({ error: "invalid photo url" }, { status: 400 });
-  }
-  // ownershipError() above already proved userId is the lister
-  // [PAYWALL DISABLED — free for now] the featured flag comes straight from the
-  // request body; restore the resolveFeatured() ledger lookup to re-gate it
-  const featured = l.featured === true;
+  if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const { id } = await params;
+
+  const l = await parseJsonBody(request, (v) => validateListing(v, safeImageUrl));
+  if (l instanceof Response) return l;
+
+  // The featured flag is never taken from the body: it is whatever the ledger
+  // says, so an edit can neither self-feature nor accidentally drop a paid boost.
+  const [allowed, boost] = await Promise.all([
+    checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000),
+    hasPurchase(userId, "featured_property", id),
+  ]);
+  if (!allowed) return rateLimitedResponse();
+  if (!boost.ok) return Response.json({ error: boost.error }, { status: 500 });
 
   const { data, error } = await db
     .from("properties")
-    .update({ ...listingToRow(l), featured })
+    .update({ ...listingToRow(l), featured: boost.granted })
     .eq("id", id)
+    .eq("user_id", userId)
     .select(OWNED_COLUMNS)
     .maybeSingle();
   if (error) {
@@ -150,26 +97,61 @@ export async function PUT(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
-  // ownershipError() above already proved the caller is the lister
+  // the user_id filter above proved the caller is the lister
   return Response.json({ ...rowToListing(data), owner: l.owner ?? undefined, mine: true });
+}
+
+/** Best-effort removal of a listing's uploaded photos. Never fails the request. */
+async function removePhotos(id: string, photos: unknown): Promise<void> {
+  if (!Array.isArray(photos)) return;
+  const names = photos
+    .filter((p): p is string => typeof p === "string")
+    .map((p) => storageObjectName(p, "photos"))
+    .filter((n): n is string => n !== null);
+  if (names.length === 0) return;
+  try {
+    const { error } = await db.storage.from("photos").remove(names);
+    if (error) {
+      console.warn(`DELETE /api/properties/${id}: photo cleanup failed:`, error.message);
+    }
+  } catch (e) {
+    console.warn(`DELETE /api/properties/${id}: photo cleanup threw:`, e);
+  }
 }
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
-  const denied = await ownershipError(id);
-  if (denied) return denied;
+
+  // Grab the photo URLs first (scoped to the lister) so the objects can be
+  // dropped after the row is; a missing row short-circuits to 404 below.
+  const { data: existing, error: selectError } = await db
+    .from("properties")
+    .select("photos")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle<{ photos: string[] | null }>();
+  if (selectError) {
+    console.error(`DELETE /api/properties/${id} lookup failed:`, selectError.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
+  if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   const { count, error } = await db
     .from("properties")
     .delete({ count: "exact" })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     console.error(`DELETE /api/properties/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!count) return Response.json({ error: "not found" }, { status: 404 });
+
+  await removePhotos(id, existing.photos);
   return new Response(null, { status: 204 });
 }

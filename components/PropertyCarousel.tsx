@@ -37,7 +37,7 @@ export default function PropertyCarousel({
        only the cards are interactive */
     <div className="no-scrollbar pointer-events-none flex snap-x gap-3 overflow-x-auto pb-1">
       {listings.map((l) => (
-        <PropertyCard key={l.id} listing={l} selected={selectedId === l.id} onClick={() => onSelect(l.id)} />
+        <PropertyCard key={l.id} listing={l} selected={selectedId === l.id} onSelect={onSelect} />
       ))}
     </div>
   );

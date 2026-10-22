@@ -18,7 +18,16 @@ const isProtected = createRouteMatcher([
 const isDev = process.env.NODE_ENV === "development";
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtected(req)) await auth.protect();
+  if (isProtected(req)) {
+    const { userId, redirectToSignIn } = await auth();
+    if (!userId) {
+      // APIs answer 401 JSON (auth.protect() would 404 them); pages redirect.
+      if (req.nextUrl.pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return redirectToSignIn({ returnBackUrl: req.url });
+    }
+  }
 
   // Per-request nonce so the CSP can drop 'unsafe-inline' from script-src.
   // Next.js parses the nonce out of the request's Content-Security-Policy header
