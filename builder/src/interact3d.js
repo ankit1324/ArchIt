@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {blockGroups, doorPlacement, updateSelection} from './house3d.js';
 import {C} from './catalog.js';
 import {chips, ov, stage, toast} from './dom.js';
-import {commit, footprint, getBlock, localToWorld, newRoom, redoStack, sel, selBlock, selDoor, selFurn, setSel, snapshot, state, ui, undoStack} from './state.js';
+import {commit, footprint, getBlock, localToWorld, newRoom, redoStack, sel, selBlock, selDoor, selFurn, setDirty, setSel, snapshot, state, ui, undoStack} from './state.js';
 import {clampFurn, nearestWallT, overlaps, sharedWall, snapBlock, worldToLocal} from './geometry.js';
 import {blocksRoot, camera, canvas, controls, renderer, requestRender, requestShadows, selOutline} from './scene.js';
 import {render2D} from './plan2d.js';
@@ -198,16 +198,16 @@ canvas.addEventListener('pointerup', e=>{
           d3.b.cx = d3.sx; d3.b.cz = d3.sz;
           toast('Rooms can’t overlap');
         } else if(d3.b.cx!==d3.sx || d3.b.cz!==d3.sz){
-          undoStack.push(d3.snap); redoStack.length = 0;
+          undoStack.push(d3.snap); redoStack.length = 0; setDirty(true);
         }
       } else if(d3.kind==='furn'){
-        if(d3.f.lx!==d3.x0 || d3.f.lz!==d3.z0){ undoStack.push(d3.snap); redoStack.length = 0; }
+        if(d3.f.lx!==d3.x0 || d3.f.lz!==d3.z0){ undoStack.push(d3.snap); redoStack.length = 0; setDirty(true); }
       } else if(d3.kind==='door' && (d3.d.wall!==d3.w0 || Math.abs(d3.d.t-d3.t0)>0.005)){
         const nowShared = !!sharedWall(d3.b, d3.d.wall);
         const wasExt = d3.d.type.startsWith('ext');
         if(nowShared && wasExt) d3.d.type = 'int_hard';
         if(!nowShared && !wasExt) d3.d.type = 'ext_hard';
-        undoStack.push(d3.snap); redoStack.length = 0;
+        undoStack.push(d3.snap); redoStack.length = 0; setDirty(true);
       }
       renderAll();
       return;

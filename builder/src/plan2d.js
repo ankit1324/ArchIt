@@ -1,7 +1,7 @@
 import './walk.js';
 import {C} from './catalog.js';
 import {$, chips, escapeMarkup, ov, round1, stage, toast} from './dom.js';
-import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
+import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setDirty, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
 import {boundsOf, clampFurn, nearestWallT, overlaps, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
 import {renderAll, renderSelection} from './ui.js';
@@ -48,77 +48,7 @@ function render2D(){
     });
   }
 
-  blks.forEach(b=>{
-    const seld = sel && sel.blockId===b.id && sel.kind==='block';
-    const col = seld ? '#e5476f' : '#1d5bb4';
-    const [w,d] = footprint(b);
-    const spec = C.rooms[b.type];
-    const [x0,y0] = P(b.cx-w/2, b.cz-d/2, ox,oy);
-    const W2 = w*S, D2 = d*S;
-    s += `<g class="blk" data-id="${b.id}" style="cursor:pointer">`;
-    s += `<rect x="${x0}" y="${y0}" width="${W2}" height="${D2}" fill="${b.floorCol ? tint(C.floorCol[b.floorCol].hex, .45) : spec.fill}"${drag2 ? '' : ' filter="url(#soft)"'}/>`;
-    // walls with door gaps
-    s += wallLines2D(b, ox, oy, col);
-    // windows
-    b.windows.forEach(wd=>{
-      const seg = openSeg2D(b, wd.wall, wd.t, wd.kind==='pano' ? 2.2 : 1.2, ox, oy);
-      s += `<g data-win="${wd.id}" data-blk="${b.id}" style="cursor:grab">
-            <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#9cc3ea" stroke-width="7" stroke-linecap="butt"/>
-            <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#ffffff" stroke-width="2.5"/>
-            <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="transparent" stroke-width="16"/>
-            </g>`;
-    });
-    // partitions
-    b.partitions.forEach(p=>{
-      const [ax,az] = localToWorld(b,(p.t-.5)*b.len,-b.w/2+0.05);
-      const [bx,bz] = localToWorld(b,(p.t-.5)*b.len, b.w/2-0.05);
-      const [px1,py1]=P(ax,az,ox,oy),[px2,py2]=P(bx,bz,ox,oy);
-      s += `<g data-part="${p.id}" data-blk="${b.id}" style="cursor:grab">
-            <line x1="${px1}" y1="${py1}" x2="${px2}" y2="${py2}" stroke="${col}" stroke-width="2.5"/>
-            <line x1="${px1}" y1="${py1}" x2="${px2}" y2="${py2}" stroke="transparent" stroke-width="16"/>
-            </g>`;
-    });
-    // furniture symbols
-    b.furniture.forEach(f=>{
-      const s2 = C.furniture[f.key];
-      const [fw, fd] = f.rot%2 ? [s2.d, s2.w] : [s2.w, s2.d];
-      const pts = [[-fw/2,-fd/2],[fw/2,-fd/2],[fw/2,fd/2],[-fw/2,fd/2]].map(([px,pz])=>{
-        const [ax,az] = localToWorld(b, f.lx+px, f.lz+pz);
-        return P(ax, az, ox, oy).join(',');
-      }).join(' ');
-      const selF = sel && sel.kind==='furn' && sel.furnId===f.id;
-      s += `<g data-furn="${f.id}" data-blk="${b.id}" style="cursor:grab">
-        <polygon points="${pts}" fill="rgba(255,255,255,.55)" stroke="${selF?'#e5476f':'#8b96ab'}" stroke-width="1.6"/>
-        </g>`;
-    });
-    // doors (gap + swing)
-    b.doors.forEach(dd=>{ s += door2D(b, dd, ox, oy, sel&&sel.kind==='door'&&sel.doorId===dd.id ? '#e5476f' : col); });
-    // Quiet, bounded labels keep the plan readable at whole-house zoom.
-    const [ncx,ncy] = P(b.cx, b.cz, ox, oy);
-    const fullName = b.name || spec.name;
-    const labelSize = Math.min(12, Math.max(8, W2/12));
-    const maxChars = Math.max(4, Math.floor((W2-12)/(labelSize*.65)));
-    const label = fullName.length>maxChars ? fullName.slice(0,maxChars-1)+'…' : fullName;
-    const showDims = W2>85 && D2>55;
-    s += `<g pointer-events="none"><title>${escapeMarkup(fullName)}</title>
-      <rect x="${x0+5}" y="${ncy-12}" width="${Math.max(0,W2-10)}" height="${showDims?34:23}" rx="4" fill="#fff" fill-opacity=".82"/>
-      <text x="${ncx}" y="${ncy+3}" text-anchor="middle" style="font-size:${labelSize}px;font-weight:700;fill:#394b51">${escapeMarkup(label)}</text>`;
-    if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#62747c">${round1(b.len)} × ${round1(b.w)} m</text>`;
-    s += '</g>';
-    if(seld){
-      // side dimension pills + corner handles
-      s += chip2D(x0+W2/2-24, y0-9, `${round1(b.rot%2? b.w : b.len)} m`, '#e5476f');
-      s += chip2D(x0-14, y0+D2/2-9, `${round1(b.rot%2? b.len : b.w)} m`, '#e5476f', true);
-      [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
-       [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
-        const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
-        s += `<g data-hdl data-sx="${sx}" data-sz="${sz}" data-blk="${b.id}" style="cursor:${cur}">
-          <rect x="${hx-11}" y="${hy-11}" width="22" height="22" fill="transparent"/>
-          <rect x="${hx-4}" y="${hy-4}" width="8" height="8" rx="2" fill="#fff" stroke="#e5476f" stroke-width="2"/></g>`;
-      });
-    }
-    s += `</g>`;
-  });
+  blks.forEach(b=>{ s += blockSvg(b, ox, oy); });
   planSvg.innerHTML = s;
 
   // hotspots (+) around blocks — html overlay (hidden in interior focus mode)
@@ -145,6 +75,89 @@ function render2D(){
   } else chips.style.display='none';
 
   planSvg.onclick = ()=>{ if(justDragged2) return; setSel(null); renderSelection(); };
+}
+
+// One room's plan: floor, walls, openings, furniture, label and (when selected)
+// its resize handles — everything that moves with it, in one <g class="blk">.
+function blockSvg(b, ox, oy){
+  const seld = sel && sel.blockId===b.id && sel.kind==='block';
+  const col = seld ? '#e5476f' : '#1d5bb4';
+  const [w,d] = footprint(b);
+  const spec = C.rooms[b.type];
+  const [x0,y0] = P(b.cx-w/2, b.cz-d/2, ox,oy);
+  const W2 = w*S, D2 = d*S;
+  let s = `<g class="blk" data-id="${b.id}" style="cursor:pointer">`;
+  s += `<rect x="${x0}" y="${y0}" width="${W2}" height="${D2}" fill="${b.floorCol ? tint(C.floorCol[b.floorCol].hex, .45) : spec.fill}"${drag2 ? '' : ' filter="url(#soft)"'}/>`;
+  // walls with door gaps
+  s += wallLines2D(b, ox, oy, col);
+  // windows
+  b.windows.forEach(wd=>{
+    const seg = openSeg2D(b, wd.wall, wd.t, wd.kind==='pano' ? 2.2 : 1.2, ox, oy);
+    s += `<g data-win="${wd.id}" data-blk="${b.id}" style="cursor:grab">
+          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#9cc3ea" stroke-width="7" stroke-linecap="butt"/>
+          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#ffffff" stroke-width="2.5"/>
+          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="transparent" stroke-width="16"/>
+          </g>`;
+  });
+  // partitions
+  b.partitions.forEach(p=>{
+    const [ax,az] = localToWorld(b,(p.t-.5)*b.len,-b.w/2+0.05);
+    const [bx,bz] = localToWorld(b,(p.t-.5)*b.len, b.w/2-0.05);
+    const [px1,py1]=P(ax,az,ox,oy),[px2,py2]=P(bx,bz,ox,oy);
+    s += `<g data-part="${p.id}" data-blk="${b.id}" style="cursor:grab">
+          <line x1="${px1}" y1="${py1}" x2="${px2}" y2="${py2}" stroke="${col}" stroke-width="2.5"/>
+          <line x1="${px1}" y1="${py1}" x2="${px2}" y2="${py2}" stroke="transparent" stroke-width="16"/>
+          </g>`;
+  });
+  // furniture symbols
+  b.furniture.forEach(f=>{
+    const s2 = C.furniture[f.key];
+    const [fw, fd] = f.rot%2 ? [s2.d, s2.w] : [s2.w, s2.d];
+    const pts = [[-fw/2,-fd/2],[fw/2,-fd/2],[fw/2,fd/2],[-fw/2,fd/2]].map(([px,pz])=>{
+      const [ax,az] = localToWorld(b, f.lx+px, f.lz+pz);
+      return P(ax, az, ox, oy).join(',');
+    }).join(' ');
+    const selF = sel && sel.kind==='furn' && sel.furnId===f.id;
+    s += `<g data-furn="${f.id}" data-blk="${b.id}" style="cursor:grab">
+      <polygon points="${pts}" fill="rgba(255,255,255,.55)" stroke="${selF?'#e5476f':'#8b96ab'}" stroke-width="1.6"/>
+      </g>`;
+  });
+  // doors (gap + swing)
+  b.doors.forEach(dd=>{ s += door2D(b, dd, ox, oy, sel&&sel.kind==='door'&&sel.doorId===dd.id ? '#e5476f' : col); });
+  // Quiet, bounded labels keep the plan readable at whole-house zoom.
+  const [ncx,ncy] = P(b.cx, b.cz, ox, oy);
+  const fullName = b.name || spec.name;
+  const labelSize = Math.min(12, Math.max(8, W2/12));
+  const maxChars = Math.max(4, Math.floor((W2-12)/(labelSize*.65)));
+  const label = fullName.length>maxChars ? fullName.slice(0,maxChars-1)+'…' : fullName;
+  const showDims = W2>85 && D2>55;
+  s += `<g pointer-events="none"><title>${escapeMarkup(fullName)}</title>
+    <rect x="${x0+5}" y="${ncy-12}" width="${Math.max(0,W2-10)}" height="${showDims?34:23}" rx="4" fill="#fff" fill-opacity=".82"/>
+    <text x="${ncx}" y="${ncy+3}" text-anchor="middle" style="font-size:${labelSize}px;font-weight:700;fill:#394b51">${escapeMarkup(label)}</text>`;
+  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#62747c">${round1(b.len)} × ${round1(b.w)} m</text>`;
+  s += '</g>';
+  if(seld){
+    // side dimension pills + corner handles
+    s += chip2D(x0+W2/2-24, y0-9, `${round1(b.rot%2? b.w : b.len)} m`, '#e5476f');
+    s += chip2D(x0-14, y0+D2/2-9, `${round1(b.rot%2? b.len : b.w)} m`, '#e5476f', true);
+    [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
+     [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
+      const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
+      s += `<g data-hdl data-sx="${sx}" data-sz="${sz}" data-blk="${b.id}" style="cursor:${cur}">
+        <rect x="${hx-11}" y="${hy-11}" width="22" height="22" fill="transparent"/>
+        <rect x="${hx-4}" y="${hy-4}" width="8" height="8" rx="2" fill="#fff" stroke="#e5476f" stroke-width="2"/></g>`;
+    });
+  }
+  return s + `</g>`;
+}
+// Swap just this room's <g> for a fresh one. Dragging a door, window, partition,
+// piece of furniture or a resize handle changes one room, so pointermove redraws
+// that room instead of re-serialising the whole plan.
+function redrawBlock2D(b){
+  const old = planSvg.querySelector(`.blk[data-id="${b.id}"]`);
+  if(!old){ render2D(); return; }
+  old.insertAdjacentHTML('afterend', blockSvg(b, planOff.ox, planOff.oy));
+  old.remove();
 }
 
 /* -------- 2D dragging -------- */
@@ -195,6 +208,12 @@ planSvg.addEventListener('pointermove', e=>{
   if(!drag2) return;
   const dx = e.clientX-drag2.x0, dy = e.clientY-drag2.y0;
   if(!drag2.moved && dx*dx+dy*dy < 16) return;
+  if(!drag2.moved){
+    // hotspots and chips are placed for the old layout: hide them until drop
+    ov.style.visibility = 'hidden'; chips.style.display = 'none';
+    drag2.el = planSvg.querySelector(`.blk[data-id="${drag2.b.id}"]`);
+    drag2.el?.querySelector('rect')?.removeAttribute('filter');
+  }
   drag2.moved = true;
   const r = stage.getBoundingClientRect();
   const wx = (e.clientX-r.left-drag2.ox)/S, wz = (e.clientY-r.top-drag2.oy)/S;
@@ -202,6 +221,9 @@ planSvg.addEventListener('pointermove', e=>{
     const b = drag2.b;
     const [cx,cz] = snapBlock(b, wx-drag2.offX, wz-drag2.offZ);
     b.cx = cx; b.cz = cz;
+    // a move is rigid: shift the room's existing <g> instead of redrawing it
+    drag2.el?.setAttribute('transform', `translate(${(cx-drag2.sx)*S} ${(cz-drag2.sz)*S})`);
+    return;
   } else if(drag2.kind==='resize'){
     const b = drag2.b, mn = C.roomMin, mx = C.roomMax;
     let L = drag2.L0, R = drag2.R0, T = drag2.T0, B = drag2.B0;
@@ -228,9 +250,9 @@ planSvg.addEventListener('pointermove', e=>{
     const cand = nearestWallT(b, lx, lz, drag2.kind==='door' ? o.w : 1.2);
     o.wall = cand.wall; o.t = cand.t;
   }
-  render2D();
+  redrawBlock2D(drag2.b);
 });
-planSvg.addEventListener('pointercancel', ()=>{ if(drag2){ drag2 = null; renderAll(); } });
+planSvg.addEventListener('pointercancel', ()=>{ if(drag2){ drag2 = null; ov.style.visibility = ''; renderAll(); } });
 planSvg.addEventListener('pointerup', ()=>{
   if(!drag2) return;
   const d2 = drag2;
@@ -248,6 +270,7 @@ planSvg.addEventListener('pointerup', ()=>{
   }
   if(d2.moved){
     justDragged2 = true; setTimeout(()=>justDragged2 = false, 0);
+    ov.style.visibility = '';
     let changed = true;
     if(d2.kind==='block'){
       const [w,d] = footprint(d2.b);
@@ -276,7 +299,7 @@ planSvg.addEventListener('pointerup', ()=>{
       if(nowShared && wasExt) d2.o.type = 'int_hard';
       if(!nowShared && !wasExt) d2.o.type = 'ext_hard';
     }
-    if(changed){ undoStack.push(d2.snap); redoStack.length = 0; }
+    if(changed){ undoStack.push(d2.snap); redoStack.length = 0; setDirty(true); }
     renderAll();
   }
 });
