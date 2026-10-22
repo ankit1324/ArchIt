@@ -12,5 +12,14 @@ export const metadata: Metadata = {
 export default function FindLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return children;
+  return (
+    <>
+      {/* React hoists <link> into <head>: warm the TLS handshakes for the
+          vector style/tiles and the satellite imagery while the map chunk
+          is still downloading */}
+      <link rel="preconnect" href="https://tiles.openfreemap.org" crossOrigin="" />
+      <link rel="preconnect" href="https://server.arcgisonline.com" crossOrigin="" />
+      {children}
+    </>
+  );
 }

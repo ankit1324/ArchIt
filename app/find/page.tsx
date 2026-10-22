@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import type { Filters, Listing } from "@/lib/types";
@@ -12,13 +12,12 @@ import FilterSidebar from "@/components/FilterSidebar";
 import SearchBar from "@/components/SearchBar";
 import MapControls from "@/components/MapControls";
 import PropertyCarousel from "@/components/PropertyCarousel";
-import PropertyDetailPanel from "@/components/PropertyDetailPanel";
+import PropertyDetailPanel, { invalidateListing } from "@/components/PropertyDetailPanel";
 import AddPropertyForm, {
   type PropertyDraft,
 } from "@/components/AddPropertyForm";
-// [PAYWALL DISABLED — free for now]
-// import { payFee } from "@/lib/checkout";
-import { celebrate } from "@/components/Celebration";
+import { payFee } from "@/lib/checkout";
+import { celebrate, notify } from "@/components/Celebration";
 
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
@@ -43,7 +42,8 @@ export default function Home() {
   const [geocoding, setGeocoding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const geocodeSeq = useRef(0);
+  const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geocodeAbort = useRef<AbortController | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
 
   useEffect(() => {
@@ -68,13 +68,24 @@ export default function Home() {
     () => findListings(listings, filters, query, sort),
     [filters, listings, query, sort],
   );
+  // The map (marker diff + prism geojson) and the card strip are the heavy
+  // consumers; feeding them a deferred copy keeps slider drags and typing
+  // responsive — the inputs commit at high priority, these catch up after.
+  const deferredFiltered = useDeferredValue(filtered);
+  // histogram distribution: all listings of the chosen type, independent of
+  // the other filters; memoised so FilterSidebar/PriceHistogram don't recompute
+  // their bars on every unrelated render
+  const histogramListings = useMemo(
+    () => (filters.type ? listings.filter((l) => l.type === filters.type) : listings),
+    [filters.type, listings],
+  );
 
-  const resetSearch = () => {
+  const resetSearch = useCallback(() => {
     setFilters(DEFAULT_FILTERS);
     setQuery("");
-  };
+  }, []);
 
-  const showResults = () => {
+  const showResults = useCallback(() => {
     const map = mapRef.current;
     if (!map || !filtered.length) return;
     const height = map.getContainer().clientHeight;
@@ -84,18 +95,19 @@ export default function Home() {
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
       { padding: { top: Math.min(140, height * 0.2), bottom: Math.min(260, height * 0.4), left: window.innerWidth >= 1024 ? 300 : 40, right: 60 }, maxZoom: 16, duration: 1000 },
     );
-  };
+  }, [filtered]);
 
   const selected = filtered.find((l) => l.id === selectedId) ?? null;
   const editing = listings.find((l) => l.id === editingId) ?? null;
 
-  const flyToListing = (id: string) => {
+  // stable per `listings` so memoised cards don't re-render on every keystroke
+  const flyToListing = useCallback((id: string) => {
     const l = listings.find((x) => x.id === id);
     if (!l) return;
     setFiltersOpen(false);
     setSelectedId(id);
     mapRef.current?.flyTo({ center: l.coords, zoom: 16.4, duration: 1600 });
-  };
+  }, [listings]);
 
   const searchPlace = async (query: string, signal: AbortSignal): Promise<boolean> => {
     const map = mapRef.current;
@@ -137,36 +149,58 @@ export default function Home() {
     }
   };
 
-  const reverseGeocode = async (coords: [number, number]) => {
-    const seq = ++geocodeSeq.current;
-    setGeocoding(true);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${coords[1]}&lon=${coords[0]}&format=jsonv2&zoom=18`,
-      );
-      if (res.ok && seq === geocodeSeq.current) {
-        const j = (await res.json()) as {
-          display_name?: string;
-          address?: Record<string, string>;
-        };
-        const a = j.address ?? {};
-        const line = [a.house_number, a.road ?? a.neighbourhood, a.suburb]
-          .filter(Boolean)
-          .join(", ");
-        const cityName = a.city ?? a.town ?? a.village ?? a.county ?? "";
-        setGeoAddress(
-          line ||
-            (j.display_name ?? "").split(",").slice(0, 2).join(",").trim(),
-        );
-        setGeoCity([cityName, a.postcode].filter(Boolean).join(", "));
-      }
-    } catch {
-      // leave fields blank — user types the address
-    }
-    if (seq === geocodeSeq.current) setGeocoding(false);
-  };
+  // Drops any pending/in-flight Nominatim lookup. Called on the next click,
+  // on cancel and on unmount so a late response never fills a stale form.
+  const stopGeocode = useCallback(() => {
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+    geocodeTimer.current = null;
+    geocodeAbort.current?.abort();
+    geocodeAbort.current = null;
+  }, []);
+  useEffect(() => stopGeocode, [stopGeocode]);
 
-  const handleMapClick = (coords: [number, number]) => {
+  // 400ms debounce: rapid re-clicks while placing the pin only hit Nominatim
+  // (rate-limited to ~1 req/s) for the spot the user settles on
+  const reverseGeocode = useCallback((coords: [number, number]) => {
+    stopGeocode();
+    setGeocoding(true);
+    geocodeTimer.current = setTimeout(async () => {
+      geocodeTimer.current = null;
+      const controller = new AbortController();
+      geocodeAbort.current = controller;
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${coords[1]}&lon=${coords[0]}&format=jsonv2&zoom=18`,
+          { signal: controller.signal },
+        );
+        if (res.ok) {
+          const j = (await res.json()) as {
+            display_name?: string;
+            address?: Record<string, string>;
+          };
+          if (controller.signal.aborted) return;
+          const a = j.address ?? {};
+          const line = [a.house_number, a.road ?? a.neighbourhood, a.suburb]
+            .filter(Boolean)
+            .join(", ");
+          const cityName = a.city ?? a.town ?? a.village ?? a.county ?? "";
+          setGeoAddress(
+            line ||
+              (j.display_name ?? "").split(",").slice(0, 2).join(",").trim(),
+          );
+          setGeoCity([cityName, a.postcode].filter(Boolean).join(", "));
+        }
+      } catch {
+        // aborted, or leave fields blank — user types the address
+      }
+      if (!controller.signal.aborted) {
+        geocodeAbort.current = null;
+        setGeocoding(false);
+      }
+    }, 400);
+  }, [stopGeocode]);
+
+  const handleMapClick = useCallback((coords: [number, number]) => {
     if (addStage === "idle") return;
     setDraftCoords(coords);
     setAddStage("form");
@@ -175,13 +209,15 @@ export default function Home() {
       setGeoCity("");
       reverseGeocode(coords);
     }
-  };
+  }, [addStage, editingId, reverseGeocode]);
 
-  const cancelAdd = () => {
+  const cancelAdd = useCallback(() => {
+    stopGeocode();
+    setGeocoding(false);
     setAddStage("idle");
     setEditingId(null);
     setDraftCoords(null);
-  };
+  }, [stopGeocode]);
 
   const openEdit = (l: Listing) => {
     setSelectedId(null);
@@ -210,8 +246,9 @@ export default function Home() {
       );
       const failedUploads = uploadedPhotos.filter((url) => url === null).length;
       if (failedUploads > 0) {
-        window.alert(
+        notify(
           `${failedUploads} photo${failedUploads > 1 ? "s" : ""} failed to upload — saving the listing with the rest.`,
+          { kind: "error" },
         );
       }
       const photos = [
@@ -255,32 +292,39 @@ export default function Home() {
           .json()
           .then((j: { error?: string }) => j.error)
           .catch(() => null);
-        window.alert(`Could not save the listing${msg ? `: ${msg}` : ""}. Please try again.`);
+        notify(`Could not save the listing${msg ? `: ${msg}` : ""}. Please try again.`, {
+          kind: "error",
+        });
         return;
       }
       const saved = (await res.json()) as Listing;
 
-      // [PAYWALL DISABLED — free for now] featuring a listing is free; the
-      // server persists `featured` straight from the POST/PUT request body,
-      // so no Razorpay checkout or follow-up flip is needed.
-      // Featured boost is a paid add-on; the server only persists it after
-      // verifying a purchase tied to this listing's id (see properties/[id]).
-      // if (!editing && d.featured && !saved.featured) {
-      //   const paid = await payFee(
-      //     "featured_property",
-      //     "Featured listing boost",
-      //     saved.id,
-      //   );
-      //   if (paid) {
-      //     const flip = await fetch(`/api/properties/${saved.id}`, {
-      //       method: "PUT",
-      //       headers: { "Content-Type": "application/json" },
-      //       body: JSON.stringify({ ...saved, featured: true }),
-      //     });
-      //     if (flip.ok) Object.assign(saved, await flip.json());
-      //   }
-      // }
+      // Featured boost is a paid add-on (₹250). The listing is saved first so
+      // the purchase can be tied to its id; on a verified payment the server
+      // flips `featured` itself (lib/purchases.ts applyEntitlement), so we only
+      // need to re-read the listing. Cancelling leaves a normal, unfeatured
+      // listing — nothing is lost. The listing already exists server-side at
+      // this point, so a checkout failure must not lose it from the UI either.
+      if (!editing && d.featured && !saved.featured) {
+        try {
+          const paid = await payFee(
+            "featured_property",
+            "Featured listing boost",
+            saved.id,
+          );
+          if (paid) {
+            const fresh = await fetch(`/api/properties/${saved.id}`);
+            if (fresh.ok) Object.assign(saved, await fresh.json());
+          }
+        } catch {
+          notify(
+            "The listing was saved, but the featured boost payment didn\u2019t go through. You can retry it later.",
+            { kind: "error" },
+          );
+        }
+      }
 
+      invalidateListing(saved.id);
       setListings((prev) =>
         editing
           ? prev.map((l) => (l.id === saved.id ? saved : l))
@@ -293,6 +337,11 @@ export default function Home() {
       celebrate(
         editing ? "Listing updated!" : "Listing added — it\u2019s live on the map!",
       );
+    } catch {
+      // network failure / aborted upload / JSON parse error
+      notify("Could not save the listing. Check your connection and try again.", {
+        kind: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -305,9 +354,22 @@ export default function Home() {
     try {
       const res = await fetch(`/api/properties/${id}`, { method: "DELETE" });
       if (res.ok || res.status === 404) {
+        invalidateListing(id);
         setListings((prev) => prev.filter((l) => l.id !== id));
         setSelectedId(null);
+      } else {
+        const msg = await res
+          .json()
+          .then((j: { error?: string }) => j.error)
+          .catch(() => null);
+        notify(`Could not delete the listing${msg ? `: ${msg}` : ""}. Please try again.`, {
+          kind: "error",
+        });
       }
+    } catch {
+      notify("Could not delete the listing. Check your connection and try again.", {
+        kind: "error",
+      });
     } finally {
       setDeleting(false);
     }
@@ -325,7 +387,7 @@ export default function Home() {
 
       <main className={`${styles.canvas} relative mx-2 mb-2 min-h-0 flex-1 overflow-hidden rounded-[22px] bg-cream-soft sm:mx-3 sm:mb-3`}>
         <Map3D
-          listings={filtered}
+          listings={deferredFiltered}
           pois={POIS}
           mapRef={mapRef}
           onSelect={flyToListing}
@@ -341,7 +403,7 @@ export default function Home() {
             <FilterSidebar
               filters={filters}
               onChange={setFilters}
-              allListings={filters.type ? listings.filter((l) => l.type === filters.type) : listings}
+              allListings={histogramListings}
               onReset={resetSearch}
               activeCount={activeFilters}
             />
@@ -396,7 +458,7 @@ export default function Home() {
               </div>
             </div>
             <PropertyCarousel
-              listings={filtered}
+              listings={deferredFiltered}
               onSelect={flyToListing}
               hasAny={listings.length > 0}
               status={loadState}

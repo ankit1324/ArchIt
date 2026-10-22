@@ -13,6 +13,23 @@ export function celebrate(message: string) {
   );
 }
 
+/**
+ * Quiet, dismissible toast at the top of the viewport — the non-blocking
+ * replacement for window.alert. No confetti.
+ */
+export function notify(message: string, { kind = "info" }: { kind?: "info" | "error" } = {}) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("archit:notify", { detail: { message, kind } }),
+  );
+}
+
+interface Toast {
+  id: number;
+  message: string;
+  kind: "info" | "error";
+}
+
 const COLORS = [
   "#f0483e", // coral
   "#e2ef6a", // lime
@@ -72,6 +89,29 @@ export default function CelebrationLayer() {
   const rafRef = useRef(0);
   const [message, setMessage] = useState<string | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastSeq = useRef(0);
+  const dismiss = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
+
+  useEffect(() => {
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const onNotify = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string; kind?: Toast["kind"] }>).detail;
+      if (!detail?.message) return;
+      const id = ++toastSeq.current;
+      setToasts((t) => [...t.slice(-2), { id, message: detail.message!, kind: detail.kind ?? "info" }]);
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        setToasts((t) => t.filter((x) => x.id !== id));
+      }, detail.kind === "error" ? 7000 : 4000);
+      timers.add(timer);
+    };
+    window.addEventListener("archit:notify", onNotify);
+    return () => {
+      window.removeEventListener("archit:notify", onNotify);
+      timers.forEach(clearTimeout);
+    };
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -150,6 +190,31 @@ export default function CelebrationLayer() {
   return (
     <div className="pointer-events-none fixed inset-0 z-[200]">
       <canvas ref={canvasRef} className="h-full w-full" />
+      {toasts.length > 0 && (
+        <div className="absolute inset-x-0 top-4 flex flex-col items-center gap-2 px-4">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              role={t.kind === "error" ? "alert" : "status"}
+              className={`toast-chip pointer-events-auto flex max-w-[460px] items-start gap-3 rounded-2xl border px-4 py-3 text-[13px] font-semibold shadow-[0_18px_50px_-12px_rgba(61,24,48,.35)] ${
+                t.kind === "error"
+                  ? "border-coral/40 bg-[#fff3f2] text-plum"
+                  : "border-white/60 bg-white/95 text-plum"
+              }`}
+            >
+              <span className="flex-1">{t.message}</span>
+              <button
+                type="button"
+                onClick={() => dismiss(t.id)}
+                aria-label="Dismiss"
+                className="shrink-0 rounded-full px-1.5 leading-none text-plum-soft hover:text-plum"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {message && (
         <div className="absolute inset-x-0 top-[26%] flex justify-center">
           <div className="hurray-chip flex items-center gap-2.5 rounded-full border border-white/60 bg-white/80 px-6 py-3 shadow-[0_18px_50px_-12px_rgba(61,24,48,.35)] backdrop-blur-md">

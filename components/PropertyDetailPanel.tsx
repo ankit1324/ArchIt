@@ -5,12 +5,9 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
-// [PAYWALL DISABLED — free for now]
-// import { payFee } from "@/lib/checkout";
-// [PAYWALL DISABLED — free for now] celebrate was only used inside unlockOwner() below
-// import { celebrate } from "@/components/Celebration";
-// [PAYWALL DISABLED — free for now]
-// import { feeLabel } from "@/lib/fees";
+import { payFee } from "@/lib/checkout";
+import { celebrate } from "@/components/Celebration";
+import { feeLabel } from "@/lib/fees";
 import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
@@ -20,6 +17,25 @@ interface PropertyDetailPanelProps {
   onEdit: () => void;
   onDelete: () => void;
   deleting?: boolean;
+}
+
+// Gated detail responses (`owner`, `hasOwner`, `mine`) per listing id, so
+// re-opening a card doesn't refetch. The response depends on the viewer, so
+// the cache is dropped whenever the signed-in user changes.
+const detailCache = new Map<string, Listing>();
+let detailCacheUser: string | null | undefined;
+
+/** Forget the cached detail for a listing (after unlock / edit / delete). */
+export function invalidateListing(id: string) {
+  detailCache.delete(id);
+}
+
+function cachedDetail(id: string, userId: string | null | undefined): Listing | undefined {
+  if (detailCacheUser !== userId) {
+    detailCache.clear();
+    detailCacheUser = userId;
+  }
+  return detailCache.get(id);
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -40,75 +56,64 @@ export default function PropertyDetailPanel({
   onDelete,
   deleting = false,
 }: PropertyDetailPanelProps) {
-  // reset fetched detail state per listing (adjust-state-during-render —
-  // avoids a setState-in-effect cascade)
-  const [listing, setListingRaw] = useState(propListing);
-  const setListing = setListingRaw;
-  const [prevId, setPrevId] = useState(propListing.id);
-  if (prevId !== propListing.id) {
-    setPrevId(propListing.id);
-    setListingRaw(propListing);
-  }
-  const sale = listing.type === "sale";
   // only the lister manages a property; the server tells us via `mine`
   // (the raw lister id is never sent to the client)
   const { userId } = useAuth();
+  // reset fetched detail state per listing (adjust-state-during-render —
+  // avoids a setState-in-effect cascade); a cached detail wins immediately
+  const [listing, setListing] = useState(
+    () => cachedDetail(propListing.id, userId) ?? propListing,
+  );
+  const [prevId, setPrevId] = useState(propListing.id);
+  if (prevId !== propListing.id) {
+    setPrevId(propListing.id);
+    setListing(cachedDetail(propListing.id, userId) ?? propListing);
+  }
+  const sale = listing.type === "sale";
   const canManage = !!listing.mine;
-  // [PAYWALL DISABLED — free for now] owner contact is free, no unlock gate.
-  // was: owner contact is paywalled; a paid unlock persists per listing in the
-  // purchases ledger, so it survives reloads and sessions
-  // const [unlockedId, setUnlockedId] = useState<string | null>(null);
-  // const [unlocking, setUnlocking] = useState(false);
-  // const ownerUnlocked = unlockedId === listing.id;
+  // bumped to force a refetch (after a paid unlock, which is what makes the
+  // server start returning `owner`)
+  const [detailVersion, setDetailVersion] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
 
-  /* [PAYWALL DISABLED — free for now]
-  useEffect(() => {
-    let stale = false;
-    fetch(`/api/purchases?purpose=contact_owner&ref=${listing.id}`)
-      .then((r) => (r.ok ? r.json() : { unlocked: false }))
-      .then((d: { unlocked?: boolean }) => {
-        if (!stale && d.unlocked) setUnlockedId(listing.id);
-      })
-      .catch(() => {});
-    return () => {
-      stale = true;
-    };
-  }, [listing.id]);
-  */
-
-  // the public list drops the paywalled `owner` field — refetch the gated
-  // detail route when the lister or a paying viewer opens this panel
+  // The public list drops the paywalled `owner` field. The gated detail route
+  // returns it iff the viewer is the lister or has paid (and `hasOwner` either
+  // way), so one fetch covers both the "mine" and "unlocked" cases — no
+  // separate purchases lookup needed.
   useEffect(() => {
     if (!userId) return;
-    let stale = false;
-    fetch(`/api/properties/${listing.id}`)
+    if (cachedDetail(propListing.id, userId)) return;
+    const controller = new AbortController();
+    fetch(`/api/properties/${propListing.id}`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((d: Listing | null) => {
-        if (!stale && d) setListing(d);
+        if (controller.signal.aborted || !d) return;
+        detailCache.set(propListing.id, d);
+        setListing(d);
       })
       .catch(() => {});
-    return () => {
-      stale = true;
-    };
-    // ponytail: refetches only on unlock change; a manual refresh button is
-    // the upgrade when staleness matters
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listing.id, userId]);
+    return () => controller.abort();
+  }, [propListing.id, userId, detailVersion]);
 
-  /* [PAYWALL DISABLED — free for now]
   const unlockOwner = async () => {
     if (unlocking) return;
     setUnlocking(true);
     try {
       if (await payFee("contact_owner", "Contact owner fee", listing.id)) {
-        setUnlockedId(listing.id);
+        // the server flips the gate; refetch so `owner` lands in the panel
+        invalidateListing(listing.id);
+        setDetailVersion((v) => v + 1);
         celebrate("Owner contact unlocked!");
       }
     } finally {
       setUnlocking(false);
     }
   };
-  */
+  // Offer the unlock to a signed-in viewer who is not the lister, once the
+  // detail fetch has confirmed there is a contact to buy. The lister (or a
+  // past buyer) already has `owner` in hand.
+  const showUnlock =
+    !!userId && !canManage && !listing.owner && listing.hasOwner === true;
   return (
     <section className="glass no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-3xl p-4">
       <header className="flex items-start justify-between gap-2">
@@ -160,10 +165,7 @@ export default function PropertyDetailPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        {/* [PAYWALL DISABLED — free for now] was: {listing.owner && ownerUnlocked && ( */}
-        {listing.owner && (
-          <Fact label="Owner" value={listing.owner} />
-        )}
+        {listing.owner && <Fact label="Owner" value={listing.owner} />}
         <Fact label="Type" value={listing.kind} />
         <Fact label="Beds" value={String(listing.beds)} />
         <Fact label="Baths" value={String(listing.baths)} />
@@ -176,8 +178,7 @@ export default function PropertyDetailPanel({
         />
       </div>
 
-      {/* [PAYWALL DISABLED — free for now]
-      {listing.owner && !ownerUnlocked && (
+      {showUnlock && (
         <button
           onClick={unlockOwner}
           disabled={unlocking}
@@ -188,7 +189,6 @@ export default function PropertyDetailPanel({
             : `Contact owner · ${feeLabel("contact_owner")}`}
         </button>
       )}
-      */}
 
       {canManage && (
       <div className="mt-1 flex gap-2">

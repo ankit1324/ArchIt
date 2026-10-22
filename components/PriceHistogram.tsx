@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Listing } from "@/lib/types";
 import { PRICE_DOMAIN } from "@/lib/listings";
 
@@ -50,14 +50,46 @@ export default function PriceHistogram({
     return counts.map((c) => c / max);
   }, [listings, domain]);
 
-  const [lo, hi] = value;
+  // The thumbs track a local copy while dragging so the histogram, label and
+  // range bar repaint instantly; the (expensive) filter commit via onChange
+  // happens when the gesture ends. Snap back to the committed value whenever
+  // the parent changes it (reset, external edit).
+  const [local, setLocal] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
+  if (prevValue !== value) {
+    setPrevValue(value);
+    setLocal(value);
+  }
+  const [lo, hi] = local;
   const loPos = priceToPos(lo, domain);
   const hiPos = priceToPos(hi, domain);
 
   const setLo = (pos: number) =>
-    onChange([Math.min(pos === 0 ? 0 : posToPrice(pos, domain), hi), hi]);
+    setLocal(([, h]) => [Math.min(pos === 0 ? 0 : posToPrice(pos, domain), h), h]);
   const setHi = (pos: number) =>
-    onChange([lo, Math.max(pos === 100 ? Infinity : posToPrice(pos, domain), lo)]);
+    setLocal(([l]) => [l, Math.max(pos === 100 ? Infinity : posToPrice(pos, domain), l)]);
+  const commit = () => {
+    if (local[0] !== value[0] || local[1] !== value[1]) onChange(local);
+  };
+  const commitOnKey = (e: React.KeyboardEvent) => {
+    // arrow/home/end nudges fire change per press; commit once the key lifts
+    if (e.key !== "Tab") commit();
+  };
+  // Fallback for a thumb released outside the input (no pointerup on it): a
+  // native `change` on a range input fires exactly once, at gesture end.
+  // React's onChange maps to `input`, so this is wired by hand.
+  const commitRef = useRef(commit);
+  useEffect(() => {
+    commitRef.current = commit;
+  });
+  const loInput = useRef<HTMLInputElement>(null);
+  const hiInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onNativeChange = () => commitRef.current();
+    const inputs = [loInput.current, hiInput.current];
+    inputs.forEach((el) => el?.addEventListener("change", onNativeChange));
+    return () => inputs.forEach((el) => el?.removeEventListener("change", onNativeChange));
+  }, []);
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -90,23 +122,33 @@ export default function PriceHistogram({
           style={{ left: `${loPos}%`, right: `${100 - hiPos}%` }}
         />
         <input
+          ref={loInput}
           type="range"
           min={0}
           max={100}
           step={0.5}
           value={loPos}
           onChange={(e) => setLo(Number(e.target.value))}
+          onPointerUp={commit}
+          onTouchEnd={commit}
+          onKeyUp={commitOnKey}
+          onBlur={commit}
           className="range-input"
           aria-label="Minimum price"
           aria-valuetext={lo === 0 ? "No minimum" : compact(lo)}
         />
         <input
+          ref={hiInput}
           type="range"
           min={0}
           max={100}
           step={0.5}
           value={hiPos}
           onChange={(e) => setHi(Number(e.target.value))}
+          onPointerUp={commit}
+          onTouchEnd={commit}
+          onKeyUp={commitOnKey}
+          onBlur={commit}
           className="range-input"
           aria-label="Maximum price"
           aria-valuetext={Number.isFinite(hi) ? compact(hi) : "No maximum"}

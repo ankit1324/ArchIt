@@ -44,8 +44,10 @@ function Panel({
   title?: string;
   children: React.ReactNode;
 }) {
+  // no backdrop-filter here: the sidebar is already a 94%-opaque surface, so
+  // a blur would cost a per-frame compositing pass for no visible gain
   return (
-    <section className="glass rounded-3xl p-3.5">
+    <section className="rounded-3xl bg-white/55 p-3.5 shadow-[0_8px_28px_rgb(61_24_48/0.1)]">
       {title && (
         <h3 className="mb-3 text-center text-[13px] font-bold text-plum">
           {title}
@@ -87,10 +89,10 @@ export default function FilterSidebar({
               key={id}
               aria-pressed={active}
               onClick={() => set({ kind: active ? null : id })}
-              className={`glass flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl transition-all ${
+              className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl transition-colors ${
                 active
-                  ? "bg-plum/90! text-cream shadow-lg"
-                  : "text-plum hover:bg-white/70"
+                  ? "bg-plum/90 text-cream shadow-lg"
+                  : "bg-white/55 text-plum shadow-[0_8px_28px_rgb(61_24_48/0.1)] hover:bg-white/70"
               }`}
             >
               <Icon width={21} height={21} />
