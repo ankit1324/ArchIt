@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-// [PAYWALL DISABLED — free for now] Razorpay checkout not needed while
-// templates are free.
-// import { payFee } from "@/lib/checkout";
+import { payFee } from "@/lib/checkout";
 import type { DesignMeta, DesignStateV3 } from "@/lib/types";
 import type { Neighbor } from "@/lib/design";
 
@@ -15,15 +13,28 @@ interface DesignerOverlayProps {
   facing?: DesignMeta["facing"];
   /** present when reopening a saved design */
   existingDesign?: DesignStateV3;
-  onSave: (design: DesignStateV3, snapshotDataUrl: string) => void;
+  /**
+   * Persist the design. `snapshot` is a small WebP/JPEG Blob from the builder
+   * (a data-URL string only from a stale, cached builder). The result is relayed
+   * back to the builder as `archit:saved`, which is when it shows "Saved".
+   */
+  onSave: (
+    design: DesignStateV3,
+    snapshot: Blob | string,
+  ) => Promise<SaveResult | void> | SaveResult | void;
   onClose: () => void;
+}
+
+export interface SaveResult {
+  ok: boolean;
+  error?: string;
 }
 
 type BuilderMessage =
   | { type: "archit:ready" }
   | {
       type: "archit:save";
-      payload: { design: DesignStateV3; snapshot: string };
+      payload: { design: DesignStateV3; snapshot: Blob | string };
     }
   | { type: "archit:close"; dirty: boolean }
   | { type: "archit:buy-template"; payload: { key: string; name: string } };
@@ -89,34 +100,43 @@ export default function DesignerOverlay({
           location.origin,
         );
       } else if (m.type === "archit:save") {
-        p.onSave(m.payload.design, m.payload.snapshot);
+        // Reply only after the save settles — the builder keeps "dirty" and
+        // shows "Saving…" until it hears back.
+        void Promise.resolve()
+          .then(() => p.onSave(m.payload.design, m.payload.snapshot))
+          .then(
+            (r): SaveResult => r ?? { ok: true },
+            (err): SaveResult => ({
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          )
+          .then((payload) => {
+            frame.contentWindow?.postMessage(
+              { type: "archit:saved", payload },
+              location.origin,
+            );
+          });
       } else if (m.type === "archit:close") {
         if (!m.dirty || window.confirm("Discard unsaved changes?")) p.onClose();
       } else if (m.type === "archit:buy-template") {
-        // [PAYWALL DISABLED — free for now] Templates are free: skip Razorpay
-        // checkout and grant instantly. The builder reloads the catalog, marks the
-        // key owned and loads geometry from the server. Restore the payFee() call
-        // below to re-enable monetization.
-        const { key } = m.payload;
-        frame.contentWindow?.postMessage(
-          { type: "archit:template-purchased", payload: { key } },
-          location.origin,
-        );
-        // --- original checkout flow (restore to re-enable the paywall) ---
-        // const { key, name } = m.payload;
-        // if (buyingRef.current) return; // ignore double-clicks mid-checkout
-        // buyingRef.current = true;
-        // void payFee("template_unlock", `Template — ${name}`, key)
-        //   .then((paid) => {
-        //     if (!paid) return;
-        //     frame.contentWindow?.postMessage(
-        //       { type: "archit:template-purchased", payload: { key } },
-        //       location.origin,
-        //     );
-        //   })
-        //   .finally(() => {
-        //     buyingRef.current = false;
-        //   });
+        // Paid template (₹99): run checkout in the parent, then tell the builder
+        // so it marks the key owned and loads geometry from the server (which
+        // does its own ledger check — the message is a hint, not a grant).
+        const { key, name } = m.payload;
+        if (buyingRef.current) return; // ignore double-clicks mid-checkout
+        buyingRef.current = true;
+        void payFee("template_unlock", `Template — ${name}`, key)
+          .then((paid) => {
+            if (!paid) return;
+            frame.contentWindow?.postMessage(
+              { type: "archit:template-purchased", payload: { key } },
+              location.origin,
+            );
+          })
+          .finally(() => {
+            buyingRef.current = false;
+          });
       }
     };
     window.addEventListener("message", onMessage);
