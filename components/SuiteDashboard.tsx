@@ -1,6 +1,7 @@
 import Link from "next/link";
 import localFont from "next/font/local";
 import Navbar from "@/components/Navbar";
+import MobileTabBar from "@/components/MobileTabBar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
 import { feeLabel } from "@/lib/fees";
 
@@ -61,7 +62,7 @@ const PRODUCTS = [
 export default function SuiteDashboard() {
   return (
     <div
-      className={`${fraunces.variable} relative flex h-full flex-col overflow-y-auto overflow-x-hidden bg-cream`}
+      className={`${fraunces.variable} relative flex h-full flex-col overflow-y-auto overflow-x-hidden bg-cream pt-[env(safe-area-inset-top)]`}
     >
       {/* atmosphere: soft blobs + grain */}
       <div
@@ -83,7 +84,7 @@ export default function SuiteDashboard() {
 
       <Navbar />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-16">
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-16">
         <section className="pb-14 pt-14 text-center lg:pt-20">
           <p className="mb-5 text-[12px] font-bold uppercase tracking-[0.28em] text-plum-soft">
             The ArchIt suite
@@ -183,6 +184,8 @@ export default function SuiteDashboard() {
           <span>UPI payments via YouPI</span>
         </footer>
       </main>
+
+      <MobileTabBar active="/" />
     </div>
   );
 }

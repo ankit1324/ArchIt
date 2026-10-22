@@ -1,7 +1,7 @@
 import {ClerkProvider} from "@clerk/nextjs";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CelebrationLayer from "@/components/Celebration";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -22,6 +22,10 @@ const SITE_DESCRIPTION =
 // Neutral suite-wide defaults. Pages refine title/description; the OG image
 // comes from app/opengraph-image.tsx. Note: nested fields (openGraph, robots,
 // alternates) are replaced, not merged, by any segment that sets them.
+// viewport-fit=cover lets env(safe-area-inset-*) report the notch / home
+// indicator insets that /find's bottom sheet and the dashboard tab bar pad by
+export const viewport: Viewport = { viewportFit: "cover" };
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://archit.chaudharyankit.in"),
   title: {

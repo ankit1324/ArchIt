@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-// page.tsx is a client component, so its metadata lives here.
+// FindClient is a client component; the route metadata lives here.
 export const metadata: Metadata = {
   title: "Find a property",
   description:
@@ -19,6 +19,11 @@ export default function FindLayout({
           is still downloading */}
       <link rel="preconnect" href="https://tiles.openfreemap.org" crossOrigin="" />
       <link rel="preconnect" href="https://server.arcgisonline.com" crossOrigin="" />
+      {/* the style document and its TileJSON gate every tile; fetch them in
+          parallel with the map chunk instead of after it (same URL, mode and
+          credentials as maplibre's own requests, so the preloads are reused) */}
+      <link rel="preload" href="https://tiles.openfreemap.org/styles/positron" as="fetch" crossOrigin="anonymous" />
+      <link rel="preload" href="https://tiles.openfreemap.org/planet" as="fetch" crossOrigin="anonymous" />
       {children}
     </>
   );

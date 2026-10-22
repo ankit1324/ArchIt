@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
+import sharp from "@/lib/sharp";
 import { db } from "@/lib/db";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { readBodyCapped } from "@/lib/request";
 import { detectImageType, EXT_BY_MIME, MAX_UPLOAD_BYTES } from "@/lib/upload";
+import { THUMB_WIDTHS, thumbObjectNames } from "@/lib/url";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -50,15 +52,50 @@ export async function POST(request: Request) {
     return Response.json({ error: "only jpeg/png/webp/avif images" }, { status: 415 });
   }
 
-  const name = `${crypto.randomUUID()}${ext}`;
+  // Resized webp variants for markers (64px) and cards/panels (480px). Only
+  // when every variant is stored does the original get the `-t` name that
+  // tells readers they exist (lib/url.ts thumbnailUrl); otherwise it is saved
+  // under a plain name and readers fall back to the original.
+  const id = crypto.randomUUID();
+  const thumbed = await storeThumbnails(`${id}-t`, buf);
+  const name = `${thumbed ? `${id}-t` : id}${ext}`;
   const { error } = await db.storage
     .from("photos")
     .upload(name, buf, { contentType: mime });
   if (error) {
     console.error("Photo upload failed:", error.message);
+    if (thumbed) await db.storage.from("photos").remove(thumbObjectNames(name));
     return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   const { data } = db.storage.from("photos").getPublicUrl(name);
   return Response.json({ url: data.publicUrl }, { status: 201 });
+}
+
+/** Generate and upload every THUMB_WIDTHS variant; false (and nothing left behind) on any failure. */
+async function storeThumbnails(base: string, buf: Buffer): Promise<boolean> {
+  const names = THUMB_WIDTHS.map((w) => `${base}.w${w}.webp`);
+  try {
+    const variants = await Promise.all(
+      THUMB_WIDTHS.map((w) =>
+        sharp(buf, { limitInputPixels: 40_000_000 })
+          .rotate() // honour EXIF orientation before it is stripped
+          .resize(w === 64 ? { width: 64, height: 64, fit: "cover" } : { width: w, withoutEnlargement: true })
+          .webp({ quality: w === 64 ? 70 : 76 })
+          .toBuffer(),
+      ),
+    );
+    const results = await Promise.all(
+      variants.map((v, i) =>
+        db.storage.from("photos").upload(names[i], v, { contentType: "image/webp" }),
+      ),
+    );
+    const failed = results.find((r) => r.error)?.error;
+    if (failed) throw new Error(failed.message);
+    return true;
+  } catch (e) {
+    console.warn("Thumbnail generation failed, storing original only:", (e as Error).message);
+    await db.storage.from("photos").remove(names).catch(() => {});
+    return false;
+  }
 }

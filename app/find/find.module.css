@@ -10,13 +10,18 @@
 .results { position: absolute; bottom: 26px; left: 280px; right: 14px; }
 .resultBar { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 12px 16px; border: 1px solid #fff9; border-radius: 18px; background: #f5f1eaf0; box-shadow: 0 8px 24px #3d183018; }
 .resultBar strong { display: block; font-size: 15px; letter-spacing: -.03em; }
-.resultBar span { display: block; max-width: 240px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--color-plum-soft); }
+.resultBar > div:first-child > span { display: block; max-width: 240px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--color-plum-soft); }
 .resultActions { display: flex; align-items: center; gap: 16px; font-size: 11px; font-weight: 700; }
 .resultActions button:disabled { opacity: .4; }
 .resultActions select { max-width: 145px; border-radius: 10px; padding: 8px; background: #fff9; }
 .detailPanel { pointer-events: auto; position: absolute; top: 76px; bottom: 26px; right: 14px; display: flex; align-items: flex-start; max-width: calc(100% - 28px); z-index: 20; }
 .detailPanel > * { max-width: 100%; }
 .pickHint { position: absolute; top: 80px; left: 280px; right: 80px; text-align: center; }
+.areaToggle { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+.areaShort { display: none; }
+.resultBar > div:first-child { min-width: 0; }
+.areaToggle input { width: 15px; height: 15px; accent-color: var(--color-plum); }
+.detailPanel :global(.sheet-handle) { display: none; }
 @media (max-width: 1023px) {
   .filters { display: none; z-index: 40; top: 124px; bottom: 26px; width: min(300px, calc(100% - 28px)); background: var(--color-cream); }
   .filtersOpen { display: flex; }
@@ -26,14 +31,25 @@
   .toolbar form { flex-basis: 100%; }
   .toolbar > button:last-child { margin-left: auto; }
   .results { left: 14px; }
-  .detailPanel { top: 124px; }
+  /* detail / add panels dock to the bottom as a sheet; the card strip they
+     would cover is hidden meanwhile */
+  .detailPanel { top: auto; left: 0; right: 0; bottom: 0; max-width: none; max-height: min(74%, 600px); flex-direction: column; align-items: stretch; padding: 0 6px 6px; transition: transform .2s ease; }
+  .detailPanel > * { width: 100%; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px; }
+  .detailPanel :global(.sheet-handle) { display: block; flex: none; align-self: center; width: 64px; height: 22px; margin-bottom: -22px; position: relative; z-index: 1; touch-action: none; cursor: grab; }
+  .detailPanel :global(.sheet-handle)::before { content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 99px; background: rgb(61 24 48 / .28); }
+  .detailPanel > section { background: rgb(245 241 234 / .97); }
+  .formPanel { max-height: 82%; }
+  .resultsUnderSheet { visibility: hidden; }
   .pickHint { top: 124px; left: 14px; right: 14px; }
 }
 @media (max-width: 600px) {
   .resultBar { padding: 10px 12px; gap: 8px; }
-  .resultBar span { max-width: 145px; }
+  .resultBar > div:first-child > span { max-width: 145px; }
   .resultActions button { display: none; }
-  .resultActions select { max-width: 130px; }
+  .resultActions { gap: 10px; }
+  .areaLong { display: none; }
+  .areaShort { display: inline; }
+  .resultActions select { max-width: 112px; }
   .results > div:last-child > button { height: 165px; width: 215px; }
   .mapControls { top: 140px; }
 }
