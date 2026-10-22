@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
+import { readBodyCapped } from "@/lib/request";
 import { detectImageType, EXT_BY_MIME, MAX_UPLOAD_BYTES } from "@/lib/upload";
 
 export async function POST(request: Request) {
@@ -13,17 +14,26 @@ export async function POST(request: Request) {
     return rateLimitedResponse();
   }
 
-  // Reject oversized bodies before request.formData() buffers the whole payload
-  // into memory. Content-Length includes multipart boundaries/headers, so allow
-  // a little headroom over MAX_UPLOAD_BYTES; the exact file.size check below is
-  // still the authoritative guard. This only stops the pathological case (a
-  // several-hundred-MB body that would otherwise be materialized in full).
+  // Multipart boundaries/headers add a little over the file itself; the exact
+  // file.size check below is still the authoritative guard.
+  const maxBody = MAX_UPLOAD_BYTES + 64 * 1024;
   const declaredBytes = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_UPLOAD_BYTES + 64 * 1024) {
+  if (Number.isFinite(declaredBytes) && declaredBytes > maxBody) {
     return Response.json({ error: "max 8 MB" }, { status: 413 });
   }
+  // Content-Length is advisory (absent when chunked); count the bytes as they
+  // stream in so an oversized body is cut off, never buffered in full.
+  const raw = await readBodyCapped(request, maxBody);
+  if (!raw) return Response.json({ error: "max 8 MB" }, { status: 413 });
 
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await new Response(raw as BodyInit, {
+      headers: { "content-type": request.headers.get("content-type") ?? "" },
+    }).formData();
+  } catch {
+    return Response.json({ error: "multipart body required" }, { status: 400 });
+  }
   const file = form.get("file");
   if (!(file instanceof File)) {
     return Response.json({ error: "file field required" }, { status: 400 });
