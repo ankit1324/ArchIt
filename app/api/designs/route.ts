@@ -1,19 +1,18 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
-import type { Design } from "@/lib/types";
+import { parseJsonBody } from "@/lib/request";
+import { safeImageUrl } from "@/lib/url";
+import { MAX_DESIGN_BYTES, validateDesign } from "@/lib/validators";
 
-// Designs are private: every query is scoped to the signed-in user.
-// [PAYWALL DISABLED — free for now] The builder used to be a paid product
-// (₹2000 builder_unlock) gated by the ledger check below; it is commented out
-// so the builder is free. Restore the calls to re-enable the paywall.
+// Designs are private: every query is scoped to the signed-in user, and the
+// builder is a paid product (₹2000 builder_unlock) gated by the ledger check.
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  // [PAYWALL DISABLED — free for now]
-  // const locked = await builderUnlockError(userId);
-  // if (locked) return locked;
+  const locked = await builderUnlockError(userId);
+  if (locked) return locked;
   const { data, error } = await db
     .from("designs")
     .select("*")
@@ -29,24 +28,16 @@ export async function GET() {
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
-  // [PAYWALL DISABLED — free for now]
-  // const locked = await builderUnlockError(userId);
-  // if (locked) return locked;
-  const d = (await request.json()) as Omit<Design, "id">;
-  if (
-    !d.plotCenter ||
-    d.design?.v !== 3 ||
-    !(d.design.state.floors?.some((f) => f.blocks.length) ??
-      d.design.state.blocks?.length)
-  ) {
-    return Response.json(
-      { error: "plotCenter and a non-empty v3 design required" },
-      { status: 400 },
-    );
-  }
+  const locked = await builderUnlockError(userId);
+  if (locked) return locked;
+  // designs carry the full block list; allow the 1 MB design cap plus envelope
+  const d = await parseJsonBody(request, (v) => validateDesign(v, safeImageUrl), {
+    maxBytes: MAX_DESIGN_BYTES + 64 * 1024,
+  });
+  if (d instanceof Response) return d;
   const { data, error } = await db
     .from("designs")
-    .insert({ ...designToRow({ ...d, name: d.name || "My home" }), user_id: userId })
+    .insert({ ...designToRow(d), user_id: userId })
     .select()
     .single();
   if (error) {

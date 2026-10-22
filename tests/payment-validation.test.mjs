@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // These are the real shipped decisions, imported directly: lib/payment-validation.ts
-// deliberately has no Razorpay/Supabase/"server-only" imports so the money logic
+// deliberately has no gateway/Supabase/"server-only" imports so the money logic
 // is testable without standing up any of it.
 import {
   checkPayment,
@@ -16,15 +16,15 @@ import { FEES } from "../lib/fees.ts";
 // checkPayment logs every rejection by design; keep the test output readable.
 console.error = () => {};
 
-const ORDER = "order_NfP9k2LmQ1xYzA";
-const PAYMENT = "pay_NfP9k9ZzT4bWqR";
+const ORDER = "contact_owner_m1abc_9f3a2c1d";
+const PAYMENT = "c7942127-14e3-469a-9e4a-9359a16f903a";
 
 /** A payment that should pass every gate, minus whatever the test breaks. */
 function payment(overrides = {}) {
   return {
-    order_id: ORDER,
-    status: "captured",
-    amount: 5000,
+    orderId: ORDER,
+    status: "SUCCESS",
+    amountPaise: "5000",
     currency: "INR",
     ...overrides,
   };
@@ -39,43 +39,47 @@ function check(p, purpose = "contact_owner") {
   });
 }
 
-test("accepts a captured payment of the exact fee for every purpose", () => {
-  assert.equal(check(payment({ amount: 5000 }), "contact_owner"), null);
-  assert.equal(check(payment({ amount: 25000 }), "featured_property"), null);
-  assert.equal(check(payment({ amount: 200000 }), "builder_unlock"), null);
+test("accepts a successful payment of the exact fee for every purpose", () => {
+  assert.equal(check(payment({ amountPaise: "5000" }), "contact_owner"), null);
+  assert.equal(check(payment({ amountPaise: "25000" }), "featured_property"), null);
+  assert.equal(check(payment({ amountPaise: "200000" }), "builder_unlock"), null);
+  assert.equal(check(payment({ amountPaise: "9900" }), "template_unlock"), null);
 });
 
-test("rejects a payment captured against a different order", () => {
+test("rejects a payment completed against a different order", () => {
   // A payment id stolen from someone else's order must not buy anything here.
-  assert.deepEqual(check(payment({ order_id: "order_SomeoneElse" })), {
+  assert.deepEqual(check(payment({ orderId: "builder_unlock_someone_else" })), {
     error: "payment does not match order",
     status: 400,
   });
 });
 
-test("defers an authorized-but-uncaptured payment instead of granting it", () => {
-  // Authorized holds auto-void after a few days, so this must not grant. But it
-  // is a live payment mid-capture, so it is 202 (webhook will finish it), not a
+test("defers a live, not-yet-verified session instead of granting it", () => {
+  // The gateway is still inside its verification window. It must not grant, but
+  // it is a real payment in flight, so it is 202 (webhook will finish it), not a
   // hard failure that tells the user their payment broke.
-  assert.deepEqual(check(payment({ status: "authorized" })), {
-    error: "payment processing",
-    status: 202,
-  });
-});
-
-test("rejects failed and created payments outright", () => {
-  for (const status of ["failed", "created"]) {
+  for (const status of ["INITIATED", "ACTIVE", "QUEUED", "PROCESSING"]) {
     assert.deepEqual(
       check(payment({ status })),
-      { error: "payment not captured", status: 402 },
+      { error: "payment processing", status: 202 },
+      `status "${status}" is pending, not failed`,
+    );
+  }
+});
+
+test("rejects failed, expired and cancelled sessions outright", () => {
+  for (const status of ["FAILED", "EXPIRED", "CANCELLED"]) {
+    assert.deepEqual(
+      check(payment({ status })),
+      { error: "payment not completed", status: 402 },
       `status "${status}" must not be treated as paid`,
     );
   }
 });
 
-test("never grants on any non-captured status", () => {
-  // Whatever the status, a non-captured payment must not return null (= granted).
-  for (const status of ["authorized", "failed", "created", "refunded", ""]) {
+test("never grants on any non-SUCCESS status", () => {
+  // Whatever the status, a non-SUCCESS payment must not return null (= granted).
+  for (const status of ["PROCESSING", "FAILED", "EXPIRED", "CANCELLED", "success", "", undefined]) {
     assert.notEqual(
       check(payment({ status })),
       null,
@@ -86,17 +90,23 @@ test("never grants on any non-captured status", () => {
 
 test("rejects an underpayment for the requested purpose", () => {
   // ₹50 paid, ₹2000 product.
-  assert.deepEqual(check(payment({ amount: 5000 }), "builder_unlock"), {
+  assert.deepEqual(check(payment({ amountPaise: "5000" }), "builder_unlock"), {
     error: "payment amount mismatch",
     status: 400,
   });
 });
 
-test("accepts a correct amount delivered as a string", () => {
-  // Razorpay sometimes serialises amount as a string; Number() coercion must
-  // not false-reject a genuinely good payment.
-  assert.equal(check(payment({ amount: "200000" }), "builder_unlock"), null);
-  assert.equal(check(payment({ amount: "5000" }), "contact_owner"), null);
+test("accepts a correct amount delivered as a number", () => {
+  // The gateway serialises amountPaise as a string; the webhook body as a
+  // number. Number() coercion must not false-reject a genuinely good payment.
+  assert.equal(check(payment({ amountPaise: 200000 }), "builder_unlock"), null);
+  assert.equal(check(payment({ amountPaise: 5000 }), "contact_owner"), null);
+});
+
+test("does not accept the rupee amount in place of paise", () => {
+  // "50.00" is the rupee field; a refactor that reads it instead of amountPaise
+  // must fail here, not in production.
+  assert.notEqual(check(payment({ amountPaise: "50.00" }), "contact_owner"), null);
 });
 
 test("rejects a payment in the wrong currency", () => {
@@ -111,7 +121,7 @@ test("reports the order mismatch before the amount mismatch", () => {
   // Pins guard ordering so a refactor cannot silently reorder the checks and
   // start leaking "which order was this?" through the error body.
   assert.deepEqual(
-    check(payment({ order_id: "order_SomeoneElse", amount: 1 })),
+    check(payment({ orderId: "builder_unlock_someone_else", amountPaise: "1" })),
     { error: "payment does not match order", status: 400 },
   );
 });
@@ -121,7 +131,7 @@ test("treats a payment_id unique violation as the same payment arriving twice", 
     isSamePaymentConflict({
       message:
         'duplicate key value violates unique constraint "purchases_payment_id_key"',
-      details: "Key (payment_id)=(pay_NfP9k9ZzT4bWqR) already exists.",
+      details: "Key (payment_id)=(c7942127-14e3-469a-9e4a-9359a16f903a) already exists.",
     }),
     true,
   );

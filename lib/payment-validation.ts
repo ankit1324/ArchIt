@@ -4,7 +4,7 @@ import type { FeePurpose } from "./fees";
  * Pure payment-validation decisions. This module deliberately has NO runtime
  * imports — the FeePurpose import above is type-only and erased — so the money
  * logic can be unit-tested directly under `node --test` without standing up
- * Razorpay, Supabase or "server-only". lib/purchases.ts owns the I/O.
+ * the YouPI gateway, Supabase or "server-only". lib/purchases.ts owns the I/O.
  */
 
 /** The ledger's idempotency key — a conflict here is the same money twice. */
@@ -15,7 +15,7 @@ export const PAYMENT_ID_CONSTRAINT = "purchases_payment_id_key";
  * value (rather than importing FEES) to keep this module import-free. `satisfies`
  * only rejects unknown entries; the exhaustiveness check below also fails the
  * build when FeePurpose gains a member that is missing here — a purpose left out
- * would take a captured payment and then refuse to record it.
+ * would take a successful payment and then refuse to record it.
  */
 export const FEE_PURPOSES = [
   "contact_owner",
@@ -29,16 +29,23 @@ const allPurposesListed: [UnlistedPurpose] extends [never] ? true : UnlistedPurp
 void allPurposesListed;
 
 export function isFeePurpose(value: string): value is FeePurpose {
-  // A plain array lookup, not `key in FEES`: purpose arrives from Razorpay
-  // order notes, and `"toString" in FEES` would otherwise be true.
+  // A plain array lookup, not `key in FEES`: purpose arrives from gateway
+  // metadata, and `"toString" in FEES` would otherwise be true.
   return (FEE_PURPOSES as readonly string[]).includes(value);
 }
 
-/** Minimal shape of a fetched Razorpay payment that we actually gate on. */
+/**
+ * YouPI session states that mean "still live, keep waiting" rather than
+ * "not paid". The webhook (or a later verify call) settles them.
+ */
+export const PENDING_STATUSES = ["INITIATED", "ACTIVE", "QUEUED", "PROCESSING"] as const;
+
+/** Minimal shape of a fetched YouPI payment that we actually gate on. */
 export interface FetchedPayment {
-  order_id?: string | null;
+  orderId?: string | null;
   status?: string;
-  amount?: string | number;
+  /** Paise; the gateway returns it as a string. */
+  amountPaise?: string | number;
   currency?: string;
 }
 
@@ -47,9 +54,9 @@ export type PurchaseFailure = { error: string; status: number };
 /**
  * Does this payment actually match what was ordered? Returns null when good.
  *
- * The order alone only proves what we asked for, never what was paid — without
- * this, an authorized-but-uncaptured payment (which auto-voids after a few days)
- * would buy a permanent entitlement.
+ * Our order record only proves what we asked for, never what was paid —
+ * without this a session that was opened but never completed (or completed for
+ * a different amount) would buy a permanent entitlement.
  */
 export function checkPayment(
   payment: FetchedPayment,
@@ -63,31 +70,31 @@ export function checkPayment(
 ): PurchaseFailure | null {
   const { orderId, purpose, paymentId, expectedAmount } = expected;
 
-  if (payment.order_id !== orderId) {
+  if (payment.orderId !== orderId) {
     console.error(
-      `Payment ${paymentId} belongs to order ${payment.order_id}, not ${orderId}`,
+      `Payment ${paymentId} belongs to order ${payment.orderId}, not ${orderId}`,
     );
     return { error: "payment does not match order", status: 400 };
   }
-  if (payment.status !== "captured") {
-    // "authorized" is a live payment mid-auto-capture, not a failure: the
-    // webhook will finish it. 202 keeps the client from showing a scary
-    // "could not be confirmed" alert (and from paying a second time) for
-    // money that is about to settle. Anything else really is not paid.
-    if (payment.status === "authorized") {
+  if (payment.status !== "SUCCESS") {
+    // A live session mid-verification is not a failure: the webhook will finish
+    // it. 202 keeps the client from showing a scary "could not be confirmed"
+    // alert (and from paying a second time) for money that is about to settle.
+    // FAILED / EXPIRED / CANCELLED really are not paid.
+    if ((PENDING_STATUSES as readonly string[]).includes(payment.status ?? "")) {
       console.warn(
-        `Payment ${paymentId} still authorized, awaiting capture — deferring ${purpose} to the webhook`,
+        `Payment ${paymentId} still ${payment.status} — deferring ${purpose} to the webhook`,
       );
       return { error: "payment processing", status: 202 };
     }
     console.error(
-      `Payment ${paymentId} is "${payment.status}", not captured — not granting ${purpose}`,
+      `Payment ${paymentId} is "${payment.status}", not SUCCESS — not granting ${purpose}`,
     );
-    return { error: "payment not captured", status: 402 };
+    return { error: "payment not completed", status: 402 };
   }
-  if (Number(payment.amount) !== expectedAmount) {
+  if (Number(payment.amountPaise) !== expectedAmount) {
     console.error(
-      `Payment ${paymentId} amount ${payment.amount} != expected ${expectedAmount} for ${purpose}`,
+      `Payment ${paymentId} amount ${payment.amountPaise} != expected ${expectedAmount} for ${purpose}`,
     );
     return { error: "payment amount mismatch", status: 400 };
   }

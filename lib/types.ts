@@ -36,6 +36,12 @@ export interface Listing {
   mine?: boolean;
   /** true when the lister paid the ₹250 featured-listing fee */
   featured?: boolean;
+  /**
+   * Detail route only: whether this listing has an owner contact at all, so
+   * the UI can offer the ₹50 unlock without revealing the value. `owner`
+   * itself is present only for the lister or after a contact_owner purchase.
+   */
+  hasOwner?: boolean;
 }
 
 export interface Poi {

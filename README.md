@@ -56,7 +56,7 @@ flowchart TB
         propsApi["/api/properties"]
         designsApi["/api/designs"]
         payApi["/api/create-order<br/>/api/verify-payment"]
-        hook["/api/webhooks/razorpay"]
+        hook["/api/webhooks/youpi"]
         upload["/api/upload"]
     end
 
@@ -80,9 +80,9 @@ flowchart TB
     db -->|"bypasses RLS"| pg
     db --> storage
 
-    rzp["Razorpay"]
-    payApi --> rzp
-    rzp -.->|"signed webhook"| hook
+    pg2["YouPI-PG<br/>self-hosted UPI gateway"]
+    payApi --> pg2
+    pg2 -.->|"signed webhook"| hook
 ```
 
 Every arrow into Postgres goes through a server route holding the secret key. There
@@ -97,7 +97,8 @@ is no path from the browser to the database, which is why RLS can stay deny-all.
 - **[Supabase](https://supabase.com)** — Postgres for listings, designs, and the
   purchase ledger; Storage for listing photos
 - **[Clerk](https://clerk.com)** for auth
-- **[Razorpay](https://razorpay.com)** for payments
+- **[YouPI-PG](https://github.com/youpi-pg/YouPI-PG)** — self-hosted, zero-fee UPI
+  payment gateway; the browser embeds its checkout, the server talks to its API
 - **Tailwind CSS 4**
 - Tests on `node --test`, no test framework dependency
 
@@ -122,7 +123,7 @@ sequenceDiagram
     autonumber
     participant C as Browser
     participant O as /api/create-order
-    participant R as Razorpay
+    participant G as YouPI-PG gateway
     participant V as /api/verify-payment
     participant L as purchases ledger
 
@@ -131,22 +132,26 @@ sequenceDiagram
     O->>O: Clerk session, else 401
     O->>O: rate limit, 5 per minute
     O->>O: amount looked up in the fee table
-    O->>R: create order, notes carry purpose + userId + ref
-    O-->>C: orderId, amount, keyId
-    C->>R: checkout
-    R-->>C: order_id, payment_id, signature
-    C->>V: POST the three fields
-    V->>V: HMAC-SHA256, timingSafeEqual
-    Note over V: mismatch stops here with 400
-    V->>R: read the order back
+    O->>G: create payment, metadata carries purpose + userId + ref
+    O-->>C: paymentId, checkoutUrl
+    C->>G: youpi.js iframe checkout (UPI)
+    G-->>C: payment_success (postMessage)
+    C->>V: POST paymentId
+    V->>G: GET payment with X-Merchant-Key
+    Note over V: metadata only comes back with the merchant key
+    V->>V: status SUCCESS, amount, currency, order all checked
     V->>L: record purchase, server-side only
     V-->>C: verified
+    G-.->>L: signed webhook records it too if the tab closed
     L-->>C: later reads derive entitlements
 ```
 
 The amount is read from the fee table *after* the session check, and the purchase is
-written only after the signature verifies — so a client can choose what it is buying,
-never what it costs or whether it succeeded.
+written only after the server has re-read the payment from the gateway — the browser
+can say "I paid" but it can never make that true. Both the verify route and the
+webhook (`/api/webhooks/youpi`, HMAC-SHA256 over the raw body) funnel into the same
+`recordPurchase`, so a user who closes the tab mid-checkout still gets what they paid
+for, and a duplicate delivery is a no-op.
 
 **Row Level Security is deny-all on purpose.** Every table has RLS enabled and
 zero policies, so the anon and publishable keys can read nothing. All data access
@@ -184,9 +189,10 @@ Open [http://localhost:3000](http://localhost:3000).
 | `SUPABASE_SECRET_KEY` | Server routes; bypasses RLS, never expose |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser client |
 | `CLERK_SECRET_KEY` | Clerk server verification |
-| `RAZORPAY_KEY_ID` | Checkout |
-| `RAZORPAY_KEY_SECRET` | Order creation and payment verification |
-| `RAZORPAY_WEBHOOK_SECRET` | Webhook signature verification |
+| `YOUPI_API_URL` | YouPI-PG payment API base, server-only |
+| `NEXT_PUBLIC_YOUPI_PORTAL_URL` | Checkout portal that serves `youpi.js` and the iframe; defaults to the API URL |
+| `YOUPI_MERCHANT_ID` | Merchant UUID (optional if the gateway has a single default merchant) |
+| `YOUPI_WEBHOOK_SECRET` | Signs webhooks; also sent as `X-Merchant-Key` so payment lookups include metadata |
 | `CRON_SECRET` | Authorizes `/api/keepalive`; the endpoint 401s without it |
 
 ### Database

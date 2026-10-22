@@ -2,8 +2,7 @@ import Link from "next/link";
 import localFont from "next/font/local";
 import Navbar from "@/components/Navbar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
-// [PAYWALL DISABLED — free for now]
-// import { feeLabel } from "@/lib/fees";
+import { feeLabel } from "@/lib/fees";
 
 // Self-hosted rather than next/font/google: a build that has to reach Google
 // Fonts is a build that can fail offline. See assets/fonts/README.md.
@@ -35,9 +34,7 @@ const PRODUCTS = [
     name: "ArchIt Find",
     tagline: "Every home, on a living map",
     body: "Fly over a 3D satellite city, browse real listings, list your own property and reach owners directly.",
-    // [PAYWALL DISABLED — free for now]
-    // badge: `Free listing · ${feeLabel("contact_owner")} contact`,
-    badge: "Free listing · free contact",
+    badge: `Free listing · ${feeLabel("contact_owner")} contact`,
     badgeClass: "bg-magenta text-white",
     cta: "Open the map",
     href: "/find",
@@ -50,7 +47,7 @@ const PRODUCTS = [
     name: "ArchIt 3D Builder",
     tagline: "Your home, room by room",
     body: "Design a complete house in 3D — floors, facades, windows, furniture — then save and refine every idea.",
-    badge: "Paid",
+    badge: `${feeLabel("builder_unlock")} one-time`,
     badgeClass: "bg-plum text-cream",
     cta: "Start designing",
     href: "/designer",
@@ -183,7 +180,7 @@ export default function SuiteDashboard() {
           <span aria-hidden>·</span>
           <span>Data on Supabase</span>
           <span aria-hidden>·</span>
-          <span>Payments by Razorpay</span>
+          <span>UPI payments via YouPI</span>
         </footer>
       </main>
     </div>

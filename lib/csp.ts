@@ -7,7 +7,24 @@
 
 const SUPABASE = "https://tdbnwismmyllpufurqus.supabase.co"; // NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_WS = "wss://tdbnwismmyllpufurqus.supabase.co"; // realtime, if ever enabled
-const RAZORPAY = ["https://checkout.razorpay.com", "https://*.razorpay.com"]; // lib/checkout.ts
+// YouPI-PG self-hosted gateway (lib/checkout.ts): the checkout portal serves
+// youpi.js (script-src) and the /checkout/:id iframe (frame-src). Read from env
+// so a dev gateway on localhost and a production one on pay.<domain> both
+// work without a code change. Unset = paywall cannot run, so nothing is listed.
+const YOUPI = Array.from(
+  new Set(
+    [process.env.NEXT_PUBLIC_YOUPI_PORTAL_URL, process.env.YOUPI_API_URL]
+      .filter((u): u is string => Boolean(u))
+      .map((u) => {
+        try {
+          return new URL(u).origin;
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean),
+  ),
+);
 // Clerk: dev instances serve clerk.browser.js + the FAPI from *.clerk.accounts.dev,
 // production instances from clerk.<your-domain> — add that host here at launch.
 const CLERK = [
@@ -32,7 +49,7 @@ const VERCEL_INSIGHTS = [
 ];
 
 const SCRIPT_HOSTS = [
-  ...RAZORPAY,
+  ...YOUPI,
   ...CLERK,
   "https://challenges.cloudflare.com",
   JSDELIVR,
@@ -46,7 +63,7 @@ export interface CspOptions {
    * 'unsafe-inline' — Next.js stamps it onto its own framework/page scripts
    * (and ClerkProvider onto its injected ones). Omit it only for the static
    * builder carve-out, whose inline importmap has no nonce and therefore must
-   * keep 'unsafe-inline'. External SDK scripts (Clerk, Razorpay, Vercel) load
+   * keep 'unsafe-inline'. External SDK scripts (Clerk, YouPI, Vercel) load
    * by src from the allow-listed hosts above, so no 'strict-dynamic' is needed.
    */
   nonce?: string;
@@ -75,12 +92,12 @@ export function buildCsp({ isDev, nonce }: CspOptions): string {
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' data: https://fonts.gstatic.com`,
     // blob:/data: cover maplibre's canvas + WebGL textures and builder screenshots.
-    `img-src 'self' data: blob: https://images.unsplash.com ${SUPABASE} ${TILES.join(" ")} https://img.clerk.com ${RAZORPAY.join(" ")}`,
+    `img-src 'self' data: blob: https://images.unsplash.com ${SUPABASE} ${TILES.join(" ")} https://img.clerk.com`,
     `media-src 'self' blob:`,
-    `connect-src 'self'${isDev ? " ws://localhost:* http://localhost:*" : ""} ${SUPABASE} ${SUPABASE_WS} ${[...CLERK, ...CLERK_EXTRA, ...RAZORPAY, "https://lumberjack.razorpay.com", ...TILES, NOMINATIM, JSDELIVR, ...VERCEL_INSIGHTS].join(" ")}`,
-    // Razorpay checkout renders in an iframe; Clerk uses one for its handshake and
+    `connect-src 'self'${isDev ? " ws://localhost:* http://localhost:*" : ""} ${SUPABASE} ${SUPABASE_WS} ${[...CLERK, ...CLERK_EXTRA, ...YOUPI, ...TILES, NOMINATIM, JSDELIVR, ...VERCEL_INSIGHTS].join(" ")}`,
+    // YouPI checkout renders in an iframe; Clerk uses one for its handshake and
     // Cloudflare Turnstile for bot protection.
-    `frame-src 'self' ${[...RAZORPAY, ...CLERK, "https://challenges.cloudflare.com"].join(" ")}`,
+    `frame-src 'self' ${[...YOUPI, ...CLERK, "https://challenges.cloudflare.com"].join(" ")}`,
     // maplibre-gl spawns its tile workers from blob: URLs.
     `worker-src 'self' blob:`,
     `manifest-src 'self'`,

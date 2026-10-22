@@ -58,10 +58,11 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong className="text-plum">Payment data</strong> —
-                transaction identifiers, order IDs, and payment status
-                relating to purchases you make. We do not collect or store
-                your card, UPI, or bank account details; these are handled
-                directly by our payment processor, Razorpay.
+                transaction identifiers, order IDs, UPI transaction
+                references (UTR), and payment status relating to purchases
+                you make. We do not collect or store your card, UPI PIN, or
+                bank account details; the payment itself happens inside your
+                UPI app.
               </li>
               <li>
                 <strong className="text-plum">Usage &amp; device data</strong>{" "}
@@ -85,8 +86,8 @@ export default function PrivacyPage() {
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>Provide, operate, and maintain the Services;</li>
               <li>
-                Process payments for contact unlocks, featured-listing
-                boosts, and builder-suite access via Razorpay;
+                Process UPI payments for contact unlocks, featured-listing
+                boosts, builder-suite access, and premium templates;
               </li>
               <li>
                 Display your listings and designs to other users of the
@@ -118,8 +119,9 @@ export default function PrivacyPage() {
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
                 <strong className="text-plum">Service providers</strong> —
-                Clerk (authentication), Razorpay (payment processing),
-                Supabase (database and file storage), and hosting/CDN
+                Clerk (authentication), our self-hosted UPI payment gateway
+                (payment processing), Supabase (database and file storage),
+                and hosting/CDN
                 providers, each bound by their own privacy and security
                 obligations;
               </li>

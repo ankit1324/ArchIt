@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Listing, ListingType, PropertyKind } from "@/lib/types";
-// [PAYWALL DISABLED — free for now]
-// import { feeLabel } from "@/lib/fees";
+import { feeLabel } from "@/lib/fees";
 import { MAX_UPLOAD_BYTES, SUPPORTED_MIME_TYPES } from "@/lib/upload";
 import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
@@ -399,12 +398,9 @@ export default function AddPropertyForm({
         <span className="text-[18px]">{featured ? "⭐" : "☆"}</span>
         <span className="flex flex-col">
           <span className="text-[12.5px] font-bold">
-            {/* [PAYWALL DISABLED — free for now] featuring is free now
             {featured
               ? `Featured listing — ${feeLabel("featured_property")}`
               : `Feature on map — ${feeLabel("featured_property")}`}
-            */}
-            {featured ? "Featured listing — free" : "Feature on map — free"}
           </span>
           <span className="text-[11px] font-medium opacity-70">
             {featured
@@ -419,7 +415,6 @@ export default function AddPropertyForm({
         disabled={saving}
         className="mt-1 rounded-full bg-plum py-2.5 text-[13px] font-bold text-cream transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {/* [PAYWALL DISABLED — free for now] no payment on save anymore
         {saving
           ? "Saving…"
           : editing
@@ -427,8 +422,6 @@ export default function AddPropertyForm({
             : featured
               ? `Pay ${feeLabel("featured_property")} & save featured property`
               : "Save property — free"}
-        */}
-        {saving ? "Saving…" : editing ? "Save changes" : "Save property"}
       </button>
     </section>
   );

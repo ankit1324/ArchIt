@@ -1,5 +1,4 @@
 import "server-only";
-import Razorpay from "razorpay";
 import { db } from "./db";
 import { FEES, type FeePurpose } from "./fees";
 import {
@@ -8,6 +7,7 @@ import {
   isSamePaymentConflict,
 } from "./payment-validation";
 import { retryTransientDb } from "./retry";
+import { fetchPayment, type YoupiPayment } from "./youpi";
 
 // re-exported so callers have one import site for the purchase contract
 export {
@@ -20,25 +20,31 @@ export type {
   PurchaseFailure,
 } from "./payment-validation";
 
-// one SDK client for every server-side Razorpay call
-export const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
-
 /**
- * Fetch the payment, giving auto-capture a moment to land.
+ * Fetch the payment, giving the gateway's verification window a moment to land.
  *
- * verify-payment runs the instant the browser's checkout handler fires, which
- * can be a beat before Razorpay flips authorized → captured. Re-reading a
- * couple of times turns what would be a "payment processing" bounce into a
+ * verify-payment runs the instant the checkout iframe posts `payment_success`,
+ * which can be a beat before the gateway flips PROCESSING → SUCCESS. Re-reading
+ * a couple of times turns what would be a "payment processing" bounce into a
  * clean confirmation for the overwhelming majority of real payments.
+ *
+ * `poll: false` skips the re-reads: the webhook already arrives after the
+ * gateway settled, so sleeping there only ties up the handler.
  */
-async function fetchSettledPayment(paymentId: string) {
-  let payment = await razorpay.payments.fetch(paymentId);
-  for (let attempt = 1; attempt < 3 && payment.status === "authorized"; attempt++) {
+async function fetchSettledPayment(
+  paymentId: string,
+  poll: boolean,
+): Promise<YoupiPayment> {
+  let payment = await fetchPayment(paymentId);
+  for (
+    let attempt = 1;
+    poll &&
+    attempt < 3 &&
+    (payment.status === "PROCESSING" || payment.status === "ACTIVE");
+    attempt++
+  ) {
     await new Promise((resolve) => setTimeout(resolve, 1200));
-    payment = await razorpay.payments.fetch(paymentId);
+    payment = await fetchPayment(paymentId);
   }
   return payment;
 }
@@ -48,8 +54,8 @@ async function fetchSettledPayment(paymentId: string) {
  *
  * Only featured_property has one: the boost lives in a column on the listing.
  * Doing it here means the webhook grants it too, so a user who closes the tab
- * mid-checkout still gets what they paid for — previously this depended on the
- * browser making a follow-up PUT, and the money was simply lost if it didn't.
+ * mid-checkout still gets what they paid for — otherwise this would depend on
+ * the browser making a follow-up PUT, and the money would be lost if it didn't.
  *
  * Idempotent, and safe to re-run on a duplicate-payment retry.
  */
@@ -75,53 +81,61 @@ async function applyEntitlement(
   }
 }
 
+function metaString(meta: Record<string, unknown> | undefined, key: string): string {
+  const v = meta?.[key];
+  return typeof v === "string" ? v : "";
+}
+
 /**
- * Record a captured payment in the purchases ledger, resolving purpose/user/ref
- * from the order notes written by create-order. Shared by verify-payment and
- * the Razorpay webhook so the ledger contract lives in one place.
+ * Record a successful payment in the purchases ledger, resolving
+ * purpose/user/ref from the metadata written by create-order. Shared by
+ * verify-payment and the YouPI webhook so the ledger contract lives in one place.
  *
- * The payment itself is re-fetched from Razorpay and checked (captured, right
- * amount, right currency, right order) before anything is granted — the order
- * alone only proves what we asked for, not what was actually paid.
+ * The payment is re-fetched from the gateway with the merchant key and checked
+ * (SUCCESS, right amount, right currency, right order) before anything is
+ * granted — a webhook body or a browser claim alone is never trusted.
  *
  * Returns null on success; a duplicate of the *same* payment counts as success.
  * A duplicate that trips an entitlement index instead means a second, distinct
- * payment was captured for something already owned: that is money we owe back,
- * so it is logged loudly rather than swallowed. Throws if a Razorpay lookup fails.
+ * payment was completed for something already owned: that is money we owe back,
+ * so it is logged loudly rather than swallowed. Throws if the gateway lookup fails.
  */
-export async function recordPurchaseFromOrder(
-  orderId: string,
+export async function recordPurchase(
   paymentId: string,
   fallbackUserId?: string | null,
+  options: { poll?: boolean } = {},
 ): Promise<{ error: string; status: number } | null> {
-  const order = await razorpay.orders.fetch(orderId);
-  const notes = (order.notes ?? {}) as {
-    purpose?: string;
-    userId?: string;
-    ref?: string;
-  };
-  const userId = notes.userId || fallbackUserId;
-  if (!notes.purpose || !userId) {
+  const payment = await fetchSettledPayment(paymentId, options.poll ?? true);
+  const orderId = payment.orderId;
+  const meta = payment.metadata;
+  if (!meta) {
+    // Public view only: the merchant key was rejected or unset. Without
+    // metadata we cannot know who paid for what — refuse rather than guess.
+    console.error(`Payment ${paymentId} returned no metadata — check YOUPI_WEBHOOK_SECRET`);
+    return { error: "payment metadata unavailable", status: 502 };
+  }
+  const rawPurpose = metaString(meta, "purpose");
+  const metaUserId = metaString(meta, "userId");
+  const ref = metaString(meta, "ref") || null;
+  const userId = metaUserId || fallbackUserId;
+  if (!rawPurpose || !userId) {
     return { error: "no user for purchase", status: 400 };
   }
-  // notes are echoed back from Razorpay; never trust them as a fee purpose
-  if (!isFeePurpose(notes.purpose)) {
+  // metadata is echoed back from the gateway; never trust it as a fee purpose
+  if (!isFeePurpose(rawPurpose)) {
     console.error(
-      `Unknown purpose "${notes.purpose}" on order ${orderId} — refusing to record`,
+      `Unknown purpose "${rawPurpose}" on payment ${paymentId} — refusing to record`,
     );
     return { error: "unknown purchase purpose", status: 400 };
   }
-  const purpose = notes.purpose;
+  const purpose = rawPurpose;
   // verify-payment: the paying session must match the order's owner so one
   // user can't confirm another's order (ledger grief/confirm oracle)
-  if (fallbackUserId && notes.userId && notes.userId !== fallbackUserId) {
+  if (fallbackUserId && metaUserId && metaUserId !== fallbackUserId) {
     return { error: "order belongs to another user", status: 403 };
   }
 
   // Confirm the money actually landed, for the right amount, on this order.
-  // Without this an authorized-but-uncaptured payment (which auto-voids after
-  // a few days) would buy a permanent entitlement.
-  const payment = await fetchSettledPayment(paymentId);
   const mismatch = checkPayment(payment, {
     orderId,
     purpose,
@@ -134,10 +148,10 @@ export async function recordPurchaseFromOrder(
     db.from("purchases").insert({
       user_id: userId,
       purpose,
-      ref: notes.ref || null,
+      ref,
       order_id: orderId,
       payment_id: paymentId,
-      amount: Number(payment.amount),
+      amount: Number(payment.amountPaise),
     }),
   );
 
@@ -146,7 +160,7 @@ export async function recordPurchaseFromOrder(
     // Re-apply the entitlement anyway — the first attempt may have died
     // between the insert and the grant.
     if (isSamePaymentConflict(error)) {
-      await applyEntitlement(purpose, userId, notes.ref || null);
+      await applyEntitlement(purpose, userId, ref);
       return null;
     }
     // Different payment, same entitlement: the user was charged again for
@@ -154,7 +168,7 @@ export async function recordPurchaseFromOrder(
     // this payment is unreconciled and owed back.
     console.error(
       `DUPLICATE CHARGE: payment ${paymentId} (order ${orderId}, user ${userId}, ` +
-        `${purpose}, ${FEES[purpose]} paise) was captured for an entitlement already ` +
+        `${purpose}, ${FEES[purpose]} paise) succeeded for an entitlement already ` +
         `held. Not recorded — refund required. Constraint: ${error.message}`,
     );
     return { error: "already purchased", status: 409 };
@@ -169,6 +183,6 @@ export async function recordPurchaseFromOrder(
     };
   }
 
-  await applyEntitlement(purpose, userId, notes.ref || null);
+  await applyEntitlement(purpose, userId, ref);
   return null;
 }

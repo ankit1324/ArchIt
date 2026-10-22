@@ -3,7 +3,7 @@ import { db } from "./db";
 import type { FeePurpose } from "./fees";
 
 /**
- * Ledger lookups for paid entitlements. Kept free of the Razorpay SDK so route
+ * Ledger lookups for paid entitlements. Kept free of the gateway client so route
  * handlers that only need to *check* a purchase (designs, property detail)
  * don't pull the payments client into their bundle.
  *
@@ -53,26 +53,19 @@ export async function hasBuilderUnlock(
 /**
  * Guard for the builder routes: returns a Response to send back when the user
  * has not paid (or the check failed), or null when they may proceed.
- *
- * [PAYWALL DISABLED — free for now] The ₹2000 builder_unlock check is commented
- * out so every signed-in user can use the builder. To re-enable monetization,
- * restore the body below (and the payFee("builder_unlock") flow in
- * app/designer/page.tsx + lib/checkout.ts).
  */
 export async function builderUnlockError(
   userId: string,
 ): Promise<Response | null> {
-  // --- original paid gate (restore to re-enable the paywall) ---
-  // const result = await hasBuilderUnlock(userId);
-  // if (!result.ok) {
-  //   return Response.json({ error: result.error }, { status: 500 });
-  // }
-  // if (!result.granted) {
-  //   return Response.json(
-  //     { error: "builder unlock required", purpose: "builder_unlock" },
-  //     { status: 402 },
-  //   );
-  // }
-  void userId; // unused while the paywall is disabled
+  const result = await hasBuilderUnlock(userId);
+  if (!result.ok) {
+    return Response.json({ error: result.error }, { status: 500 });
+  }
+  if (!result.granted) {
+    return Response.json(
+      { error: "builder unlock required", purpose: "builder_unlock" },
+      { status: 402 },
+    );
+  }
   return null;
 }

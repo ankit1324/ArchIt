@@ -44,8 +44,8 @@ jobs:
 
       # Placeholder values only. next build evaluates route modules to collect
       # page data, so anything constructed at module scope runs during the build:
-      # lib/purchases.ts builds its Razorpay client that way, and Clerk wants a
-      # publishable key it can parse. lib/db.ts no longer needs this — its client
+      # lib/csp.ts reads the YouPI origins at module scope for the builder CSP
+      # carve-out in next.config.ts, and Clerk wants a publishable key it can parse. lib/db.ts no longer needs this — its client
       # is lazy now — but the Supabase entries stay so a future module-scope
       # regression fails on its own merits rather than on missing config.
       # Nothing here authenticates against anything; no request is made during a
@@ -58,6 +58,6 @@ jobs:
           SUPABASE_SECRET_KEY: sb_secret_ci_placeholder
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_ci_placeholder
-          RAZORPAY_KEY_ID: rzp_test_ci_placeholder
-          RAZORPAY_KEY_SECRET: ci_placeholder
-          RAZORPAY_WEBHOOK_SECRET: ci_placeholder
+          YOUPI_API_URL: https://pay.placeholder.test
+          NEXT_PUBLIC_YOUPI_PORTAL_URL: https://pay.placeholder.test
+          YOUPI_WEBHOOK_SECRET: ci_placeholder

@@ -5,14 +5,10 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { safeImageUrl } from "@/lib/url";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
-import DesignerOverlay from "@/components/DesignerOverlay";
+import DesignerOverlay, { type SaveResult } from "@/components/DesignerOverlay";
 import { CloseIcon } from "@/components/icons";
-// [PAYWALL DISABLED — free for now]
-// import { payFee } from "@/lib/checkout";
+import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
-// [PAYWALL DISABLED — free for now] kept imported on purpose: its only remaining
-// use is inside the preserved-for-restore sales card below (disabled via `if (false)`),
-// and removing the import would break compilation of that untouched JSX.
 import { feeLabel } from "@/lib/fees";
 
 interface Setup {
@@ -29,16 +25,11 @@ interface Setup {
 const FT_PER_M = 3.28084;
 const toM = (v: number, unit: "m" | "ft") => (unit === "ft" ? v / FT_PER_M : v);
 
-// Decode a base64 data: URL locally — fetch(dataUrl) is blocked by the CSP's
-// connect-src, which doesn't (and shouldn't) allow data:.
-function dataUrlToBlob(dataUrl: string): Blob {
-  const [head, b64 = ""] = dataUrl.split(",", 2);
-  const mime = /^data:([^;,]+)/.exec(head)?.[1] ?? "application/octet-stream";
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
-}
+const SNAPSHOT_EXT: Record<string, string> = {
+  "image/webp": "webp",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+};
 
 /** blueprint-grid + colour-wash stage behind the designer's card screens */
 function Backdrop({
@@ -320,23 +311,16 @@ export default function DesignerPage() {
   const [setup, setSetup] = useState<Setup | null>(null);
   const [session, setSession] = useState(0); // bump to remount the builder
   const [listOpen, setListOpen] = useState(true);
-  // [PAYWALL DISABLED — free for now] everyone is unlocked while the builder
-  // paywall is off, so the builder renders immediately.
-  // was: const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
-  const [unlocked] = useState<boolean | null>(true);
-  // [PAYWALL DISABLED — free for now]
-  // was: const [paying, setPaying] = useState(false);
-  const [paying] = useState(false);
+  const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
+  const [paying, setPaying] = useState(false);
   const savingRef = useRef(false);
 
-  /* [PAYWALL DISABLED — free for now]
   useEffect(() => {
     fetch("/api/purchases?purpose=builder_unlock")
       .then((r) => (r.ok ? r.json() : { unlocked: false }))
       .then((d: { unlocked?: boolean }) => setUnlocked(!!d.unlocked))
       .catch(() => setUnlocked(false));
   }, []);
-  */
 
   useEffect(() => {
     if (!unlocked) return;
@@ -346,7 +330,6 @@ export default function DesignerPage() {
       .catch(() => {});
   }, [unlocked]);
 
-  /* [PAYWALL DISABLED — free for now]
   const buyUnlock = async () => {
     setPaying(true);
     try {
@@ -358,27 +341,34 @@ export default function DesignerPage() {
       setPaying(false);
     }
   };
-  */
-  // [PAYWALL DISABLED — free for now] no-op stub so the preserved sales card
-  // below still compiles; was: open Razorpay checkout via payFee().
-  const buyUnlock = async () => {};
 
   const current = designs.find((d) => d.id === currentId) ?? null;
 
-  const saveDesign = async (designState: DesignStateV3, snapshot: string) => {
-    if (savingRef.current) return;
+  const saveDesign = async (
+    designState: DesignStateV3,
+    snapshot: Blob | string,
+  ): Promise<SaveResult> => {
+    if (savingRef.current) return { ok: false, error: "a save is already in progress" };
     savingRef.current = true;
     try {
       let snapshotUrl = current?.snapshot;
       // Thumbnail is best-effort: a failed upload keeps the old snapshot
-      // instead of failing the whole save.
-      try {
-        const fd = new FormData();
-        fd.append("file", new File([dataUrlToBlob(snapshot)], "snapshot.png", { type: "image/png" }));
-        const up = await fetch("/api/upload", { method: "POST", body: fd });
-        if (up.ok) snapshotUrl = ((await up.json()) as { url: string }).url;
-      } catch (err) {
-        console.warn("Snapshot upload failed", err);
+      // instead of failing the whole save. The builder sends a small WebP/JPEG
+      // Blob; a string (data URL from a stale cached builder) is skipped rather
+      // than decoded — fetch(data:) is blocked by the CSP's connect-src.
+      if (snapshot instanceof Blob) {
+        try {
+          const type = SNAPSHOT_EXT[snapshot.type] ? snapshot.type : "image/webp";
+          const fd = new FormData();
+          fd.append(
+            "file",
+            new File([snapshot], `snapshot.${SNAPSHOT_EXT[type]}`, { type }),
+          );
+          const up = await fetch("/api/upload", { method: "POST", body: fd });
+          if (up.ok) snapshotUrl = ((await up.json()) as { url: string }).url;
+        } catch (err) {
+          console.warn("Snapshot upload failed", err);
+        }
       }
 
       const body = {
@@ -411,7 +401,7 @@ export default function DesignerPage() {
           });
       if (!res.ok) {
         window.alert("Could not save the design — try again.");
-        return;
+        return { ok: false, error: `server responded ${res.status}` };
       }
       const saved = (await res.json()) as Design;
       setDesigns((prev) =>
@@ -421,8 +411,10 @@ export default function DesignerPage() {
       );
       setCurrentId(saved.id);
       celebrate(current ? "Design saved!" : "Design created!");
-    } catch {
+      return { ok: true };
+    } catch (err) {
       window.alert("Could not save the design — try again.");
+      return { ok: false, error: err instanceof Error ? err.message : "network error" };
     } finally {
       savingRef.current = false;
     }
@@ -457,8 +449,7 @@ export default function DesignerPage() {
     }
   };
 
-  if (false) {
-    // [PAYWALL DISABLED — free for now] was: unlocked !== true — sales card kept for easy restore
+  if (unlocked !== true) {
     return (
       <Backdrop className="relative h-full">
         {unlocked === false && (
