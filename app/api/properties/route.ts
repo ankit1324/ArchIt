@@ -1,8 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
-import type { Listing } from "@/lib/types";
-import { safeImageUrl } from "@/lib/url";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
+import { parseJsonBody } from "@/lib/request";
+import { safeImageUrl } from "@/lib/url";
+import { validateListing } from "@/lib/validators";
+
+/** Hard cap on the public list; the map renders every row it gets. */
+const LIST_LIMIT = 1000;
 
 // owner contact is paywalled (#3): the public list never includes it, and the
 // raw lister user_id is dropped — each row carries a server-computed `mine`.
@@ -11,10 +15,16 @@ export async function GET() {
   const { data, error } = await db
     .from("properties")
     .select(OWNED_COLUMNS)
-    .order("created_at");
+    .order("created_at")
+    .limit(LIST_LIMIT);
   if (error) {
     console.error("GET /api/properties failed:", error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
+  }
+  if (data.length === LIST_LIMIT) {
+    console.warn(
+      `GET /api/properties hit the ${LIST_LIMIT}-row cap — listings beyond it are not served; paginate`,
+    );
   }
   return Response.json(
     data.map((r) => ({ ...rowToListing(r), mine: ownsRow(r, userId) })),
@@ -22,30 +32,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const l = (await request.json()) as Omit<Listing, "id">;
-  if (!l.address || !l.price || !l.coords) {
-    return Response.json({ error: "address, price, coords required" }, { status: 400 });
-  }
-  if (
-    (l.photo && !safeImageUrl(l.photo)) ||
-    (l.photos && l.photos.some((p) => !safeImageUrl(p)))
-  ) {
-    return Response.json({ error: "invalid photo url" }, { status: 400 });
-  }
   // lister recorded from the session, never from the client body
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
   if (!(await checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000))) {
     return rateLimitedResponse();
   }
-  // [PAYWALL DISABLED — free for now] featuring is a free toggle, so the flag
-  // is trusted from the client body on create. Original paid-boost behaviour
-  // (force false, then flip via PUT only after a verified featured_property
-  // purchase with ref = this listing's id) — restore to re-enable the paywall:
-  // .insert({ ...listingToRow(l), user_id: userId, featured: false })
+  const l = await parseJsonBody(request, (v) => validateListing(v, safeImageUrl));
+  if (l instanceof Response) return l;
+
+  // featured is a paid boost (₹250 featured_property): never trusted from the
+  // body. It starts false and is flipped server-side once a purchase with
+  // ref = this listing's id is recorded (lib/purchases.ts applyEntitlement).
   const { data, error } = await db
     .from("properties")
-    .insert({ ...listingToRow(l), user_id: userId, featured: l.featured === true })
+    .insert({ ...listingToRow(l), user_id: userId, featured: false })
     .select(OWNED_COLUMNS)
     .single();
   if (error) {

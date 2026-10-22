@@ -22,3 +22,25 @@ export function safeImageUrl(url: string | null | undefined): string | null {
   if (!ALLOWED_IMAGE_HOSTS.includes(u.hostname)) return null;
   return url;
 }
+
+/**
+ * Object name inside a Supabase Storage public bucket, derived from the URL
+ * `getPublicUrl()` produced (`/storage/v1/object/public/<bucket>/<name>`), or
+ * null when the URL is not one of ours. Lets a listing delete also drop its
+ * uploaded photos without the row having to store object names separately.
+ */
+export function storageObjectName(url: string, bucket: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || !u.hostname.endsWith(".supabase.co")) return null;
+  const prefix = `/storage/v1/object/public/${bucket}/`;
+  if (!u.pathname.startsWith(prefix)) return null;
+  const name = decodeURIComponent(u.pathname.slice(prefix.length));
+  // one flat level of uuid.ext names; refuse anything that could traverse
+  if (!name || name.includes("/") || name.includes("..")) return null;
+  return name;
+}
