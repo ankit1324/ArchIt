@@ -35,7 +35,7 @@ const PRODUCTS = [
     tagline: "Every home, on a living map",
     body: "Fly over a 3D satellite city, browse real listings, list your own property and reach owners directly.",
     badge: `Free listing · ${feeLabel("contact_owner")} contact`,
-    badgeClass: "bg-magenta text-white",
+    badgeClass: "bg-magenta-deep text-white",
     cta: "Open the map",
     href: "/find",
     external: false,
@@ -92,7 +92,7 @@ export default function SuiteDashboard() {
             className="mx-auto max-w-3xl text-[42px] leading-[1.06] text-plum sm:text-[58px]"
             style={{ fontFamily: "var(--font-fraunces)" }}
           >
-            Dream it. <em className="text-magenta">Find</em> it.{" "}
+            Dream it. <em className="text-magenta-deep">Find</em> it.{" "}
             <em className="text-plum">Build</em> it.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-[15px] font-medium leading-relaxed text-plum-soft">
@@ -119,7 +119,7 @@ export default function SuiteDashboard() {
                   <p.Icon width={24} height={24} />
                 </span>
                 <span
-                  className={`rounded-full px-3 py-1.5 text-[10.5px] font-bold ${p.badgeClass}`}
+                  className={`rounded-full px-3 py-1.5 text-[11.5px] font-bold ${p.badgeClass}`}
                 >
                   {p.badge}
                 </span>
@@ -175,7 +175,7 @@ export default function SuiteDashboard() {
           ))}
         </section>
 
-        <footer className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[11px] font-bold uppercase tracking-[0.2em] text-plum-soft/60">
+        <footer className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[11px] font-bold uppercase tracking-[0.2em] text-plum-soft">
           <span>Secured by Clerk</span>
           <span aria-hidden>·</span>
           <span>Data on Supabase</span>

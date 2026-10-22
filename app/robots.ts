@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const SITE = "https://archit.chaudharyankit.in";
+import { SITE_URL } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -8,8 +7,9 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Gated app surfaces and auth screens: nothing useful to crawl.
-      disallow: ["/api/", "/find", "/designer", "/sign-in", "/sign-up"],
+      // /property/:id stays crawlable — those are the public listing pages.
+      disallow: ["/api/", "/find", "/designer", "/dashboard", "/sign-in", "/sign-up"],
     },
-    sitemap: `${SITE}/sitemap.xml`,
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
