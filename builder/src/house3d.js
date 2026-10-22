@@ -6,49 +6,69 @@ import {FLH, boundsOf, loopArea, pointInLoop, roofComponents, roofRects, sharedW
 import {beam, blocksRoot, fitShadows, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setSelOutline} from './scene.js';
 import {cachedMat, ceilMatCache, curbMat, doorFrameExtMat, doorFrameIntMat, doorGlassFrameMat, doorGlassMat, doorPanelExtMat, doorPanelIntMat, eavesMat, edgeMat, fasciaMat, fasciaSteelMat, handleMat, makeSurfaceTexture, mkFacadeMat, mkPaintMat, mkRevealMat, mkRoofMat, partMat, plantMat, skyFrameMat, skyGlassMat, slabMatCache, soffitMat, stepMat, trimMat, valleyMat, winFrameMat, winGlassMat} from './materials.js';
 import {markOverlayDirty} from './interact3d.js';
+import {BoxBatch} from './batch.js';
 
 // where a door sits on its wall — shared by buildBlockGroup and the live 3D door drag
 function doorPlacement(b, d){
   const [x,z] = wallPoint(b, d.wall, d.t);
   return {x, y:.06, z, rotY:(d.wall===0||d.wall===2) ? 0 : Math.PI/2};
 }
-function buildBlockGroup(b, opts={}){
+// Everything buildBlockGroup reads from outside the block, in the room's own frame:
+// per-wall thickness, party-wall de-duplication, the openings to cut (its own and a
+// neighbour's on a shared wall) and whether each door sits on a shared wall. Being
+// room-local, it is unchanged by moving or rotating the room as a whole.
+function blockContext(b){
+  const walls = (b.type==='balcony' ? [] : b.type==='veranda' ? [1,2,3] : [0,1,2,3]).map(wall=>{
+    const wl = wallLen(b, wall);
+    const nbs = wallNeighbors(b, wall);
+    return {
+      wall, wl,
+      // honest thickness: exterior 23 cm, interior party wall 10 cm (was a flat 9 cm)
+      wt: nbs.length ? 0.10 : 0.23,
+      // build a party wall once, not twice — but only when the neighbour's wall spans
+      // this one end to end, otherwise skipping would leave a real gap
+      skip: nbs.some(n => n.other.id < b.id && n.lo <= 0.02 && n.hi >= wl-0.02),
+      ops: wallOpenings(b, wall),
+    };
+  });
+  return {walls, interior: b.doors.map(d=>!!sharedWall(b, d.wall))};
+}
+// A room's group is rebuilt only when this changes. Position, rotation and name
+// are left out: they never change the room's own geometry (blockContext is local).
+function blockSignature(b, ctx){
+  const {cx, cz, rot, name, ...own} = b;
+  return JSON.stringify([own, ctx, C.paint[b.paint || state.paint].hex, state.facade, state.facadeMat]);
+}
+function buildBlockGroup(b, ctx = blockContext(b)){
   const g = new THREE.Group();
   b.furniture = b.furniture || [];
   const spec = C.rooms[b.type] || C.rooms.bedroom;
   const L = b.len, W = b.w, H = C.H;
   const paintHex = C.paint[b.paint || state.paint].hex;
-  const mkFacade = mkFacadeMat;
 
-  // walls: box material order [+x,-x,+y,-y,+z,-z]; outward face gets the facade
+  // The shell — wall pieces, reveals, rails, posts and stair treads — goes into one
+  // batched mesh with a draw call per material, not a mesh per box.
+  const shell = new BoxBatch();
+  // walls: box face order [+x,-x,+y,-y,+z,-z]; outward face gets the facade
   const OUT_FACE = {0:4, 2:5, 1:0, 3:1};
-  const wallsToBuild = b.type==='balcony' ? [] : b.type==='veranda' ? [1,2,3] : [0,1,2,3];
   // one paint material for every inward/hidden face in this room (cached by colour
-  // and finish, so rooms sharing a paint share the material too)
-  const paintMat = mkPaintMat(paintHex, b.wallMat, L, W);
+  // and finish, so rooms sharing a paint share the material too). UVs are metres,
+  // so the facade texture is the 1 m-repeat one.
+  const paintMat = mkPaintMat(paintHex, b.wallMat);
+  const facadeMat = mkFacadeMat(1, 1);
   const revealMat = mkRevealMat(paintHex);
+  const wallMats = OUT => [0,1,2,3,4,5].map(f=>f===OUT ? facadeMat : paintMat);
   // place a box on `wall`: uc = offset along the wall from its centre, st = depth
   const placeWall = (wall, wt, uc, yc, su, sy, st, mat)=>{
-    const m = new THREE.Mesh(
-      wall%2 ? new THREE.BoxGeometry(st, sy, su) : new THREE.BoxGeometry(su, sy, st), mat);
-    if(wall===0) m.position.set( uc, yc,  W/2-wt/2);
-    if(wall===2) m.position.set(-uc, yc, -W/2+wt/2);
-    if(wall===1) m.position.set( L/2-wt/2, yc, -uc);
-    if(wall===3) m.position.set(-L/2+wt/2, yc,  uc);
-    m.castShadow = true; g.add(m);
-    return m;
+    if(wall===0) shell.add( uc, yc,  W/2-wt/2, su, sy, st, mat);
+    if(wall===2) shell.add(-uc, yc, -W/2+wt/2, su, sy, st, mat);
+    if(wall===1) shell.add( L/2-wt/2, yc, -uc, st, sy, su, mat);
+    if(wall===3) shell.add(-L/2+wt/2, yc,  uc, st, sy, su, mat);
   };
-  wallsToBuild.forEach(wall=>{
-    const wl = wallLen(b, wall);
-    const nbs = wallNeighbors(b, wall);
-    // honest thickness: exterior 23 cm, interior party wall 10 cm (was a flat 9 cm)
-    const wt = nbs.length ? 0.10 : 0.23;
-    // build a party wall once, not twice — but only when the neighbour's wall spans
-    // this one end to end, otherwise skipping would leave a real gap
-    if(nbs.some(n => n.other.id < b.id && n.lo <= 0.02 && n.hi >= wl-0.02)) return;
+  ctx.walls.forEach(({wall, wl, wt, skip, ops})=>{
+    if(skip) return;
     // segment the wall around its openings (same maths as wallLines2D) instead of
     // one solid box with the door pasted in front of it
-    const ops = wallOpenings(b, wall);
     const pieces = [];
     let cur = 0;
     ops.forEach(op=>{
@@ -58,11 +78,10 @@ function buildBlockGroup(b, opts={}){
       cur = Math.max(cur, op.u1);
     });
     if(cur < wl-.02) pieces.push({u0:cur, u1:wl, y0:0, y1:H});
+    const mats = wallMats(OUT_FACE[wall]);
     pieces.forEach(p=>{
       const su = p.u1-p.u0, sy = p.y1-p.y0;
       if(su <= .01 || sy <= .01) return;
-      const mats = [];
-      for(let f=0; f<6; f++) mats.push(f===OUT_FACE[wall] ? mkFacade(su, sy) : paintMat);
       placeWall(wall, wt, (p.u0+p.u1)/2 - wl/2, (p.y0+p.y1)/2, su, sy, wt, mats);
     });
     // reveals — jambs, head and sill so the wall's depth reads through the opening
@@ -81,19 +100,26 @@ function buildBlockGroup(b, opts={}){
     for(let i=0;i<=n;i++){
       const o = (i/n-0.5)*(wl-0.1);
       const [px,pz] = wall%2 ? [(wall===1?L/2-.05:-L/2+.05), -o] : [o, (wall===0?W/2-.05:-W/2+.05)];
-      g.add(beam(.05,.95,.05, px,.62,pz, trimMat));
+      shell.add(px,.62,pz, .05,.95,.05, trimMat);
     }
-    const top = wall%2 ? beam(.07,.06,wl-.04, (wall===1?L/2-.05:-L/2+.05),1.12,0, trimMat)
-                       : beam(wl-.04,.06,.07, 0,1.12,(wall===0?W/2-.05:-W/2+.05), trimMat);
-    g.add(top);
+    if(wall%2) shell.add((wall===1?L/2-.05:-L/2+.05),1.12,0, .07,.06,wl-.04, trimMat);
+    else       shell.add(0,1.12,(wall===0?W/2-.05:-W/2+.05), wl-.04,.06,.07, trimMat);
   };
   if(b.type==='balcony') [0,1,2,3].forEach(addRail);
   if(b.type==='veranda') addRail(0);
 
   if(b.type==='veranda'){
     [[-L/2+.06,-W/2+.06],[L/2-.06,-W/2+.06],[-L/2+.06,W/2-.06],[L/2-.06,W/2-.06]].forEach(([x,z])=>
-      g.add(beam(.09,H,.09, x,H/2,z, trimMat)));
+      shell.add(x,H/2,z, .09,H,.09, trimMat));
   }
+
+  // signature fixtures
+  if(b.type==='stairs'){
+    const n = 7, tread = (L-.15)/n, rise = (H-.35)/n;
+    for(let i=0;i<n;i++) shell.add(-L/2+.08+tread*(i+.5), .14+rise*(i+1)/2, 0, tread, rise*(i+1), W-.2, stepMat);
+  }
+  const shellMesh = shell.toMesh();
+  if(shellMesh){ shellMesh.castShadow = true; g.add(shellMesh); }
 
   // floor slab, coloured per room type; an optional material adds a tiled texture
   const floorHex = b.floorCol ? C.floorCol[b.floorCol].hex : spec.floor;
@@ -114,16 +140,6 @@ function buildBlockGroup(b, opts={}){
       cachedMat(ceilMatCache, paintHex, ()=>new THREE.MeshStandardMaterial({color:tint(paintHex,.4), roughness:.95, envMapIntensity:.2})));
     ceil.position.y = H-.04; ceil.receiveShadow = true;
     ceil.userData.roof = true; g.add(ceil);
-  }
-
-  // signature fixtures
-  if(b.type==='stairs'){
-    const n = 7, tread = (L-.15)/n, rise = (H-.35)/n;
-    for(let i=0;i<n;i++){
-      const s = new THREE.Mesh(new THREE.BoxGeometry(tread, rise*(i+1), W-.2), stepMat);
-      s.position.set(-L/2+.08+tread*(i+.5), .14+rise*(i+1)/2, 0);
-      s.castShadow = true; g.add(s);
-    }
   }
 
   // furniture
@@ -166,10 +182,10 @@ function buildBlockGroup(b, opts={}){
     grp.traverse(o=>{o.castShadow = true; o.userData.pick = {kind:'window', blockId:b.id, winId:w.id};});
     g.add(grp);
   });
-  b.doors.forEach(d=>{
+  b.doors.forEach((d, i)=>{
     const pl = doorPlacement(b, d);
     const grp = new THREE.Group();
-    const interior = !!sharedWall(b, d.wall);
+    const interior = ctx.interior[i];
     if(d.type==='ext_glass'){
       const fr = new THREE.Mesh(new THREE.BoxGeometry(d.w+.1, d.h+.06, .1), doorGlassFrameMat);
       fr.position.y = (d.h+.06)/2;
@@ -419,12 +435,13 @@ function buildRoofGroups(blocks){
   return out;
 }
 
-// Geometry only. Materials are shared across rebuilds (see the caches above the
+// Geometry only, and not the furniture models shared by every piece of a kind
+// (furniture.js). Materials are shared across rebuilds (see the caches above the
 // block builder) and must never be disposed here; the one exception is the
 // per-group clones ghostify() makes for inactive floors.
 function disposeGroup(g){
   g.traverse(o=>{
-    if(o.geometry) o.geometry.dispose();
+    if(o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
     if(o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.userData.ghost) m.dispose(); });
   });
 }
@@ -453,38 +470,67 @@ function ghostify(g){
     if(o.material) o.material = Array.isArray(o.material) ? o.material.map(ghostMat) : ghostMat(o.material);
   });
 }
+// Built groups from the last rebuild, keyed by floor + room (or roof) and whether
+// the floor was the active one (ghost floors get cloned, faded materials). A group
+// is reused as long as its signature is unchanged, so a commit only rebuilds the
+// rooms it actually touched: resizing a room rebuilds it and the neighbours whose
+// shared walls moved, recolouring one room rebuilds that room alone.
+let built = new Map();   // key -> {sig, groups:[Group]}
 function rebuild3D(){
   // build the new scene graph first, then swap — a throw mid-build leaves the
   // old house on screen instead of an empty stage
-  const fresh = [], groups = {};
+  const next = new Map(), groups = {};
   const topIdx = state.floors.length - 1;
   const liveBlocks = state.blocks;
-  state.floors.forEach((fl, fi)=>{
-    const active = fi === state.floor;
-    // wallNeighbors/sharedWall read state.blocks — point them at the floor being
-    // built, or ghost floors get adjacency from the active floor's plan
-    state.blocks = fl.blocks;
-    fl.blocks.forEach(b=>{
-      const g = buildBlockGroup(b);
-      g.position.y = (fi - state.floor) * FLH();     // active floor always sits at ground level
-      if(active) groups[b.id] = g;
-      else ghostify(g);
-      fresh.push(g);
-    });
-    // ONE roof per connected building, top floor only (was one per room)
-    if(fi === topIdx){
-      buildRoofGroups(fl.blocks).forEach(rg=>{
-        rg.position.y = (fi - state.floor) * FLH();
-        if(!active) ghostify(rg);
-        fresh.push(rg);
+  const reuse = (key, sig, make)=>{
+    const prev = built.get(key);
+    const entry = prev && prev.sig === sig ? prev : {sig, groups:make()};
+    next.set(key, entry);
+    return entry.groups;
+  };
+  try{
+    state.floors.forEach((fl, fi)=>{
+      const active = fi === state.floor;
+      const y = (fi - state.floor) * FLH();     // active floor always sits at ground level
+      // wallNeighbors/sharedWall read state.blocks — point them at the floor being
+      // built, or ghost floors get adjacency from the active floor's plan
+      state.blocks = fl.blocks;
+      fl.blocks.forEach(b=>{
+        const ctx = blockContext(b);
+        const [g] = reuse(`${fi}|${active}|${b.id}`, blockSignature(b, ctx), ()=>{
+          const g = buildBlockGroup(b, ctx);
+          if(!active) ghostify(g);
+          return [g];
+        });
+        // placement is not part of the signature: (re)apply it every time, which
+        // also snaps back a group that a cancelled drag moved live
+        g.position.set(b.cx, y, b.cz);
+        g.rotation.y = b.rot*Math.PI/2;
+        if(active) groups[b.id] = g;
       });
-    }
+      // ONE roof per connected building, top floor only (was one per room)
+      if(fi === topIdx){
+        const sig = JSON.stringify([state.roofStyle, state.roofCol, state.facade, state.facadeMat,
+          fl.blocks.map(b=>[b.type, b.cx, b.cz, ...footprint(b)])]);
+        reuse(`${fi}|${active}|roof`, sig, ()=>{
+          const rgs = buildRoofGroups(fl.blocks);
+          if(!active) rgs.forEach(ghostify);
+          return rgs;
+        }).forEach(rg=>{ rg.position.y = y; });
+      }
+    });
+  } finally {
     state.blocks = liveBlocks;
-  });
-  while(blocksRoot.children.length){ const ch = blocksRoot.children.pop(); disposeGroup(ch); blocksRoot.remove(ch); }
+  }
+  const keep = new Set([...next.values()].flatMap(e=>e.groups));
+  for(const ch of [...blocksRoot.children]) if(!keep.has(ch)){ blocksRoot.remove(ch); disposeGroup(ch); }
+  for(const g of keep) if(g.parent !== blocksRoot){
+    blocksRoot.add(g);
+    // a fresh group starts with its roof/ceiling showing; match the current mode
+    if((ui.interior && ui.view==='3d') || ui.walk) g.traverse(o=>{ if(o.userData.roof) o.visible = false; });
+  }
+  built = next;
   blockGroups = groups;
-  fresh.forEach(g=>blocksRoot.add(g));
-  if(ui.interior && ui.view==='3d') toggleRoofs(false);
   fitShadows();
   updateSelection();
   requestShadows();

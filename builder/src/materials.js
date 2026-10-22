@@ -308,13 +308,13 @@ function mkFacadeMat(faceW, faceH){
     return m;
   });
 }
-function mkPaintMat(paintHex, wallMat, L, W){
-  const rx = wallMat ? Math.max(1, Math.round(Math.max(L,W))) : 0;
-  return cachedMat(paintMatCache, paintHex+'|'+(wallMat||'')+'|'+rx, ()=>{
+// Room walls are batched with UVs in metres (see BoxBatch), so the finish
+// texture repeats once per metre: no per-room or per-face repeat in the key.
+function mkPaintMat(paintHex, wallMat){
+  return cachedMat(paintMatCache, paintHex+'|'+(wallMat||''), ()=>{
     const m = mkWallMat({color:paintHex});
-    // optional wall finish: a tiled texture over the inward faces. Fine-grained
-    // finishes (plaster/wallpaper/concrete) tolerate the per-face UV tiling.
-    const wt = wallMat ? makeSurfaceTexture(wallMat, paintHex, Math.max(L,W), C.H) : null;
+    // optional wall finish: a tiled texture over the inward faces
+    const wt = wallMat ? makeSurfaceTexture(wallMat, paintHex, 1, 1) : null;
     if(wt){ m.map = wt; m.color.set('#ffffff'); }
     return m;
   });

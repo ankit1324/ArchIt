@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {FURN_MATS} from './materials.js';
 import {C} from './catalog.js';
 import {beam, requestShadows} from './scene.js';
+import {flattenModel} from './batch.js';
 
 // Realistic procedural furniture models (parallel-authored). Each entry:
 // (M) => THREE.Group built centred in X/Z, base on the floor (y=0), height up.
@@ -395,24 +396,42 @@ const FURN_BUILDERS = {
 }
 };
 
+// A model is authored as a Group of 5-30 small meshes. It is built once per key
+// and flattened to one merged geometry per (material, shadow) pair, so a placed
+// piece costs a few draw calls instead of one per leg and handle, and a rebuild
+// allocates no furniture geometry at all. The merged geometries are shared by
+// every piece of that key (geometry.userData.shared: disposeGroup skips them).
+const _furnProto = new Map();
+function furnProto(key){
+  let parts = _furnProto.get(key);
+  if(parts) return parts;
+  const build = FURN_BUILDERS[key];
+  const src = build ? build(FURN_MATS()) : legacyBuildFurn({key, lx:0, lz:0, rot:0, id:0});
+  // legs, knobs, handles, book spines, hob rings: too small to shadow visibly,
+  // but each one is another draw call into the shadow map
+  parts = flattenModel(src, o=>{
+    if(!o.castShadow) return false;
+    const geo = o.geometry; if(!geo.boundingBox) geo.computeBoundingBox();
+    const s = geo.boundingBox.getSize(_tmpV3);
+    return s.x*s.y*s.z >= .004;
+  });
+  parts.forEach(p=>{ p.geometry.userData.shared = true; });
+  _furnProto.set(key, parts);
+  return parts;
+}
 // Model dispatch: a realistic FURN_BUILDERS entry when one exists, else the
 // legacy box model. A catalog `model` URL (GLB) overrides the mesh once loaded.
 function buildFurn(f){
-  const M = FURN_MATS();
   const spec = C.furniture[f.key] || {};
-  const build = FURN_BUILDERS[f.key];
-  const g = build ? build(M) : legacyBuildFurn(f);
+  const g = new THREE.Group();
+  furnProto(f.key).forEach(p=>{
+    const m = new THREE.Mesh(p.geometry, p.material);
+    m.castShadow = p.castShadow;
+    g.add(m);
+  });
   g.position.set(f.lx, 0, f.lz);
   g.rotation.y = f.rot*Math.PI/2;
   g.userData.furnRoot = f.id;
-  // legs, knobs, handles, book spines, hob rings: too small to shadow visibly,
-  // but each one is another draw call into the shadow map
-  g.traverse(o=>{
-    if(!o.isMesh || !o.castShadow) return;
-    const geo = o.geometry; if(!geo.boundingBox) geo.computeBoundingBox();
-    const s = geo.boundingBox.getSize(_tmpV3);
-    if(s.x*s.y*s.z < .004) o.castShadow = false;
-  });
   if(spec.model){
     loadModel(spec.model, spec).then(model=>{
       if(!model || !g.parent) return;               // dropped before load finished
