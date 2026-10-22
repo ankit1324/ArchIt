@@ -7,6 +7,7 @@ import {boundsOf, roofComponents, unionLoops, wallNeighbors, wallOpenings} from 
 import {blocksRoot, camera, controls, pmrem, renderer, scene, setContext, wallMats} from './scene.js';
 import {buildRoofGroups, rebuild3D, toggleRoofs} from './house3d.js';
 import {resize} from './interact3d.js';
+import {exitWalk, walkActive} from './walk.js';
 import {closeToolPop, releaseThumbRenderer} from './tools.js';
 import {hideModal, renderAll, resetCam, setView} from './ui.js';
 import {snapshotBlob} from './export.js';
@@ -87,6 +88,7 @@ addEventListener('pagehide', e=>{
 (async ()=>{
   if(EMBED){
     newProject('empty');
+    let initialized = false;
     window.addEventListener('message', async e=>{
       if(e.origin !== location.origin) return;
       const m = e.data;
@@ -104,6 +106,16 @@ addEventListener('pagehide', e=>{
       }
       if(m?.type !== 'archit:init') return;
       const p = m.payload || {};
+      // DesignerOverlay keeps this iframe (and its WebGL context) alive and sends
+      // archit:init again for every design it opens: start each one from the same
+      // clean slate a fresh page load would give it.
+      if(initialized){
+        if(walkActive) exitWalk();
+        hideModal();
+        setState(null);
+        newProject('empty');
+      }
+      initialized = true;
       if(p.design?.v === 3 && p.design.state){ setState(p.design.state); linkFloor(); }
       else if(p.floors > 1){
         // pre-create the floors chosen in the setup dialog (new designs only)

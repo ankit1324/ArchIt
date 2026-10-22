@@ -309,7 +309,11 @@ export default function DesignerPage() {
   const [designs, setDesigns] = useState<Design[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
-  const [session, setSession] = useState(0); // bump to remount the builder
+  // The builder iframe mounts with the first design and then stays loaded (it
+  // owns a WebGL context): `builderSetup` is the setup it was last opened with,
+  // and bumping `session` hands it the next design without a reload.
+  const [builderSetup, setBuilderSetup] = useState<Setup | null>(null);
+  const [session, setSession] = useState(0);
   const [listOpen, setListOpen] = useState(true);
   const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
   const [paying, setPaying] = useState(false);
@@ -420,9 +424,15 @@ export default function DesignerPage() {
     }
   };
 
+  const openBuilder = (s: Setup) => {
+    setSetup(s);
+    setBuilderSetup(s);
+    setSession((v) => v + 1);
+  };
+
   const openDesign = (d: Design) => {
     setCurrentId(d.id);
-    setSetup({
+    openBuilder({
       name: d.name,
       w: d.plotW,
       d: d.plotD,
@@ -432,7 +442,6 @@ export default function DesignerPage() {
       budget: d.meta?.budget,
       notes: d.meta?.notes,
     });
-    setSession((s) => s + 1);
   };
 
   const newDesign = () => {
@@ -509,25 +518,21 @@ export default function DesignerPage() {
 
   return (
     <div className="h-full bg-cream">
-      {setup ? (
+      {builderSetup && (
         <DesignerOverlay
-          key={`${currentId ?? "new"}-${session}`}
-          plot={{ w: setup.w, d: setup.d }}
+          session={session}
+          hidden={!setup}
+          plot={{ w: builderSetup.w, d: builderSetup.d }}
           neighbors={[]}
-          floors={setup.floors}
-          facing={setup.facing}
+          floors={builderSetup.floors}
+          facing={builderSetup.facing}
           existingDesign={current?.design}
           onSave={saveDesign}
           onClose={() => router.push("/")}
         />
-      ) : (
-        <SetupDialog
-          onStart={(s) => {
-            setSetup(s);
-            setSession((v) => v + 1);
-          }}
-          onBack={() => router.push("/")}
-        />
+      )}
+      {!setup && (
+        <SetupDialog onStart={openBuilder} onBack={() => router.push("/")} />
       )}
 
       {/* saved designs drawer, floats above the builder */}
