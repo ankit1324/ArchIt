@@ -16,14 +16,24 @@ const BUCKET = "photos";
  * Call after the row that dropped the URL has been written. Never throws.
  */
 export async function removeUnreferencedUploads(context: string, urls: unknown[]): Promise<void> {
-  const candidates = [
-    ...new Set(urls.filter((u): u is string => typeof u === "string" && u !== "")),
-  ].filter((u) => storageObjectName(u, BUCKET) !== null);
+  // Only exact canonical URLs (what /api/upload returned) are candidates. A
+  // variant spelling of the same object — a query string, a fragment,
+  // percent-encoding — would not match the exact-string reference checks
+  // below, so another row's use of the canonical URL would go unseen and its
+  // image would be deleted. Such variants are never deleted.
+  const candidates: Array<{ url: string; name: string }> = [];
+  for (const url of new Set(urls)) {
+    if (typeof url !== "string" || url === "") continue;
+    const name = storageObjectName(url, BUCKET);
+    if (!name) continue;
+    if (db.storage.from(BUCKET).getPublicUrl(name).data.publicUrl !== url) continue;
+    candidates.push({ url, name });
+  }
   if (candidates.length === 0) return;
 
   try {
     const names: string[] = [];
-    for (const url of candidates) {
+    for (const { url, name } of candidates) {
       const [photo, photos, snapshot] = await Promise.all([
         db.from("properties").select("id", { count: "exact", head: true }).eq("photo", url),
         db.from("properties").select("id", { count: "exact", head: true }).contains("photos", [url]),
@@ -36,7 +46,7 @@ export async function removeUnreferencedUploads(context: string, urls: unknown[]
         continue;
       }
       if (!photo.count && !photos.count && !snapshot.count) {
-        names.push(storageObjectName(url, BUCKET)!);
+        names.push(name);
       }
     }
     if (names.length === 0) return;
