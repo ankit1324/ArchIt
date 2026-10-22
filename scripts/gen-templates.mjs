@@ -42,7 +42,7 @@ import { dirname, join } from "node:path";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CHECK = process.argv.includes("--check");
 
-/* ===================== mirror of builder.html C (read-only) ===================== */
+/* ===================== mirror of the builder's C (read-only) ===================== */
 
 const ROOMS = {
   bedroom: { w: 3.0, len: 3.6 },
@@ -1287,7 +1287,7 @@ for (const k of planKeys) if (!paidKeys.includes(k)) err(k, "plan for a key that
 const compiled = {};
 for (const k of paidKeys) if (PLANS[k]) compiled[k] = compileTemplate(k, PLANS[k]);
 
-// Second, engine-level gate: check-plans.mjs replays builder.html's own geometry
+// Second, engine-level gate: check-plans.mjs replays the builder's own geometry
 // and furnishRoom, so it also catches what this mirror cannot see — furniture in a
 // doorway, a piece clampFurn would shift, a room nobody can walk into.
 if (!errors.length) {
@@ -1351,7 +1351,7 @@ const geometryTs = `import "server-only";
 ${GEN_NOTE}
 // Geometry for the 20 PAID templates. This module must never be imported from a
 // client component: it is the thing customers pay for. Free templates keep their
-// geometry inline in builder.html.
+// geometry inline in builder/src/templates.js.
 //
 // Payload shape: plans/02-template-v2-contract.md. Every template below is v2.
 // The v1 tuple form is still part of the exported type so a not-yet-migrated

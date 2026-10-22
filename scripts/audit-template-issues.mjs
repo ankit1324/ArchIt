@@ -1,7 +1,7 @@
-// Audits the generated paid-template geometry against builder.html's own
+// Audits the generated paid-template geometry against the builder engine's own
 // designIssues() rules, so authoring problems are caught without opening the app.
 //
-// Mirrors windowFacesNeighbour() in builder.html: a window is only a problem when
+// Mirrors windowFacesNeighbour() in builder/src: a window is only a problem when
 // its OWN position falls inside the span shared with a neighbouring room. Checking
 // the whole wall (as designIssues used to) produces false positives on long walls
 // that abut a small room over part of their run.
@@ -10,16 +10,12 @@
 //
 // Exits non-zero when any real issue is found, so it can gate CI.
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { builderSource } from "./builder-source.mjs";
 import { getTemplateGeometry } from "../lib/template-geometry.ts";
 import { TEMPLATE_CATALOG } from "../lib/template-catalog.ts";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-// C.rooms is parsed live out of builder.html so this cannot drift from the engine
-const html = readFileSync(join(ROOT, "public/builder/builder.html"), "utf8");
+// C.rooms is parsed live out of the builder engine so this cannot drift from the engine
+const html = builderSource();
 const roomsSrc = html.match(/rooms:\s*\{[\s\S]*?\n {2}\}/)[0];
 const C_rooms = {};
 for (const m of roomsSrc.matchAll(
@@ -28,7 +24,7 @@ for (const m of roomsSrc.matchAll(
   C_rooms[m[1]] = { name: m[2], w: +m[3], len: +m[4], open: /open:true/.test(m[0]) };
 }
 if (Object.keys(C_rooms).length < 5) {
-  console.error("Could not parse C.rooms out of builder.html — did its shape change?");
+  console.error("Could not parse C.rooms out of builder/src — did its shape change?");
   process.exit(2);
 }
 
