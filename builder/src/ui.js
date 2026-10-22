@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {closeToolPop} from './tools.js';
+import {closeToolPop, syncToolCursor} from './tools.js';
 import {C} from './catalog.js';
 import {$, chips, round1, stage, toast} from './dom.js';
 import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, setSel, state, ui, undo, undoStack} from './state.js';
@@ -34,7 +34,7 @@ function renderSelection(){
   updateSelection();
   if(ui.view==='2d') render2D(); else renderHotspots();
   renderSidebar();
-  planSvg.style.cursor = ui.tool==='door-place' ? 'crosshair' : '';
+  syncToolCursor();
 }
 
 /* ============================== modals ============================== */
@@ -293,7 +293,7 @@ function renderAll(){
   saveProject();
   $('#undoB').disabled = !undoStack.length;
   $('#redoB').disabled = !redoStack.length;
-  planSvg.style.cursor = ui.tool==='door-place' ? 'crosshair' : '';
+  syncToolCursor();
 }
 
 export {dim, hideModal, modal, renderAll, renderSelection, resetCam, setView, showModal};

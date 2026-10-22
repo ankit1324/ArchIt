@@ -1,6 +1,6 @@
 import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
-import {escapeMarkup, round1, side, toast} from './dom.js';
+import {$, escapeMarkup, round1, side, toast} from './dom.js';
 import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui} from './state.js';
 import {boundsOf, freeT, overlaps, sharedWall} from './geometry.js';
 import {openToolPop} from './tools.js';
@@ -64,6 +64,12 @@ function modernPresetButtons(){
 }
 
 function renderSidebar(){
+  renderPanel();
+  // phones: the panel is a bottom sheet; its handle names what the panel shows
+  const h = side.querySelector('h2');
+  $('#sheetT').textContent = h ? h.firstChild.textContent.trim() : 'Details';
+}
+function renderPanel(){
   if(!state){ side.innerHTML=''; return; }
   const b = selBlock();
   if(b && sel.kind==='block') return renderBlockPanel(b);
@@ -110,7 +116,7 @@ function renderSidebar(){
           <button class="end iconbtn" data-act="delfurn" data-b="${bl.id}" data-f="${f.id}" title="Remove">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg></button></div>`;
       }));
-      return (rows || `<div class="note">Select a room, then add furniture from the toolbar catalog.</div>`);
+      return (rows || `<div class="note">Pick a piece in the toolbar catalog, then tap a room to place it.</div>`);
     }],
   ];
   let area = 0; state.blocks.forEach(bl=>area += bl.w*bl.len);
@@ -367,3 +373,10 @@ document.addEventListener('click', e=>{
 });
 
 export {renderSidebar};
+
+/* phones: the details panel is a bottom sheet under the stage (CSS); the handle
+   above it opens and closes it */
+$('#sheetB').addEventListener('click', ()=>{
+  const open = $('#app').classList.toggle('sheet-open');
+  $('#sheetB').setAttribute('aria-expanded', String(open));
+});

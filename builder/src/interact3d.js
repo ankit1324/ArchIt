@@ -7,6 +7,7 @@ import {clampFurn, nearestWallT, overlaps, sharedWall, snapBlock, worldToLocal} 
 import {blocksRoot, camera, canvas, controls, renderer, requestRender, requestShadows, selOutline} from './scene.js';
 import {render2D} from './plan2d.js';
 import {renderAll, renderSelection} from './ui.js';
+import {placeFurniture} from './tools.js';
 
 /* -------- hotspots + chips overlay -------- */
 let hotspots = [];
@@ -80,11 +81,14 @@ function updateOverlay3D(){
   };
   // compute everything first, then write styles in one batch
   const hs = ov.querySelectorAll('.hs'), out = [];
+  // The selected room's "+" buttons (all of them for a one-room house) always
+  // show, so they are reachable without hover on touch screens.
+  const pinned = id=>state.blocks.length===1 || (sel?.kind==='block' && sel.blockId===id);
   hs.forEach(el=>{
     const p = project(el._h.bx, el._h.by, el._h.bz);
-    // only reveal "+" when the cursor is near — keeps the 3D view clean
+    // otherwise only reveal "+" when the cursor is near — keeps the 3D view clean
     const dx = p.x-mouse3.x, dy = p.y-mouse3.y;
-    out.push({p, near: dx*dx+dy*dy < 130*130});
+    out.push({p, near: pinned(el._h.blockId) || dx*dx+dy*dy < 130*130});
   });
   const b = selBlock();
   let cp = null;
@@ -219,6 +223,12 @@ canvas.addEventListener('pointerup', e=>{
   if(dx*dx+dy*dy > 25) return;                       // it was an orbit drag
   const hits = rayFrom(e).intersectObjects(blocksRoot.children, true);
   const hit = hits.find(h=>h.object.userData.pick);
+  if(ui.tool==='furn-place'){
+    if(!hit){ toast('Tap inside a room'); return; }
+    const b = getBlock(hit.object.userData.pick.blockId);
+    placeFurniture(b, ...worldToLocal(b, hit.point.x, hit.point.z));
+    return;
+  }
   if(hit){
     const p = hit.object.userData.pick;
     if(p.kind==='door') setSel({kind:'door', blockId:p.blockId, doorId:p.doorId});
@@ -242,7 +252,10 @@ function resize(){
   _ovlDirty = true; requestRender();
   if(ui.view==='2d') render2D();
 }
+// The stage also changes size without a window resize: the mobile details sheet
+// opening/closing, or the iframe being shown again after it was hidden.
 addEventListener('resize', resize);
+new ResizeObserver(()=>resize()).observe(stage);
 
 // overlay contents changed: re-project hotspots/chips on the next frame
 export function markOverlayDirty(){ _ovlDirty = true; }

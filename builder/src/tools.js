@@ -4,10 +4,10 @@ import {C} from './catalog.js';
 import {$, chips, toast} from './dom.js';
 import {commit, footprint, getBlock, newRoom, sel, selBlock, selFurn, setSel, state, ui} from './state.js';
 import {clampFurn, freeT, overlaps, sharedWall} from './geometry.js';
-import {blocksRoot, canvas} from './scene.js';
+import {canvas} from './scene.js';
 import {FURN_MATS} from './materials.js';
 import {FURN_BUILDERS, legacyBuildFurn} from './furniture.js';
-import {rayFrom} from './interact3d.js';
+import {planSvg} from './plan2d.js';
 import {showTemplatePicker} from './templates.js';
 
 /* ============================== chips actions ============================== */
@@ -103,7 +103,7 @@ function furnGridHTML(){
     (furnCat === 'all' || v.cat === furnCat) && (!q || v.name.toLowerCase().includes(q)));
   if(!items.length) return `<div class="note" style="grid-column:1/-1">No matching furniture</div>`;
   const html = items.map(([k,v]) =>
-    `<button class="fitem" draggable="true" data-add-furn="${k}" data-furnkey="${k}" title="${v.name} · ${v.w} × ${v.d} m">
+    `<button class="fitem${ui.tool==='furn-place' && ui.pendingFurn===k ? ' on' : ''}" data-add-furn="${k}" title="${v.name} · ${v.w} × ${v.d} m">
       <img class="fthumb" src="${furnThumb(k)}" alt="" draggable="false">
       <span class="fnm">${v.name}</span></button>`).join('');
   releaseThumbRenderer();
@@ -171,36 +171,32 @@ document.getElementById('toolbar').addEventListener('click', e=>{
 toolpop.addEventListener('input', e=>{
   if(e.target.classList.contains('fsearch')){ furnQuery = e.target.value; refreshFurnGrid(); }
 });
-// Drag a catalog item onto the 3D view to place it in the room under the cursor.
-toolpop.addEventListener('dragstart', e=>{
-  const item = e.target.closest('[data-furnkey]');
-  if(!item) return;
-  e.dataTransfer.setData('text/furnkey', item.dataset.furnkey);
-  e.dataTransfer.effectAllowed = 'copy';
-});
-canvas.addEventListener('dragover', e=>{
-  if([...e.dataTransfer.types].includes('text/furnkey')){ e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }
-});
-canvas.addEventListener('drop', e=>{
-  const key = e.dataTransfer.getData('text/furnkey');
-  if(!key || !C.furniture[key]) return;
-  e.preventDefault();
-  closeToolPop();
-  if(ui.view === '2d'){ toast('Switch to 3D to drop furniture'); return; }
-  const hits = rayFrom(e).intersectObjects(blocksRoot.children, true);
-  const hit = hits.find(h => h.object.userData.pick && h.object.userData.pick.blockId != null);
-  const b = hit ? getBlock(hit.object.userData.pick.blockId)
-                : (state.blocks.length === 1 ? state.blocks[0] : selBlock());
-  if(!b){ toast('Drop onto a room'); return; }
-  const f = {id:++state.seq.furn, key, lx:0, lz:0, rot:0};
-  if(hit){  // world hit point -> the room's local coordinates
-    const a = b.rot*Math.PI/2, dx = hit.point.x - b.cx, dz = hit.point.z - b.cz;
-    f.lx = dx*Math.cos(a) - dz*Math.sin(a);
-    f.lz = dx*Math.sin(a) + dz*Math.cos(a);
-  }
-  if(!clampFurn(b, f)){ toast('The room is too small for that'); return; }
+// Tap-to-place, which (unlike HTML5 drag-and-drop) works with touch: picking a
+// piece in the catalog arms ui.tool 'furn-place', and the next tap on a room in
+// the 3D view or the plan drops it there (interact3d.js / plan2d.js).
+function armFurniture(key){
+  ui.tool = 'furn-place'; ui.pendingFurn = key;
+  toolpop.querySelectorAll('.fitem').forEach(i=>i.classList.toggle('on', i.dataset.addFurn===key));
+  // on a phone the catalog covers the stage: get it out of the way of the tap
+  if(matchMedia('(max-width: 760px)').matches) closeToolPop();
+  toast(`Tap a room to place the ${C.furniture[key].name.toLowerCase()}`);
+  syncToolCursor();
+}
+// Drop the armed piece into room b at room-local (lx, lz). False when it can't fit.
+function placeFurniture(b, lx, lz){
+  const f = {id:++state.seq.furn, key:ui.pendingFurn, lx, lz, rot:0};
+  if(!C.furniture[f.key]) return false;
+  if(!clampFurn(b, f)){ toast('The room is too small for that'); return false; }
+  ui.tool = null; ui.pendingFurn = null;
+  toolpop.querySelectorAll('.fitem.on').forEach(i=>i.classList.remove('on'));
   commit(()=>{ b.furniture.push(f); setSel({kind:'furn', blockId:b.id, furnId:f.id}); });
-});
+  return true;
+}
+// crosshair while a tap will place something rather than select
+function syncToolCursor(){
+  planSvg.style.cursor = ui.tool==='door-place' || ui.tool==='furn-place' ? 'crosshair' : '';
+  canvas.style.cursor = ui.tool==='furn-place' ? 'crosshair' : '';
+}
 toolpop.addEventListener('click', e=>{
   if(e.target.closest('[data-close]')){ closeToolPop(); return; }
   const fcat = e.target.closest('[data-fcat]');
@@ -248,17 +244,7 @@ toolpop.addEventListener('click', e=>{
     return;
   }
   const addFurn = e.target.closest('[data-add-furn]');
-  if(addFurn){
-    const b = selBlock() || (state.blocks.length===1 ? state.blocks[0] : null);
-    if(!b){ toast('Select a room first'); return; }
-    const f = {id:++state.seq.furn, key:addFurn.dataset.addFurn, lx:0, lz:0, rot:0};
-    if(!clampFurn(b, f)){ toast('The room is too small for that'); return; }
-    // nudge off other furniture at the exact centre
-    while(b.furniture.some(o=>Math.abs(o.lx-f.lx)<.2 && Math.abs(o.lz-f.lz)<.2) && clampFurn(b, f) && f.lx < b.len/2){ f.lx += .4; }
-    clampFurn(b, f);
-    commit(()=>{ b.furniture.push(f); setSel({kind:'furn', blockId:b.id, furnId:f.id}); });
-    return;
-  }
+  if(addFurn){ armFurniture(addFurn.dataset.addFurn); return; }
   const addPart = e.target.closest('[data-add-part]');
   if(addPart){
     const b = selBlock() || state.blocks[0];
@@ -271,4 +257,4 @@ toolpop.addEventListener('click', e=>{
   }
 });
 
-export {closeToolPop, openToolPop, releaseThumbRenderer};
+export {closeToolPop, openToolPop, placeFurniture, releaseThumbRenderer, syncToolCursor};

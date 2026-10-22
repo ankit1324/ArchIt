@@ -5,6 +5,7 @@ import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, set
 import {boundsOf, clampFurn, nearestWallT, overlaps, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
 import {renderAll, renderSelection} from './ui.js';
+import {placeFurniture} from './tools.js';
 
 /* ============================== 2D plan ============================== */
 const planSvg = $('#plan');
@@ -162,7 +163,8 @@ function redrawBlock2D(b){
 
 /* -------- 2D dragging -------- */
 planSvg.addEventListener('pointerdown', e=>{
-  if(!state || ui.tool==='door-place') return;
+  // placing a door or a piece of furniture: the click handler takes the tap
+  if(!state || ui.tool==='door-place' || ui.tool==='furn-place') return;
   const hg = e.target.closest('[data-hdl]');
   const dg = e.target.closest('[data-door]');
   const wg = e.target.closest('[data-win]');
@@ -366,6 +368,14 @@ function arcSweep(hx,hy,tx,ty,ex,ey){
 }
 planSvg.addEventListener('click', e=>{
   if(justDragged2) return;
+  if(ui.tool==='furn-place'){
+    const bg = e.target.closest('.blk');
+    e.stopImmediatePropagation();
+    if(!bg){ toast('Tap inside a room'); return; }
+    const b = getBlock(+bg.dataset.id), r = stage.getBoundingClientRect();
+    placeFurniture(b, ...worldToLocal(b, (e.clientX-r.left-planOff.ox)/S, (e.clientY-r.top-planOff.oy)/S));
+    return;
+  }
   const dg = e.target.closest('[data-door]');
   if(dg){ e.stopPropagation(); setSel({kind:'door', blockId:+dg.dataset.blk, doorId:+dg.dataset.door}); renderSelection(); return; }
   const fg = e.target.closest('[data-furn]');
