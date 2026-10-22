@@ -374,6 +374,8 @@ textarea.cmt:focus{border-color:var(--blue)}
   /* with the sheet up the stage is short: keep only the view, undo and floor controls */
   #app.sheet-open :is(#toolbar,#bottombar,#scalebar,#zoomIn,#zoomOut,#fsB,#fitPlan,#toolpop){display:none}
   .acc,.selpanel{padding-bottom:24px}
+  /* /designer pins its "My designs" pill next to the logo: leave it room */
+  body.embed #helpB{display:none}
 }
 /* touch: bigger "+" targets, and nothing that only appears on hover */
 @media (pointer:coarse){
