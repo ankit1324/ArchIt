@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
 import { parseJsonBody } from "@/lib/request";
+import { removeUnreferencedUploads } from "@/lib/storage";
 import { safeImageUrl } from "@/lib/url";
 import { MAX_DESIGN_BYTES, validateDesign } from "@/lib/validators";
 
@@ -22,6 +23,14 @@ export async function PUT(
     maxBytes: MAX_DESIGN_BYTES + 64 * 1024,
   });
   if (d instanceof Response) return d;
+  // Each save uploads a fresh snapshot; remember the old one so it can be
+  // dropped once the row no longer points at it.
+  const { data: previous } = await db
+    .from("designs")
+    .select("snapshot")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle<{ snapshot: string | null }>();
   const { data, error } = await db
     .from("designs")
     .update(designToRow(d))
@@ -34,6 +43,9 @@ export async function PUT(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
+  if (previous?.snapshot && previous.snapshot !== data.snapshot) {
+    await removeUnreferencedUploads(`PUT /api/designs/${id}`, [previous.snapshot]);
+  }
   return Response.json(rowToDesign(data));
 }
 
@@ -46,15 +58,20 @@ export async function DELETE(
   const locked = await builderUnlockError(userId);
   if (locked) return locked;
   const { id } = await params;
-  const { count, error } = await db
+  const { data: deleted, error } = await db
     .from("designs")
-    .delete({ count: "exact" })
+    .delete()
     .eq("id", id)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("snapshot");
   if (error) {
     console.error(`DELETE /api/designs/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
-  if (!count) return Response.json({ error: "not found" }, { status: 404 });
+  if (!deleted?.length) return Response.json({ error: "not found" }, { status: 404 });
+  await removeUnreferencedUploads(
+    `DELETE /api/designs/${id}`,
+    deleted.map((r) => r.snapshot),
+  );
   return new Response(null, { status: 204 });
 }

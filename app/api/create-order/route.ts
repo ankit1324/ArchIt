@@ -113,6 +113,20 @@ export async function POST(request: Request) {
       console.error("YouPI create-payment returned no checkoutUrl:", payment);
       return Response.json({ error: "order creation failed" }, { status: 502 });
     }
+    // The reconciler's work list (app/api/cron/reconcile). Not fatal: the
+    // checkout still works without it, the payment just can't be swept up if
+    // both verify-payment and the webhook later miss it.
+    const { error: logError } = await db.from("payment_orders").insert({
+      order_id: orderId,
+      payment_id: payment.paymentId,
+      user_id: userId,
+      purpose,
+      ref: ref || null,
+      amount,
+    });
+    if (logError) {
+      console.error(`create-order: order ${orderId} not logged for reconciliation:`, logError.message);
+    }
     return Response.json({
       paymentId: payment.paymentId,
       orderId: payment.orderId,

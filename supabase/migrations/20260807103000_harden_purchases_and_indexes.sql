@@ -19,7 +19,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS purchases_template_ref
   ON purchases (user_id, purpose, ref) WHERE purpose = 'template_unlock';
 
 -- ---------------------------------------------------------------------------
--- 2. purpose is written from Razorpay order notes. The app validates it against
+-- 2. purpose is written from gateway order metadata. The app validates it against
 --    the fee table now, but the DB is the layer that cannot be bypassed.
 --
 --    The allowed set is the three current FeePurpose values in lib/fees.ts PLUS
@@ -70,6 +70,6 @@ CREATE INDEX IF NOT EXISTS properties_created_idx
 CREATE INDEX IF NOT EXISTS properties_user_idx
   ON properties (user_id) WHERE user_id IS NOT NULL;
 
--- Reconciling a Razorpay settlement report against the ledger.
+-- Reconciling a gateway settlement report against the ledger.
 CREATE INDEX IF NOT EXISTS purchases_order_idx
   ON purchases (order_id);
