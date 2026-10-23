@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db, listingToRow, listingForViewer, OWNED_COLUMNS } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
-import { canViewListing, statusAfterEdit } from "@/lib/moderation";
+import { canViewListing, changesReviewedContent, statusAfterEdit } from "@/lib/moderation";
 import { hasPurchase, type EntitlementResult } from "@/lib/entitlements";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
@@ -93,21 +93,26 @@ export async function PUT(
   if (!allowed) return rateLimitedResponse();
   if (!boost.ok) return Response.json({ error: boost.error }, { status: 500 });
 
-  // photos dropped in this edit are cleaned up after the write; status decides
-  // whether the edit sends a rejected listing back into the review queue
+  // photos dropped in this edit are cleaned up after the write; the reviewed
+  // fields decide whether the edit sends the listing back into review
   const { data: previous } = await db
     .from("properties")
-    .select("photos, status")
+    .select("photos, status, building_name, owner, address, city")
     .eq("id", id)
     .eq("user_id", userId)
-    .maybeSingle<{ photos: string[] | null; status: string | null }>();
+    .maybeSingle<
+      Pick<PropertyRow, "photos" | "building_name" | "owner" | "address" | "city"> & {
+        status: string | null;
+      }
+    >();
 
+  const next = listingToRow(l);
   const { data, error } = await db
     .from("properties")
     .update({
-      ...listingToRow(l),
+      ...next,
       featured: boost.granted,
-      status: statusAfterEdit(previous?.status),
+      status: statusAfterEdit(previous?.status, !previous || changesReviewedContent(previous, next)),
     })
     .eq("id", id)
     .eq("user_id", userId)
@@ -118,7 +123,7 @@ export async function PUT(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
-  const kept = new Set(listingToRow(l).photos ?? []);
+  const kept = new Set(next.photos ?? []);
   const dropped = (previous?.photos ?? []).filter((p) => !kept.has(p));
   if (dropped.length) await removeUnreferencedUploads(`PUT /api/properties/${id}`, dropped);
   // the user_id filter above proved the caller is the lister

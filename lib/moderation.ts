@@ -53,14 +53,28 @@ export function canViewListing(
   return !!userId && row.user_id === userId;
 }
 
+/** Listing fields a reviewer actually judged: words, photos, contact. */
+export const REVIEWED_FIELDS = ["building_name", "owner", "address", "city", "photos"] as const;
+type ReviewedRow = Partial<Record<(typeof REVIEWED_FIELDS)[number], unknown>>;
+
+/** True when an edit changes anything a reviewer approved. */
+export function changesReviewedContent(before: ReviewedRow, after: ReviewedRow): boolean {
+  const norm = (v: unknown) => JSON.stringify(v ?? null);
+  return REVIEWED_FIELDS.some((f) => norm(before[f]) !== norm(after[f]));
+}
+
 /**
  * Status a listing takes after its lister edits it. A rejected listing goes
- * back into the queue (the lister fixed it); pending and live keep their
- * status so an edit neither skips review nor yanks an approved listing.
+ * back into the queue (the lister fixed it). A live listing stays live for
+ * price/size tweaks, but goes back to review when its text, photos or contact
+ * change — otherwise an approved listing could be edited into anything.
  */
-export function statusAfterEdit(current: string | null | undefined): ListingStatus {
-  if (current === "rejected") return "pending";
-  return isListingStatus(current) ? current : "pending";
+export function statusAfterEdit(
+  current: string | null | undefined,
+  reviewedContentChanged = true,
+): ListingStatus {
+  if (current === "live") return reviewedContentChanged ? "pending" : "live";
+  return "pending";
 }
 
 // ---------------------------------------------------------------------------

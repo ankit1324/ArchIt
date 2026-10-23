@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   canViewListing,
+  changesReviewedContent,
   isAdminIdentity,
   onlyLive,
   onlyVisible,
@@ -80,12 +81,24 @@ test("canViewListing: live is public, the rest is lister/admin only", () => {
   assert.equal(canViewListing({ user_id: "user_owner" }, "user_other"), false);
 });
 
-test("statusAfterEdit: rejected goes back to review, others keep their status", () => {
+test("statusAfterEdit: rejected and pending go to review; live only on reviewed changes", () => {
   assert.equal(statusAfterEdit("rejected"), "pending");
-  assert.equal(statusAfterEdit("pending"), "pending");
-  assert.equal(statusAfterEdit("live"), "live");
+  assert.equal(statusAfterEdit("rejected", false), "pending");
+  assert.equal(statusAfterEdit("pending", false), "pending");
+  assert.equal(statusAfterEdit("live", false), "live");
+  assert.equal(statusAfterEdit("live", true), "pending");
   assert.equal(statusAfterEdit(null), "pending");
-  assert.equal(statusAfterEdit("bogus"), "pending");
+  assert.equal(statusAfterEdit("bogus", false), "pending");
+});
+
+test("changesReviewedContent: text, photos and contact count; numbers don't", () => {
+  const row = { building_name: "Tower", owner: "9800000000", address: "Sec 17", city: "Chd", photos: ["a.jpg"], price: 100 };
+  assert.equal(changesReviewedContent(row, { ...row, price: 999, beds: 4 }), false);
+  assert.equal(changesReviewedContent(row, { ...row, building_name: null, owner: null }), true);
+  assert.equal(changesReviewedContent(row, { ...row, photos: ["a.jpg", "b.jpg"] }), true);
+  assert.equal(changesReviewedContent(row, { ...row, address: "Sec 18" }), true);
+  // null and undefined are the same "empty"
+  assert.equal(changesReviewedContent({ ...row, owner: null }, { ...row, owner: undefined }), false);
 });
 
 // --- report validation ------------------------------------------------------

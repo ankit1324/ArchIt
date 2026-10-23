@@ -56,6 +56,9 @@ export default function Home() {
         if (!controller.signal.aborted) {
           setListings(data);
           setLoadState("ready");
+          // deep link from a public /property/:id page: open that listing
+          const linked = new URLSearchParams(window.location.search).get("property");
+          if (linked && data.some((l: Listing) => l.id === linked)) setSelectedId(linked);
         }
       })
       .catch(() => {
@@ -334,10 +337,14 @@ export default function Home() {
       cancelAdd();
       setSelectedId(saved.id);
       mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
+      // new listings, and edits to an approved listing's text/photos/contact,
+      // wait for review (the server says so via `status`)
       celebrate(
-        editing
+        saved.status !== "pending"
           ? "Listing updated!"
-          : "Listing submitted — it\u2019ll appear on the map once it\u2019s reviewed.",
+          : editing
+            ? "Listing updated — it\u2019s back in review before it shows on the map."
+            : "Listing submitted — it\u2019ll appear on the map once it\u2019s reviewed.",
       );
     } catch {
       // network failure / aborted upload / JSON parse error

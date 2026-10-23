@@ -2,6 +2,7 @@ import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 import { after } from "next/server";
 import { db } from "./db";
+import { SITE_URL as CANONICAL_SITE_URL } from "./site";
 import { sendEmail } from "./email";
 import {
   contactUnlockedEmail,
@@ -18,10 +19,8 @@ import { whatsapp, type WhatsAppMessage } from "./whatsapp";
  * throws — the purchase or moderation action it follows has already happened.
  */
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://archit.chaudharyankit.in").replace(
-  /\/$/,
-  "",
-);
+// overridable so a staging deploy's emails link back to staging
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || CANONICAL_SITE_URL).replace(/\/$/, "");
 
 interface Contact {
   email: string | null;
