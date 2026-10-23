@@ -48,7 +48,13 @@ function appendNew(prev: Listing[], more: Listing[]): Listing[] {
   return [...prev, ...more.filter((l) => !seen.has(l.id))];
 }
 
-export default function FindClient({ initialPage }: { initialPage: ListingPage | null }) {
+export default function FindClient({
+  initialPage,
+  initialSelectedId = null,
+}: {
+  initialPage: ListingPage | null;
+  initialSelectedId?: string | null;
+}) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ListingSort>("recommended");
@@ -67,7 +73,9 @@ export default function FindClient({ initialPage }: { initialPage: ListingPage |
   const [areaTruncated, setAreaTruncated] = useState(false);
   const areaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const areaAbort = useRef<AbortController | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // seeded from ?property=<id> (a public /property/:id page links here); the
+  // panel opens once that listing has loaded, possibly from a later page
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [addStage, setAddStage] = useState<AddStage>("idle");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftCoords, setDraftCoords] = useState<[number, number] | null>(null);

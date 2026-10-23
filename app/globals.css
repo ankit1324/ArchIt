@@ -11,6 +11,9 @@
   --color-lime: #e2ef6a;
   --color-lime-deep: #ccdb2a;
   --color-magenta: #e857c2;
+  /* magenta for text-bearing fills: white on it is 5.3:1 (WCAG AA); the
+     brighter --color-magenta is 3.2:1 and only suits decoration */
+  --color-magenta-deep: #b5359a;
   --color-lavender: #b18cf0;
   --font-sans: var(--font-jakarta);
 }

@@ -1,5 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
-import SuiteDashboard from "@/components/SuiteDashboard";
 import MarketingLanding from "@/components/MarketingLanding";
 import type { Metadata } from "next";
 
@@ -13,8 +11,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-export default async function Home() {
-  // Signed out: home-planning introduction; signed in: suite dashboard.
-  const { userId } = await auth();
-  return userId ? <SuiteDashboard /> : <MarketingLanding />;
+// Prerendered at build time. Signed-in visitors never see it: proxy.ts
+// rewrites "/" to the dashboard (app/(app)/dashboard) when a session exists.
+export default function Home() {
+  return <MarketingLanding />;
 }
