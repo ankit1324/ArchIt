@@ -4,6 +4,7 @@ import type { PropertyRow } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 import { canViewListing, changesReviewedContent, statusAfterEdit } from "@/lib/moderation";
 import { hasPurchase, type EntitlementResult } from "@/lib/entitlements";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
 import { removeUnreferencedUploads } from "@/lib/storage";
@@ -33,7 +34,10 @@ export async function GET(
       .select(`${OWNED_COLUMNS}, owner`)
       .eq("id", id)
       .maybeSingle<PropertyRow>(),
-    userId
+    // paywall off: any signed-in viewer sees the owner contact
+    userId && !PAYWALL_ENABLED
+      ? Promise.resolve<EntitlementResult>({ ok: true, granted: true })
+      : userId
       ? hasPurchase(userId, "contact_owner", id)
       : Promise.resolve<EntitlementResult>({ ok: true, granted: false }),
   ]);

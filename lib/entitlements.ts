@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import type { FeePurpose } from "./fees";
+import { PAYWALL_ENABLED } from "./paywall";
 
 /**
  * Ledger lookups for paid entitlements. Kept free of the gateway client so route
@@ -57,6 +58,7 @@ export async function hasBuilderUnlock(
 export async function builderUnlockError(
   userId: string,
 ): Promise<Response | null> {
+  if (!PAYWALL_ENABLED) return null;
   const result = await hasBuilderUnlock(userId);
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: 500 });

@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { hasPurchase } from "@/lib/entitlements";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import { isPaidTemplate, TEMPLATE_KEYS } from "@/lib/template-catalog";
 import { getTemplateGeometry } from "@/lib/template-geometry";
 
@@ -40,7 +41,9 @@ export async function GET(
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
 
-  const entitlement = await hasPurchase(userId, "template_unlock", key);
+  const entitlement = PAYWALL_ENABLED
+    ? await hasPurchase(userId, "template_unlock", key)
+    : { ok: true as const, granted: true };
   if (!entitlement.ok) {
     return Response.json({ error: entitlement.error }, { status: 500 });
   }
