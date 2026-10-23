@@ -18,9 +18,9 @@ test('builder CSP allows only same-origin scripts', () => {
 });
 
 test('builder.html runs no inline script, so that policy is enough', () => {
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
-  assert.deepEqual(scripts.map(m => m[1].trim()), ['type="module" src="js/builder.js"']);
-  assert.ok(scripts.every(m => !m[2].trim()), 'no inline script body');
+  // exactly one script element, and it is the bundle with an empty body
+  assert.equal(html.match(/<script\b/gi)?.length, 1);
+  assert.ok(html.includes('<script type="module" src="js/builder.js"></script>'));
   assert.doesNotMatch(html, /importmap|cdn\.|\son[a-z]+=/i);
   assert.doesNotMatch(builderSource(), /\son[a-z]+="|cdn\.jsdelivr|unpkg\.com/, 'no inline handlers or CDN imports in builder/src');
 });
