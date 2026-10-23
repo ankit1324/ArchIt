@@ -97,6 +97,8 @@ test("changesReviewedContent: text, photos and contact count; numbers don't", ()
   assert.equal(changesReviewedContent(row, { ...row, building_name: null, owner: null }), true);
   assert.equal(changesReviewedContent(row, { ...row, photos: ["a.jpg", "b.jpg"] }), true);
   assert.equal(changesReviewedContent(row, { ...row, address: "Sec 18" }), true);
+  // the cover image is reviewed too, even when photos[] is unchanged
+  assert.equal(changesReviewedContent({ ...row, photo: "a.jpg" }, { ...row, photo: "evil.jpg" }), true);
   // null and undefined are the same "empty"
   assert.equal(changesReviewedContent({ ...row, owner: null }, { ...row, owner: undefined }), false);
 });

@@ -97,11 +97,11 @@ export async function PUT(
   // fields decide whether the edit sends the listing back into review
   const { data: previous } = await db
     .from("properties")
-    .select("photos, status, building_name, owner, address, city")
+    .select("photo, photos, status, building_name, owner, address, city")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle<
-      Pick<PropertyRow, "photos" | "building_name" | "owner" | "address" | "city"> & {
+      Pick<PropertyRow, "photo" | "photos" | "building_name" | "owner" | "address" | "city"> & {
         status: string | null;
       }
     >();

@@ -54,7 +54,7 @@ export function canViewListing(
 }
 
 /** Listing fields a reviewer actually judged: words, photos, contact. */
-export const REVIEWED_FIELDS = ["building_name", "owner", "address", "city", "photos"] as const;
+export const REVIEWED_FIELDS = ["building_name", "owner", "address", "city", "photo", "photos"] as const;
 type ReviewedRow = Partial<Record<(typeof REVIEWED_FIELDS)[number], unknown>>;
 
 /** True when an edit changes anything a reviewer approved. */
