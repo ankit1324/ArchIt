@@ -15,6 +15,11 @@ const isProtected = createRouteMatcher([
   "/api/verify-payment(.*)",
   "/api/purchases(.*)",
   "/api/upload(.*)",
+  "/api/reports(.*)",
+  // admin role is checked in the pages/routes (lib/admin.ts); this just
+  // keeps signed-out visitors out before any handler runs
+  "/admin(.*)",
+  "/api/admin(.*)",
 ]);
 
 // Routes rendered per request that need the strict nonce CSP: the signed-in

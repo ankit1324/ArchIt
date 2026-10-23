@@ -439,8 +439,14 @@ export default function FindClient({
       cancelAdd();
       setSelectedId(saved.id);
       mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
+      // new listings, and edits to an approved listing's text/photos/contact,
+      // wait for review (the server says so via `status`)
       celebrate(
-        editing ? "Listing updated!" : "Listing added — it\u2019s live on the map!",
+        saved.status !== "pending"
+          ? "Listing updated!"
+          : editing
+            ? "Listing updated — it\u2019s back in review before it shows on the map."
+            : "Listing submitted — it\u2019ll appear on the map once it\u2019s reviewed.",
       );
     } catch {
       // network failure / aborted upload / JSON parse error

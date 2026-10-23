@@ -1,0 +1,87 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+
+interface ActionSpec {
+  action: string;
+  label: string;
+  tone: "primary" | "danger" | "neutral";
+  /** Prompt for a note (sent to the lister as the reason). */
+  askNote?: boolean;
+}
+
+const TONES: Record<ActionSpec["tone"], string> = {
+  primary: "bg-plum text-cream",
+  danger: "bg-coral text-white",
+  neutral: "bg-plum/10 text-plum",
+};
+
+/**
+ * Buttons for one admin decision. Posts `{ action, note }` to `endpoint`,
+ * then refreshes the server-rendered page so the item drops out of its queue.
+ * Deliberately Clerk-free so it renders under any layout.
+ */
+export default function AdminAction({
+  endpoint,
+  actions,
+}: {
+  endpoint: string;
+  actions: ActionSpec[];
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const run = async (spec: ActionSpec) => {
+    let note: string | null = null;
+    if (spec.askNote) {
+      note = window.prompt(`${spec.label}: reason (emailed to the lister)`, "");
+      if (note === null) return; // cancelled
+    }
+    setBusy(spec.action);
+    setError(null);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: spec.action, note }),
+      });
+      if (!res.ok) {
+        const msg = await res
+          .json()
+          .then((j: { error?: string }) => j.error)
+          .catch(() => null);
+        setError(msg || `Failed (${res.status})`);
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {actions.map((spec) => (
+        <button
+          key={spec.action}
+          type="button"
+          onClick={() => run(spec)}
+          disabled={busy !== null}
+          className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 ${TONES[spec.tone]}`}
+        >
+          {busy === spec.action ? "Working…" : spec.label}
+        </button>
+      ))}
+      {error && (
+        <span role="alert" className="text-[12px] font-semibold text-coral">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}

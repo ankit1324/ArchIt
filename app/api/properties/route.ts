@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, rowToListing, OWNED_COLUMNS } from "@/lib/db";
+import { db, listingToRow, listingForViewer, OWNED_COLUMNS } from "@/lib/db";
 import { parseBBox, parseCursor, parseLimit } from "@/lib/listing-query";
 import { listProperties } from "@/lib/properties";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
@@ -9,6 +9,8 @@ import { validateListing } from "@/lib/validators";
 
 // owner contact is paywalled (#3): the public list never includes it, and the
 // raw lister user_id is dropped — each row carries a server-computed `mine`.
+// Moderation: only live listings, plus the viewer's own pending/rejected ones
+// (applied in listProperties).
 //
 // ?bbox=w,s,e,n limits to a map viewport ("search as I move"); ?limit and
 // ?cursor page through the set. The body stays a plain array for existing
@@ -46,9 +48,10 @@ export async function POST(request: Request) {
   // featured is a paid boost (₹250 featured_property): never trusted from the
   // body. It starts false and is flipped server-side once a purchase with
   // ref = this listing's id is recorded (lib/purchases.ts applyEntitlement).
+  // New listings wait in the admin queue (/admin) until approved.
   const { data, error } = await db
     .from("properties")
-    .insert({ ...listingToRow(l), user_id: userId, featured: false })
+    .insert({ ...listingToRow(l), user_id: userId, featured: false, status: "pending" })
     .select(OWNED_COLUMNS)
     .single();
   if (error) {
@@ -58,7 +61,7 @@ export async function POST(request: Request) {
   // the lister just typed the owner field — echo it back so the UI keeps it
   // without a paid lookup; they own the row they just created
   return Response.json(
-    { ...rowToListing(data), owner: l.owner ?? undefined, mine: true },
+    { ...listingForViewer(data, userId), owner: l.owner ?? undefined },
     { status: 201 },
   );
 }
