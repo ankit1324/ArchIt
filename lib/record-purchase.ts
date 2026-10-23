@@ -55,6 +55,12 @@ export interface RecordPurchaseDeps {
     message: string,
     context: Record<string, unknown>,
   ): void | Promise<void>;
+  /**
+   * Called once per newly recorded payment (not for a same-payment retry),
+   * after the entitlement is applied — receipts and lister notifications hang
+   * off this. Must not throw; a throw is logged and swallowed regardless.
+   */
+  onRecorded?(row: LedgerRow): void | Promise<void>;
   /** Injected so tests don't wait out the gateway's verification window. */
   sleep?(ms: number): Promise<void>;
 }
@@ -196,14 +202,15 @@ export function createPurchaseRecorder(deps: RecordPurchaseDeps) {
     });
     if (mismatch) return mismatch;
 
-    const { error } = await deps.insertPurchase({
+    const row: LedgerRow = {
       user_id: userId,
       purpose,
       ref,
       order_id: orderId,
       payment_id: paymentId,
       amount: Number(payment.amountPaise),
-    });
+    };
+    const { error } = await deps.insertPurchase(row);
 
     if (error?.code === "23505") {
       // Same payment recorded twice: the idempotency case, already settled.
@@ -236,6 +243,13 @@ export function createPurchaseRecorder(deps: RecordPurchaseDeps) {
     }
 
     await applyEntitlement(purpose, userId, ref);
+    if (deps.onRecorded) {
+      try {
+        await deps.onRecorded(row);
+      } catch (e) {
+        console.error("onRecorded hook failed:", e instanceof Error ? e.message : e);
+      }
+    }
     return null;
   }
 

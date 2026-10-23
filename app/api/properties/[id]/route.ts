@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
+import { db, listingToRow, listingForViewer, OWNED_COLUMNS } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
+import { isAdmin } from "@/lib/admin";
+import { canViewListing, statusAfterEdit } from "@/lib/moderation";
 import { hasPurchase, type EntitlementResult } from "@/lib/entitlements";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
@@ -11,7 +13,8 @@ import { validateListing } from "@/lib/validators";
 /**
  * Public detail. The owner contact field is paywalled (#3): it is only
  * included for the lister themself or after a verified contact_owner
- * purchase (₹50) for this listing.
+ * purchase (₹50) for this listing. A listing that isn't live (pending review
+ * or rejected) is a 404 for everyone but its lister and admins.
  */
 export async function GET(
   _request: Request,
@@ -39,6 +42,11 @@ export async function GET(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
+  // the Clerk admin lookup only runs for a non-live listing seen by a non-lister
+  const admin = !canViewListing(data, userId) && (await isAdmin(userId));
+  if (!canViewListing(data, userId, admin)) {
+    return Response.json({ error: "not found" }, { status: 404 });
+  }
 
   let includeOwner = false;
   if (userId) {
@@ -53,8 +61,7 @@ export async function GET(
     }
   }
 
-  const listing = rowToListing(data);
-  listing.mine = ownsRow(data, userId);
+  const listing = listingForViewer(data, userId);
   // tells the panel whether there is anything to unlock, without leaking it
   listing.hasOwner = Boolean(data.owner);
   if (!includeOwner || !listing.owner) delete listing.owner;
@@ -86,17 +93,22 @@ export async function PUT(
   if (!allowed) return rateLimitedResponse();
   if (!boost.ok) return Response.json({ error: boost.error }, { status: 500 });
 
-  // photos dropped in this edit are cleaned up after the write
+  // photos dropped in this edit are cleaned up after the write; status decides
+  // whether the edit sends a rejected listing back into the review queue
   const { data: previous } = await db
     .from("properties")
-    .select("photos")
+    .select("photos, status")
     .eq("id", id)
     .eq("user_id", userId)
-    .maybeSingle<{ photos: string[] | null }>();
+    .maybeSingle<{ photos: string[] | null; status: string | null }>();
 
   const { data, error } = await db
     .from("properties")
-    .update({ ...listingToRow(l), featured: boost.granted })
+    .update({
+      ...listingToRow(l),
+      featured: boost.granted,
+      status: statusAfterEdit(previous?.status),
+    })
     .eq("id", id)
     .eq("user_id", userId)
     .select(OWNED_COLUMNS)
@@ -110,7 +122,7 @@ export async function PUT(
   const dropped = (previous?.photos ?? []).filter((p) => !kept.has(p));
   if (dropped.length) await removeUnreferencedUploads(`PUT /api/properties/${id}`, dropped);
   // the user_id filter above proved the caller is the lister
-  return Response.json({ ...rowToListing(data), owner: l.owner ?? undefined, mine: true });
+  return Response.json({ ...listingForViewer(data, userId), owner: l.owner ?? undefined });
 }
 
 /** Best-effort removal of a listing's uploaded photos. Never fails the request. */

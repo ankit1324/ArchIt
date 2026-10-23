@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
+import { db, listingToRow, listingForViewer, OWNED_COLUMNS } from "@/lib/db";
+import { onlyVisible } from "@/lib/moderation";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
 import { safeImageUrl } from "@/lib/url";
@@ -10,11 +11,11 @@ const LIST_LIMIT = 1000;
 
 // owner contact is paywalled (#3): the public list never includes it, and the
 // raw lister user_id is dropped — each row carries a server-computed `mine`.
+// Moderation: only live listings, plus the viewer's own pending/rejected ones.
 export async function GET() {
   const { userId } = await auth();
-  const { data, error } = await db
-    .from("properties")
-    .select(OWNED_COLUMNS)
+  const base = db.from("properties").select(OWNED_COLUMNS);
+  const { data, error } = await onlyVisible<typeof base>(base, userId)
     .order("created_at")
     .limit(LIST_LIMIT);
   if (error) {
@@ -26,9 +27,7 @@ export async function GET() {
       `GET /api/properties hit the ${LIST_LIMIT}-row cap — listings beyond it are not served; paginate`,
     );
   }
-  return Response.json(
-    data.map((r) => ({ ...rowToListing(r), mine: ownsRow(r, userId) })),
-  );
+  return Response.json(data.map((r) => listingForViewer(r, userId)));
 }
 
 export async function POST(request: Request) {
@@ -44,9 +43,10 @@ export async function POST(request: Request) {
   // featured is a paid boost (₹250 featured_property): never trusted from the
   // body. It starts false and is flipped server-side once a purchase with
   // ref = this listing's id is recorded (lib/purchases.ts applyEntitlement).
+  // New listings wait in the admin queue (/admin) until approved.
   const { data, error } = await db
     .from("properties")
-    .insert({ ...listingToRow(l), user_id: userId, featured: false })
+    .insert({ ...listingToRow(l), user_id: userId, featured: false, status: "pending" })
     .select(OWNED_COLUMNS)
     .single();
   if (error) {
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   // the lister just typed the owner field — echo it back so the UI keeps it
   // without a paid lookup; they own the row they just created
   return Response.json(
-    { ...rowToListing(data), owner: l.owner ?? undefined, mine: true },
+    { ...listingForViewer(data, userId), owner: l.owner ?? undefined },
     { status: 201 },
   );
 }

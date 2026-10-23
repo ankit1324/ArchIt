@@ -42,6 +42,11 @@ export interface Listing {
    * itself is present only for the lister or after a contact_owner purchase.
    */
   hasOwner?: boolean;
+  /**
+   * Moderation state, sent to the lister only and only while the listing is
+   * not live ('pending' review or 'rejected'). Absent means live.
+   */
+  status?: "pending" | "rejected";
 }
 
 export interface Poi {

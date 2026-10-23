@@ -218,3 +218,38 @@ test("applyEntitlement reports success/failure for the reconciler", async () => 
   const bad = harness({ grantError: { message: "nope" } });
   assert.equal(await bad.applyEntitlement("featured_property", "u", "p"), false);
 });
+
+test("onRecorded fires once per new payment, not on a same-payment retry", async () => {
+  const seen = [];
+  const make = (insertError) =>
+    createPurchaseRecorder({
+      fetchPayment: async () => payment(),
+      insertPurchase: async () => ({ error: insertError }),
+      grantFeatured: async () => ({ error: null }),
+      report() {},
+      onRecorded: (row) => {
+        seen.push(row.payment_id);
+      },
+      sleep: async () => {},
+    });
+  assert.equal(await make(null).recordPurchase(PAYMENT_ID, "user_a"), null);
+  assert.deepEqual(seen, [PAYMENT_ID]);
+
+  const dup = { code: "23505", message: 'duplicate key value violates unique constraint "purchases_payment_id_key"' };
+  assert.equal(await make(dup).recordPurchase(PAYMENT_ID, "user_a"), null);
+  assert.deepEqual(seen, [PAYMENT_ID], "retry must not re-send the receipt");
+});
+
+test("a throwing onRecorded hook never fails the purchase", async () => {
+  const recorder = createPurchaseRecorder({
+    fetchPayment: async () => payment(),
+    insertPurchase: async () => ({ error: null }),
+    grantFeatured: async () => ({ error: null }),
+    report() {},
+    onRecorded() {
+      throw new Error("resend down");
+    },
+    sleep: async () => {},
+  });
+  assert.equal(await recorder.recordPurchase(PAYMENT_ID, "user_a"), null);
+});

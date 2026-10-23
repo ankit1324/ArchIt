@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/types";
 import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
+import { MAX_REPORT_DETAILS, REPORT_REASONS, type ReportReason } from "@/lib/moderation";
 import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
@@ -36,6 +37,124 @@ function cachedDetail(id: string, userId: string | null | undefined): Listing | 
     detailCacheUser = userId;
   }
   return detailCache.get(id);
+}
+
+/**
+ * "Report listing": a reason + optional details, POSTed to /api/reports for
+ * the admin queue. Collapsed to a quiet text button until opened.
+ */
+function ReportListing({ listingId }: { listingId: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<ReportReason>("fraud");
+  const [details, setDetails] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  // a different listing starts closed and clean (adjust-state-during-render)
+  const [prevId, setPrevId] = useState(listingId);
+  if (prevId !== listingId) {
+    setPrevId(listingId);
+    setOpen(false);
+    setDetails("");
+    setState("idle");
+    setError(null);
+  }
+
+  if (state === "sent") {
+    return (
+      <p role="status" className="text-center text-[12px] font-semibold text-plum-soft">
+        Thanks — we&rsquo;ll review this listing.
+      </p>
+    );
+  }
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="self-center text-[12px] font-semibold text-plum-soft underline-offset-2 hover:text-plum hover:underline"
+      >
+        Report listing
+      </button>
+    );
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setState("sending");
+    setError(null);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId: listingId, reason, details: details.trim() || null }),
+      });
+      if (res.ok || res.status === 409) {
+        // 409 = already reported by this user; same outcome from their side
+        setState("sent");
+        return;
+      }
+      const msg = await res
+        .json()
+        .then((j: { error?: string }) => j.error)
+        .catch(() => null);
+      setError(msg || "Could not send the report. Please try again.");
+      setState("idle");
+    } catch {
+      setError("Could not send the report. Please try again.");
+      setState("idle");
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2 rounded-2xl bg-white/55 p-3">
+      <label className="text-[11px] font-bold uppercase tracking-wide text-plum-soft">
+        What&rsquo;s wrong?
+        <select
+          value={reason}
+          onChange={(e) => setReason(e.target.value as ReportReason)}
+          className="mt-1 w-full rounded-xl bg-white px-2 py-1.5 text-[13px] font-semibold normal-case tracking-normal text-plum"
+        >
+          {(Object.keys(REPORT_REASONS) as ReportReason[]).map((r) => (
+            <option key={r} value={r}>
+              {REPORT_REASONS[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <textarea
+        value={details}
+        onChange={(e) => setDetails(e.target.value)}
+        maxLength={MAX_REPORT_DETAILS}
+        rows={3}
+        required={reason === "other"}
+        placeholder={reason === "other" ? "Tell us what's wrong" : "Details (optional)"}
+        aria-label="Report details"
+        className="rounded-xl bg-white px-2 py-1.5 text-[13px] text-plum"
+      />
+      {error && (
+        <p role="alert" className="text-[12px] font-semibold text-coral">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="flex-1 rounded-full bg-plum/10 py-2 text-[12px] font-bold text-plum"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={state === "sending"}
+          className="flex-1 rounded-full bg-coral py-2 text-[12px] font-bold text-white disabled:opacity-50"
+        >
+          {state === "sending" ? "Sending…" : "Send report"}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -147,6 +266,19 @@ export default function PropertyDetailPanel({
         </div>
       )}
 
+      {canManage && listing.status && (
+        <p
+          role="status"
+          className={`rounded-2xl px-3 py-2 text-[12px] font-semibold ${
+            listing.status === "pending" ? "bg-lime/60 text-plum" : "bg-coral/15 text-plum"
+          }`}
+        >
+          {listing.status === "pending"
+            ? "Pending review — only you can see this listing until it\u2019s approved."
+            : "Not approved — hidden from the map. Edit the listing to send it back for review."}
+        </p>
+      )}
+
       <div className="flex items-center gap-2">
         <span
           className={`px-1.5 py-0.5 text-[16px] font-extrabold ${
@@ -207,6 +339,8 @@ export default function PropertyDetailPanel({
         </button>
       </div>
       )}
+
+      {!!userId && !canManage && <ReportListing listingId={listing.id} />}
     </section>
   );
 }

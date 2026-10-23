@@ -335,7 +335,9 @@ export default function Home() {
       setSelectedId(saved.id);
       mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
       celebrate(
-        editing ? "Listing updated!" : "Listing added — it\u2019s live on the map!",
+        editing
+          ? "Listing updated!"
+          : "Listing submitted — it\u2019ll appear on the map once it\u2019s reviewed.",
       );
     } catch {
       // network failure / aborted upload / JSON parse error
