@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { isFeePurpose } from "@/lib/payment-validation";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import { retryTransientDb } from "@/lib/retry";
 
 /**
@@ -19,6 +20,8 @@ export async function GET(request: Request) {
   if (!isFeePurpose(purpose)) {
     return Response.json({ error: "unknown purpose" }, { status: 400 });
   }
+  // paywall off: everything reads as owned
+  if (!PAYWALL_ENABLED) return Response.json({ unlocked: true });
 
   const result = await retryTransientDb(async () => {
     let query = db

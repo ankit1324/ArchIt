@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { hasPurchase } from "@/lib/entitlements";
 import { FEES, feeLabel, type FeePurpose } from "@/lib/fees";
 import { isFeePurpose } from "@/lib/payment-validation";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import {
   refIsProperty,
   validatePurchaseRef,
@@ -52,6 +53,10 @@ function validateOrderBody(v: unknown): OrderBody | string {
  * refused by the ledger — money we'd owe back.
  */
 export async function POST(request: Request) {
+  // paywall off: nothing is for sale, so no gateway session may be opened
+  if (!PAYWALL_ENABLED) {
+    return Response.json({ error: "payments are disabled" }, { status: 410 });
+  }
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
   if (!(await checkRateLimit(ipKey(request, "create-order", userId), 5, 60_000))) {
