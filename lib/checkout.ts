@@ -1,5 +1,6 @@
 "use client";
 
+import type { FunnelEvent } from "./analytics";
 import type { FeePurpose } from "./fees";
 
 /**
@@ -67,12 +68,19 @@ function loadScript(portalUrl: string): Promise<boolean> {
 }
 
 /**
- * Charge a fixed platform fee. Resolves true only after the payment has been
- * verified server-side; false on cancel, expiry or failure. `ref` ties the
- * purchase to a thing (e.g. property id for contact unlocks) so it persists in
- * the ledger.
+ * Report a funnel step to lib/analytics.ts via a DOM event that
+ * components/Analytics.tsx forwards (a no-op when analytics is off). An event
+ * rather than an import keeps this module free of the analytics SDK, so the
+ * checkout tests can load it under plain Node.
  */
-export async function payFee(
+function funnel(event: FunnelEvent, product: FeePurpose) {
+  window.dispatchEvent?.(
+    new CustomEvent("archit:track", { detail: { event, props: { product } } }),
+  );
+}
+
+/** The YouPI checkout round trip behind payFee(). */
+async function openCheckout(
   purpose: FeePurpose,
   description: string,
   ref?: string,
@@ -148,4 +156,22 @@ export async function payFee(
       finish(false);
     }
   });
+}
+
+/**
+ * Charge a fixed platform fee. Resolves true only after the payment has been
+ * verified server-side; false on cancel, expiry or failure. `ref` ties the
+ * purchase to a thing (e.g. property id for contact unlocks) so it persists in
+ * the ledger. Also records the unlock_started / unlock_completed funnel steps
+ * (lib/analytics.ts) for every paid product in one place.
+ */
+export async function payFee(
+  purpose: FeePurpose,
+  description: string,
+  ref?: string,
+): Promise<boolean> {
+  funnel("unlock_started", purpose);
+  const ok = await openCheckout(purpose, description, ref);
+  if (ok) funnel("unlock_completed", purpose);
+  return ok;
 }

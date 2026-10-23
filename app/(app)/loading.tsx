@@ -1,4 +1,6 @@
-// Minimal, framework-level loading state for the root segment transition.
+// Minimal loading state for transitions into the app group. Kept out of the
+// root segment on purpose: a root Suspense boundary would make every page
+// stream, and a streamed /property/:id that calls notFound() answers 200.
 // /find and /designer are client components with their own fetch-driven
 // spinners already — this only covers the brief gap before those mount.
 export default function Loading() {

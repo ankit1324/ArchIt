@@ -17,7 +17,7 @@ export default function Footer() {
           {l.label}
         </a>
       ))}
-      <span className="text-plum-soft/60">
+      <span className="text-plum-soft">
         © {new Date().getFullYear()} ArchIt
       </span>
     </footer>

@@ -1,9 +1,7 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import localFont from "next/font/local";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import LandingNav from "./LandingNav";
+import TrackedLink from "./TrackedLink";
 import { TEMPLATE_CATALOG } from "@/lib/template-catalog";
 import styles from "./MarketingLanding.module.css";
 
@@ -25,10 +23,12 @@ const starters = [
   { key: "in_row", label: "Think along the plot.", type: "03 / ROW HOUSE", rooms: "2 bedrooms · Porch · Living · Balcony", note: "Explore a longer arrangement with rooms running from front to back." },
 ];
 
-function StartButton({ children = "Start planning", className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <SignUpButton mode="modal" forceRedirectUrl="/designer" signInForceRedirectUrl="/designer">
-    <button className={`${styles.button} ${className}`}>{children} <span aria-hidden="true">↗</span></button>
-  </SignUpButton>;
+// Sign-up, then straight into the builder. A link rather than a Clerk modal
+// button keeps Clerk's bundle off this page and the first click instant.
+const START_HREF = "/sign-up?redirect_url=%2Fdesigner";
+
+function StartButton({ children = "Start planning", cta }: { children?: React.ReactNode; cta: string }) {
+  return <TrackedLink href={START_HREF} cta={cta} className={styles.button}>{children} <span aria-hidden="true">↗</span></TrackedLink>;
 }
 
 /** Editorial illustration, deliberately not presented as an available template. */
@@ -54,19 +54,14 @@ function HomeDrawing() {
   </svg>;
 }
 
+// Server component: only LandingNav (menu state) and TrackedLink (CTA events)
+// hydrate; everything else ships as static HTML.
 export default function MarketingLanding() {
-  const [menuOpen, setMenuOpen] = useState(false);
   return <div className={`${styles.page} ${display.variable} ${body.variable}`}>
     <a className={styles.skip} href="#main-content">Skip to content</a>
     <header className={styles.header}>
       <Link href="/" className={styles.logo} aria-label="ArchIt home"><svg viewBox="0 0 28 30" width="27" height="29" fill="none" aria-hidden="true"><path d="M3 13L14 3L25 13V27H3V13Z M18 4V1H23V8" stroke="currentColor" strokeWidth="1.8" /></svg>ArchIt<span className={styles.logoDot}>.</span></Link>
-      <button className={styles.menuToggle} aria-expanded={menuOpen} aria-controls="landing-nav" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "Close" : "Menu"} <span aria-hidden="true">{menuOpen ? "−" : "+"}</span></button>
-      <nav id="landing-nav" aria-label="Main navigation" className={`${styles.nav} ${menuOpen ? styles.navOpen : ""}`} onKeyDown={(e) => { if (e.key === "Escape") setMenuOpen(false); }}>
-        <a href="#layouts" onClick={() => setMenuOpen(false)}>Starter layouts</a>
-        <a href="#how-it-works" onClick={() => setMenuOpen(false)}>How it works</a>
-        <SignInButton mode="modal" forceRedirectUrl="/find"><button className={styles.textButton}>Find a property ↗</button></SignInButton>
-        <SignInButton mode="modal"><button className={styles.signIn}>Sign in <span aria-hidden="true">↗</span></button></SignInButton>
-      </nav>
+      <LandingNav />
     </header>
 
     <main id="main-content">
@@ -75,7 +70,7 @@ export default function MarketingLanding() {
           <p className={styles.eyebrow}><span /> A little imagination. A place of your own.</p>
           <h1 id="hero-title">A home begins<br />with <em>your idea.</em></h1>
           <p className={styles.intro}>Give it room to grow. Set up your plot, arrange your rooms, and explore your home in 3D — right in your browser.</p>
-          <div className={styles.actions}><StartButton /><a className={styles.secondary} href="#builder-demo">See the builder <span aria-hidden="true">↓</span></a></div>
+          <div className={styles.actions}><StartButton cta="hero" /><a className={styles.secondary} href="#builder-demo">See the builder <span aria-hidden="true">↓</span></a></div>
           <p className={styles.small}>Free to use right now · Sign in to create and save</p>
         </div>
         <figure className={styles.drawing}>
@@ -92,7 +87,7 @@ export default function MarketingLanding() {
           const template = TEMPLATE_CATALOG.find((entry) => entry.key === starter.key)!;
           return <article className={styles.starter} key={starter.key}>
             <p className={styles.eyebrow}>{starter.type}</p><h3>{starter.label}</h3><p className={styles.roomList}>{starter.rooms}</p>
-            <details><summary>Explore this starting point <span aria-hidden="true">+</span></summary><div className={styles.starterDetails}><strong>{template.name}</strong><p>{template.desc}. {starter.note}</p><p>In the builder, open Templates and choose “{template.name}”.</p><StartButton>Open the builder</StartButton></div></details>
+            <details><summary>Explore this starting point <span aria-hidden="true">+</span></summary><div className={styles.starterDetails}><strong>{template.name}</strong><p>{template.desc}. {starter.note}</p><p>In the builder, open Templates and choose “{template.name}”.</p><StartButton cta={`starter_${starter.key}`}>Open the builder</StartButton></div></details>
           </article>;
         })}</div>
         <p className={styles.caption}>Starter layouts are editable concepts. Review room connections and dimensions for your project; they are not construction drawings.</p>
@@ -109,7 +104,7 @@ export default function MarketingLanding() {
 
       <section className={`${styles.section} ${styles.demo}`} id="builder-demo" aria-labelledby="demo-title">
         <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>03 / Inside the builder</p><h2 id="demo-title">Less guessing. More exploring.</h2></div><p>Watch a short builder walkthrough before you start. Play, pause, or go fullscreen at your own pace.</p></div>
-        <div className={styles.videoFrame}><div className={styles.videoBar}><span><i /> ARCHIT / THE DESIGN WORKSPACE</span><span>BUILDER WALKTHROUGH</span></div><video controls playsInline preload="none" poster="/demo/builder-poster.webp" aria-label="Silent ArchIt builder walkthrough showing the design workspace and material controls"><source src="/demo/builder.av1.mp4" type='video/mp4; codecs="av01.0.08M.08"' /><source src="/demo/builder.h264.mp4" type="video/mp4" />Your browser does not support video. <a href="/demo/builder.h264.mp4">Download the builder walkthrough</a>.</video></div>
+        <div className={styles.videoFrame}><div className={styles.videoBar}><span><i /> ARCHIT / THE DESIGN WORKSPACE</span><span>BUILDER WALKTHROUGH</span></div><video controls playsInline preload="none" poster="/demo/builder-poster.webp" aria-label="Silent ArchIt builder walkthrough showing the design workspace and material controls"><source src="/demo/builder.av1.mp4" type='video/mp4; codecs="av01.0.05M.08"' /><source src="/demo/builder.h264.mp4" type="video/mp4" />Your browser does not support video. <a href="/demo/builder.h264.mp4">Download the builder walkthrough</a>.</video></div>
         <p className={styles.caption}>Silent demo · The builder includes room tools, material controls, 2D and 3D views, and saved designs.</p>
       </section>
 
@@ -117,10 +112,10 @@ export default function MarketingLanding() {
         <details><summary>Do I need design experience?<span aria-hidden="true">+</span></summary><p>You can begin with a template and explore the room tools at your own pace. ArchIt is a place to develop ideas before discussing them with a professional.</p></details>
         <details><summary>Is the builder free?<span aria-hidden="true">+</span></summary><p>The builder and its templates are currently free. You need an account to create projects and save your designs.</p></details>
         <details><summary>Can I use a design to build my house?<span aria-hidden="true">+</span></summary><p>Use it to communicate your ideas. Layouts and cost estimates are preliminary; an architect or engineer needs to check the design for your site before construction.</p></details>
-        <details><summary>Can I still search for properties?<span aria-hidden="true">+</span></summary><p>Yes. ArchIt Find is available separately for browsing property listings on a map.</p><SignInButton mode="modal" forceRedirectUrl="/find"><button className={styles.textButton}>Sign in to explore properties ↗</button></SignInButton></details>
+        <details><summary>Can I still search for properties?<span aria-hidden="true">+</span></summary><p>Yes. ArchIt Find is available separately for browsing property listings on a map.</p><TrackedLink href="/find" cta="faq_find" className={styles.textButton}>Sign in to explore properties ↗</TrackedLink></details>
       </div></section>
 
-      <section className={styles.finale}><p className={styles.eyebrow}>There is room for your idea.</p><h2>Let’s make a start.</h2><StartButton>Plan your home</StartButton><p>Start small. Save your progress. Make it yours.</p></section>
+      <section className={styles.finale}><p className={styles.eyebrow}>There is room for your idea.</p><h2>Let’s make a start.</h2><StartButton cta="finale">Plan your home</StartButton><p>Start small. Save your progress. Make it yours.</p></section>
     </main>
     <footer className={styles.footer}><span>ArchIt. <span>A place for your next idea.</span></span><nav aria-label="Footer navigation"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><a href="https://archit-lit.chaudharyankit.in/" target="_blank" rel="noreferrer">Explore ArchIt Lite ↗</a></nav></footer>
   </div>;
