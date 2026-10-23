@@ -1,8 +1,8 @@
 import Image from "next/image";
-import { memo, useEffect, useRef } from "react";
+import { memo } from "react";
 import type { Listing } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
-import { safeImageUrl } from "@/lib/url";
+import { safeImageUrl, thumbnailUrl } from "@/lib/url";
 
 function PropertyCard({
   listing,
@@ -15,24 +15,22 @@ function PropertyCard({
   selected?: boolean;
 }) {
   const sale = listing.type === "sale";
-  const ref = useRef<HTMLButtonElement>(null);
-  // keep the card for the listing picked on the map in view in the strip
-  useEffect(() => {
-    if (!selected) return;
-    ref.current?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-  }, [selected]);
+  // a stored 480px webp needs no optimizer round-trip; older photos get one
+  const thumb = thumbnailUrl(listing.photo, 480);
+  const photo = thumb ?? safeImageUrl(listing.photo);
   return (
     <button
-      ref={ref}
+      data-listing-id={listing.id}
       onClick={() => onSelect?.(listing.id)}
       aria-pressed={selected}
       style={selected ? { boxShadow: "inset 0 0 0 3px #e2ef6a, 0 8px 24px #3d183030" } : undefined}
       className="group pointer-events-auto relative h-[196px] w-[236px] shrink-0 snap-start overflow-hidden rounded-2xl text-left shadow-lg transition-transform hover:-translate-y-1"
     >
       {selected && <span className="pointer-events-none absolute inset-0 z-10 rounded-2xl border-[3px] border-lime" />}
-      {safeImageUrl(listing.photo) ? (
+      {photo ? (
         <Image
-          src={safeImageUrl(listing.photo)!}
+          src={photo}
+          unoptimized={!!thumb}
           alt={`${listing.address}, ${listing.city}`}
           fill
           sizes="236px"

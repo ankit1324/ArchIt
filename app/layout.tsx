@@ -48,8 +48,11 @@ export const metadata: Metadata = {
   },
 };
 
+// viewport-fit=cover lets env(safe-area-inset-*) report the notch / home
+// indicator insets that /find's bottom sheet and the dashboard tab bar pad by
 export const viewport: Viewport = {
   themeColor: "#f5f1ea", // --color-cream
+  viewportFit: "cover",
 };
 
 // No headers()/auth() here: anything request-bound in the root layout makes

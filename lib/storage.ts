@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { storageObjectName } from "./url";
+import { isThumbObjectName, storageObjectName, thumbObjectNames } from "./url";
 
 const BUCKET = "photos";
 
@@ -26,6 +26,10 @@ export async function removeUnreferencedUploads(context: string, urls: unknown[]
     if (typeof url !== "string" || url === "") continue;
     const name = storageObjectName(url, BUCKET);
     if (!name) continue;
+    // resized variants are derived from their original and only ever removed
+    // with it (below); a row pointing at one directly must not delete it
+    // out from under the original that thumbnailUrl() maps onto it
+    if (isThumbObjectName(name)) continue;
     if (db.storage.from(BUCKET).getPublicUrl(name).data.publicUrl !== url) continue;
     candidates.push({ url, name });
   }
@@ -46,7 +50,8 @@ export async function removeUnreferencedUploads(context: string, urls: unknown[]
         continue;
       }
       if (!photo.count && !photos.count && !snapshot.count) {
-        names.push(name);
+        // its resized variants (app/api/upload) go with it
+        names.push(name, ...thumbObjectNames(name));
       }
     }
     if (names.length === 0) return;

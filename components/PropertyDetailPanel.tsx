@@ -9,7 +9,7 @@ import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
 import { MAX_REPORT_DETAILS, REPORT_REASONS, type ReportReason } from "@/lib/moderation";
-import { safeImageUrl } from "@/lib/url";
+import { safeImageUrl, thumbnailUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
 interface PropertyDetailPanelProps {
@@ -231,6 +231,8 @@ export default function PropertyDetailPanel({
   // Offer the unlock to a signed-in viewer who is not the lister, once the
   // detail fetch has confirmed there is a contact to buy. The lister (or a
   // past buyer) already has `owner` in hand.
+  const thumb = thumbnailUrl(listing.photo, 480);
+  const photo = thumb ?? safeImageUrl(listing.photo);
   const showUnlock =
     !!userId && !canManage && !listing.owner && listing.hasOwner === true;
   return (
@@ -254,10 +256,11 @@ export default function PropertyDetailPanel({
         </button>
       </header>
 
-      {safeImageUrl(listing.photo) && (
+      {photo && (
         <div className="relative h-[140px] overflow-hidden rounded-2xl">
           <Image
-            src={safeImageUrl(listing.photo)!}
+            src={photo}
+            unoptimized={!!thumb}
             alt={listing.address}
             fill
             sizes="268px"
