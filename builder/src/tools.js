@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './sidebar.js';
 import {C} from './catalog.js';
-import {$, chips, toast} from './dom.js';
+import {$, chips, escapeMarkup, toast} from './dom.js';
 import {commit, footprint, getBlock, newRoom, sel, selBlock, selFurn, setSel, state, ui} from './state.js';
 import {clampFurn, freeT, overlaps, sharedWall} from './geometry.js';
 import {canvas} from './scene.js';
@@ -112,7 +112,7 @@ function furnGridHTML(){
 function furnCatalogHTML(X){
   const tabs = FURN_CATS.map(([k,n]) => `<button class="fcat${k===furnCat?' on':''}" data-fcat="${k}">${n}</button>`).join('');
   return `<h3>Furniture ${X}</h3>
-    <input class="fsearch" placeholder="Search furniture…" value="${furnQuery}">
+    <input class="fsearch" placeholder="Search furniture…" value="${escapeMarkup(furnQuery)}">
     <div class="fcats">${tabs}</div>
     <div class="fgrid">${furnGridHTML()}</div>`;
 }

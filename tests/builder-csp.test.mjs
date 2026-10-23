@@ -18,7 +18,7 @@ test('builder CSP allows only same-origin scripts', () => {
 });
 
 test('builder.html runs no inline script, so that policy is enough', () => {
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
   assert.deepEqual(scripts.map(m => m[1].trim()), ['type="module" src="js/builder.js"']);
   assert.ok(scripts.every(m => !m[2].trim()), 'no inline script body');
   assert.doesNotMatch(html, /importmap|cdn\.|\son[a-z]+=/i);
