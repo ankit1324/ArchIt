@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { TEMPLATE_CATALOG } from "@/lib/template-catalog";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
+import { isPaidTemplate, TEMPLATE_CATALOG } from "@/lib/template-catalog";
 
 /**
  * GET /api/templates → the full catalog plus which paid templates this user owns.
@@ -13,7 +14,10 @@ export async function GET() {
   const { userId } = await auth();
 
   let owned: string[] = [];
-  if (userId) {
+  if (userId && !PAYWALL_ENABLED) {
+    // paywall off: every paid template reads as owned
+    owned = TEMPLATE_CATALOG.map((t) => t.key).filter(isPaidTemplate);
+  } else if (userId) {
     const { data, error } = await db
       .from("purchases")
       .select("ref")
