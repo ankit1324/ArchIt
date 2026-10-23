@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { ListingStatus } from "./moderation";
 import type {
   Design,
   DesignMeta,
@@ -45,10 +46,12 @@ export const db = new Proxy({} as SupabaseClient, {
 export const PUBLIC_COLUMNS =
   "id, building_name, address, city, price, type, kind, beds, baths, sqft, rooms, area_m, floors, lng, lat, photo, photos, featured";
 
-// Same set plus user_id, for selects that need to derive ownership server-side.
-// user_id is used to compute the `mine` flag and is stripped before the row is
-// returned — it must never appear in a response body (rowToListing drops it).
-export const OWNED_COLUMNS = `${PUBLIC_COLUMNS}, user_id`;
+// Same set plus user_id and the moderation status, for selects that need to
+// derive ownership server-side. user_id is used to compute the `mine` flag and
+// is stripped before the row is returned — it must never appear in a response
+// body (rowToListing drops it). status is only echoed to the lister
+// (listingForViewer), since everyone else only ever sees live rows.
+export const OWNED_COLUMNS = `${PUBLIC_COLUMNS}, user_id, status`;
 
 export type PublicPropertyRow = Omit<PropertyRow, "owner">;
 
@@ -74,13 +77,15 @@ export interface PropertyRow {
   user_id: string | null;
   /** true when the lister paid the ₹250 featured-listing fee */
   featured: boolean;
+  /** moderation state; public queries only return 'live' (lib/moderation.ts) */
+  status: ListingStatus;
 }
 
-// user_id deliberately excluded: routes stamp it from the Clerk session,
+// user_id and status deliberately excluded: routes stamp them server-side,
 // never from the client body
 export function listingToRow(
   l: Omit<Listing, "id">,
-): Omit<PropertyRow, "id" | "user_id"> {
+): Omit<PropertyRow, "id" | "user_id" | "status"> {
   return {
     building_name: l.buildingName ?? null,
     owner: l.owner ?? null,
@@ -168,6 +173,20 @@ export function rowToListing(r: PublicPropertyRow): Listing {
     // returned to the client (see OWNED_COLUMNS).
     featured: r.featured ?? false,
   };
+}
+
+/**
+ * rowToListing plus the viewer-specific fields: `mine`, and — for the lister
+ * only — the moderation `status` of a listing that isn't live yet.
+ */
+export function listingForViewer(
+  r: PublicPropertyRow,
+  userId: string | null | undefined,
+): Listing {
+  const mine = ownsRow(r, userId);
+  const listing: Listing = { ...rowToListing(r), mine };
+  if (mine && r.status && r.status !== "live") listing.status = r.status;
+  return listing;
 }
 
 /** True when `row` belongs to the given session user. Server-side only. */

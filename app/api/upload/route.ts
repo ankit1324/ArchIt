@@ -1,8 +1,11 @@
 import crypto from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
+import sharp from "@/lib/sharp";
 import { db } from "@/lib/db";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
+import { readBodyCapped } from "@/lib/request";
 import { detectImageType, EXT_BY_MIME, MAX_UPLOAD_BYTES } from "@/lib/upload";
+import { THUMB_WIDTHS, thumbObjectNames } from "@/lib/url";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -13,17 +16,26 @@ export async function POST(request: Request) {
     return rateLimitedResponse();
   }
 
-  // Reject oversized bodies before request.formData() buffers the whole payload
-  // into memory. Content-Length includes multipart boundaries/headers, so allow
-  // a little headroom over MAX_UPLOAD_BYTES; the exact file.size check below is
-  // still the authoritative guard. This only stops the pathological case (a
-  // several-hundred-MB body that would otherwise be materialized in full).
+  // Multipart boundaries/headers add a little over the file itself; the exact
+  // file.size check below is still the authoritative guard.
+  const maxBody = MAX_UPLOAD_BYTES + 64 * 1024;
   const declaredBytes = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_UPLOAD_BYTES + 64 * 1024) {
+  if (Number.isFinite(declaredBytes) && declaredBytes > maxBody) {
     return Response.json({ error: "max 8 MB" }, { status: 413 });
   }
+  // Content-Length is advisory (absent when chunked); count the bytes as they
+  // stream in so an oversized body is cut off, never buffered in full.
+  const raw = await readBodyCapped(request, maxBody);
+  if (!raw) return Response.json({ error: "max 8 MB" }, { status: 413 });
 
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await new Response(raw as BodyInit, {
+      headers: { "content-type": request.headers.get("content-type") ?? "" },
+    }).formData();
+  } catch {
+    return Response.json({ error: "multipart body required" }, { status: 400 });
+  }
   const file = form.get("file");
   if (!(file instanceof File)) {
     return Response.json({ error: "file field required" }, { status: 400 });
@@ -40,15 +52,50 @@ export async function POST(request: Request) {
     return Response.json({ error: "only jpeg/png/webp/avif images" }, { status: 415 });
   }
 
-  const name = `${crypto.randomUUID()}${ext}`;
+  // Resized webp variants for markers (64px) and cards/panels (480px). Only
+  // when every variant is stored does the original get the `-t` name that
+  // tells readers they exist (lib/url.ts thumbnailUrl); otherwise it is saved
+  // under a plain name and readers fall back to the original.
+  const id = crypto.randomUUID();
+  const thumbed = await storeThumbnails(`${id}-t`, buf);
+  const name = `${thumbed ? `${id}-t` : id}${ext}`;
   const { error } = await db.storage
     .from("photos")
     .upload(name, buf, { contentType: mime });
   if (error) {
     console.error("Photo upload failed:", error.message);
+    if (thumbed) await db.storage.from("photos").remove(thumbObjectNames(name));
     return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   const { data } = db.storage.from("photos").getPublicUrl(name);
   return Response.json({ url: data.publicUrl }, { status: 201 });
+}
+
+/** Generate and upload every THUMB_WIDTHS variant; false (and nothing left behind) on any failure. */
+async function storeThumbnails(base: string, buf: Buffer): Promise<boolean> {
+  const names = THUMB_WIDTHS.map((w) => `${base}.w${w}.webp`);
+  try {
+    const variants = await Promise.all(
+      THUMB_WIDTHS.map((w) =>
+        sharp(buf, { limitInputPixels: 40_000_000 })
+          .rotate() // honour EXIF orientation before it is stripped
+          .resize(w === 64 ? { width: 64, height: 64, fit: "cover" } : { width: w, withoutEnlargement: true })
+          .webp({ quality: w === 64 ? 70 : 76 })
+          .toBuffer(),
+      ),
+    );
+    const results = await Promise.all(
+      variants.map((v, i) =>
+        db.storage.from("photos").upload(names[i], v, { contentType: "image/webp" }),
+      ),
+    );
+    const failed = results.find((r) => r.error)?.error;
+    if (failed) throw new Error(failed.message);
+    return true;
+  } catch (e) {
+    console.warn("Thumbnail generation failed, storing original only:", (e as Error).message);
+    await db.storage.from("photos").remove(names).catch(() => {});
+    return false;
+  }
 }

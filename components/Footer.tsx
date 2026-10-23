@@ -1,4 +1,5 @@
 const LINKS: Array<{ label: string; href: string }> = [
+  { label: "Pricing", href: "/pricing" },
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
   { label: "Refunds", href: "/refunds" },

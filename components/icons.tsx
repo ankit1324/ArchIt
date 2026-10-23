@@ -84,14 +84,6 @@ export const MinusIcon = (p: P) => (
   </svg>
 );
 
-export const LayersIcon = (p: P) => (
-  <svg {...base} {...p}>
-    <path d="M12 3l9 5-9 5-9-5 9-5z" />
-    <path d="M3 13l9 5 9-5" />
-    <path d="M3 17l9 5 9-5" opacity="0.45" />
-  </svg>
-);
-
 export const LogoMark = (p: P) => (
   <svg {...base} strokeWidth={1.6} {...p}>
     <circle cx="12" cy="12" r="9" />
