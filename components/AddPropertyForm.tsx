@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Listing, ListingType, PropertyKind } from "@/lib/types";
 import { feeLabel } from "@/lib/fees";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import { MAX_UPLOAD_BYTES, SUPPORTED_MIME_TYPES } from "@/lib/upload";
 import { safeImageUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
@@ -385,30 +386,32 @@ export default function AddPropertyForm({
         <p className="text-[12px] font-semibold text-coral">{error}</p>
       )}
 
-      {/* ── Featured listing upsell ── */}
-      <button
-        type="button"
-        onClick={() => setFeatured((v) => !v)}
-        className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
-          featured
-            ? "border-amber-400/60 bg-amber-50/80 text-amber-800"
-            : "border-plum/10 bg-white/40 text-plum-soft hover:bg-white/70"
-        }`}
-      >
-        <span className="text-[18px]">{featured ? "⭐" : "☆"}</span>
-        <span className="flex flex-col">
-          <span className="text-[12.5px] font-bold">
-            {featured
-              ? `Featured listing — ${feeLabel("featured_property")}`
-              : `Feature on map — ${feeLabel("featured_property")}`}
+      {/* ── Featured listing upsell (paid; hidden while the paywall is off) ── */}
+      {PAYWALL_ENABLED && (
+        <button
+          type="button"
+          onClick={() => setFeatured((v) => !v)}
+          className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
+            featured
+              ? "border-amber-400/60 bg-amber-50/80 text-amber-800"
+              : "border-plum/10 bg-white/40 text-plum-soft hover:bg-white/70"
+          }`}
+        >
+          <span className="text-[18px]">{featured ? "⭐" : "☆"}</span>
+          <span className="flex flex-col">
+            <span className="text-[12.5px] font-bold">
+              {featured
+                ? `Featured listing — ${feeLabel("featured_property")}`
+                : `Feature on map — ${feeLabel("featured_property")}`}
+            </span>
+            <span className="text-[11px] font-medium opacity-70">
+              {featured
+                ? "Your property gets a golden star on the 3D map"
+                : "Stand out with a glowing star marker on the map"}
+            </span>
           </span>
-          <span className="text-[11px] font-medium opacity-70">
-            {featured
-              ? "Your property gets a golden star on the 3D map"
-              : "Stand out with a glowing star marker on the map"}
-          </span>
-        </span>
-      </button>
+        </button>
+      )}
 
       <button
         onClick={submit}

@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import Navbar from "@/components/Navbar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
 import { feeLabel } from "@/lib/fees";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 
 // Self-hosted rather than next/font/google: a build that has to reach Google
 // Fonts is a build that can fail offline. See assets/fonts/README.md.
@@ -34,7 +35,7 @@ const PRODUCTS = [
     name: "ArchIt Find",
     tagline: "Every home, on a living map",
     body: "Fly over a 3D satellite city, browse real listings, list your own property and reach owners directly.",
-    badge: `Free listing · ${feeLabel("contact_owner")} contact`,
+    badge: PAYWALL_ENABLED ? `Free listing · ${feeLabel("contact_owner")} contact` : "Free",
     badgeClass: "bg-magenta-deep text-white",
     cta: "Open the map",
     href: "/find",
@@ -47,7 +48,7 @@ const PRODUCTS = [
     name: "ArchIt 3D Builder",
     tagline: "Your home, room by room",
     body: "Design a complete house in 3D — floors, facades, windows, furniture — then save and refine every idea.",
-    badge: `${feeLabel("builder_unlock")} one-time`,
+    badge: PAYWALL_ENABLED ? `${feeLabel("builder_unlock")} one-time` : "Free",
     badgeClass: "bg-plum text-cream",
     cta: "Start designing",
     href: "/designer",

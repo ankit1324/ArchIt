@@ -6,6 +6,7 @@ import { connection } from "next/server";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { feeLabel } from "@/lib/fees";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import { getPublicListing, type PublicListing } from "@/lib/public-listings";
 import { SITE_URL } from "@/lib/site";
 import { formatPrice } from "@/lib/types";
@@ -228,7 +229,7 @@ export default async function PropertyPage({ params }: Props) {
           <div>
             <h2 className="text-lg font-bold">Interested in this {kindLabel(l).toLowerCase()}?</h2>
             <p className="mt-1 text-[14px] text-cream/85">
-              See it in 3D on the map and unlock the owner&apos;s contact for {feeLabel("contact_owner")}.
+              See it in 3D on the map and {PAYWALL_ENABLED ? <>unlock the owner&apos;s contact for {feeLabel("contact_owner")}</> : <>get the owner&apos;s contact</>}.
               Listing is free; you only pay to reach the owner.
             </p>
           </div>
