@@ -178,6 +178,15 @@ export default function PropertyDetailPanel({
         />
       </div>
 
+      <a
+        href={`/property/${listing.id}`}
+        target="_blank"
+        rel="noopener"
+        className="text-center text-[12px] font-semibold text-plum-soft underline underline-offset-4 hover:text-plum"
+      >
+        Open shareable listing page ↗
+      </a>
+
       {showUnlock && (
         <button
           onClick={unlockOwner}

@@ -56,6 +56,9 @@ export default function Home() {
         if (!controller.signal.aborted) {
           setListings(data);
           setLoadState("ready");
+          // deep link from a public /property/:id page: open that listing
+          const linked = new URLSearchParams(window.location.search).get("property");
+          if (linked && data.some((l: Listing) => l.id === linked)) setSelectedId(linked);
         }
       })
       .catch(() => {
