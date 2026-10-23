@@ -1,34 +1,36 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, rowToListing, ownsRow, OWNED_COLUMNS } from "@/lib/db";
+import { db, listingToRow, rowToListing, OWNED_COLUMNS } from "@/lib/db";
+import { parseBBox, parseCursor, parseLimit } from "@/lib/listing-query";
+import { listProperties } from "@/lib/properties";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
 import { safeImageUrl } from "@/lib/url";
 import { validateListing } from "@/lib/validators";
 
-/** Hard cap on the public list; the map renders every row it gets. */
-const LIST_LIMIT = 1000;
-
 // owner contact is paywalled (#3): the public list never includes it, and the
 // raw lister user_id is dropped — each row carries a server-computed `mine`.
-export async function GET() {
+//
+// ?bbox=w,s,e,n limits to a map viewport ("search as I move"); ?limit and
+// ?cursor page through the set. The body stays a plain array for existing
+// callers — the next page's cursor rides in the X-Next-Cursor header.
+export async function GET(request: Request) {
   const { userId } = await auth();
-  const { data, error } = await db
-    .from("properties")
-    .select(OWNED_COLUMNS)
-    .order("created_at")
-    .limit(LIST_LIMIT);
-  if (error) {
-    console.error("GET /api/properties failed:", error.message);
+  const params = new URL(request.url).searchParams;
+  const bbox = parseBBox(params.get("bbox"));
+  const limit = parseLimit(params.get("limit"));
+  const cursor = parseCursor(params.get("cursor"));
+  if (bbox === "invalid" || limit === "invalid" || cursor === "invalid") {
+    return Response.json({ error: "invalid bbox, limit or cursor" }, { status: 400 });
+  }
+  try {
+    const page = await listProperties({ userId, bbox, cursor, limit });
+    return Response.json(page.listings, {
+      headers: page.nextCursor ? { "X-Next-Cursor": page.nextCursor } : undefined,
+    });
+  } catch (error) {
+    console.error("GET /api/properties failed:", (error as Error).message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
-  if (data.length === LIST_LIMIT) {
-    console.warn(
-      `GET /api/properties hit the ${LIST_LIMIT}-row cap — listings beyond it are not served; paginate`,
-    );
-  }
-  return Response.json(
-    data.map((r) => ({ ...rowToListing(r), mine: ownsRow(r, userId) })),
-  );
 }
 
 export async function POST(request: Request) {

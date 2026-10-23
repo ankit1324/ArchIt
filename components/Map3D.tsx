@@ -8,7 +8,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
 import type { Listing, Poi } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
-import { safeImageUrl } from "@/lib/url";
+import { safeImageUrl, sizedImageUrl } from "@/lib/url";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const CENTER: [number, number] = [76.7794, 30.741];
@@ -105,71 +105,269 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
   };
 }
 
-/** what a price marker's inner element depends on; re-rendered when it changes */
-function markerSignature(l: Listing): string {
-  const thumb = l.featured || hashOf(l.id) % 3 === 0 ? safeImageUrl(l.photo) ?? "" : "";
-  return `${formatPrice(l)}|${l.featured ? 1 : 0}|${thumb}|${l.buildingName || l.address}`;
-}
+// ── Listing markers ─────────────────────────────────────────────────────────
+// Markers are a clustered GeoJSON source drawn by symbol layers on the GPU, not
+// DOM overlays maplibre has to project() and restyle every frame. Each pill is
+// painted once into a canvas the first time a feature needs it (maplibre's
+// `styleimagemissing`), keyed by everything it shows, so a changed price or
+// selection simply asks for a new key.
+
+// Contrast (WCAG AA, 12.5px bold text needs 4.5:1): white on #c8322a is 5.3:1,
+// plum (#3d1830) on the featured amber is 7.1:1 at #f59e0b and 4.8:1 at the
+// #d97706 end of its gradient. The old white-on-amber pill was 2.15:1.
+const PIN = {
+  fill: "#c8322a",
+  text: "#ffffff",
+  featuredFrom: "#f59e0b",
+  featuredTo: "#d97706",
+  featuredText: "#3d1830",
+  featuredRing: "rgba(251, 191, 36, 0.6)",
+  selectedRing: "#e2ef6a",
+  plum: "#3d1830",
+  cream: "#f5f1ea",
+};
+const PIN_H = 30;
+const PIN_MARGIN = 7; // room for the shadow / rings around the pill
+const THUMB = 20;
+const PIN_FONT_SIZE = 12.5;
+
+const LISTING_SOURCE = "listings";
+const LAYER_CLUSTERS = "listing-clusters";
+const LAYER_PINS = "listing-pins";
+const LAYER_POIS = "pois";
 
 /**
- * The visual pill. Lives INSIDE the bare root that maplibre positions, so the
- * hover scale / pulse / transition here never touch the root's inline
- * `transform` that maplibre rewrites every frame.
+ * whether a listing's pill carries a photo bubble (stable across re-sorts).
+ * Only when a small version exists: decoding a multi-MB original for a 20px
+ * bubble is exactly the cost the stored thumbnails remove.
  */
-function priceMarkerInner(l: Listing): HTMLElement {
-  const el = document.createElement("div");
-  const thumb = l.featured || hashOf(l.id) % 3 === 0 ? safeImageUrl(l.photo) : null;
-  el.tabIndex = 0;
-  el.setAttribute("role", "button");
-  el.setAttribute("aria-label", `${l.buildingName || l.address}, ${formatPrice(l)}`);
-  el.className = `price-marker${thumb ? "" : " no-thumb"}${l.featured ? " featured" : ""}`;
-  if (thumb) {
-    const img = document.createElement("img");
-    img.className = "thumb";
-    img.src = thumb;
-    img.alt = "";
-    el.appendChild(img);
-  }
+function hasPinThumb(l: Listing): boolean {
+  const sized = sizedImageUrl(l.photo, 64);
+  return !!sized && sized !== safeImageUrl(l.photo) && (!!l.featured || hashOf(l.id) % 3 === 0);
+}
+
+/** image key for a listing pill: changes whenever what it draws changes */
+function pinKey(l: Listing, selected: boolean): string {
+  const sig = `${formatPrice(l)}|${l.featured ? 1 : 0}|${hasPinThumb(l) ? l.photo : ""}`;
+  return `pin|${l.id}|${hashOf(sig).toString(36)}|${selected ? 1 : 0}`;
+}
+
+function listingGeoJSON(listings: Listing[], selectedId: string | null): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: listings.map((l) => ({
+      type: "Feature",
+      properties: {
+        id: l.id,
+        icon: pinKey(l, l.id === selectedId),
+        // later-sorted symbols draw on top: selected > featured > the rest
+        rank: l.id === selectedId ? 2 : l.featured ? 1 : 0,
+      },
+      geometry: { type: "Point", coordinates: l.coords },
+    })),
+  };
+}
+
+let fontFamily = "";
+function pinFont(size: number): string {
+  fontFamily ||= getComputedStyle(document.body).fontFamily || "sans-serif";
+  return `700 ${size}px ${fontFamily}`;
+}
+
+function pixelRatio(): number {
+  return Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+}
+
+type ThumbSource = HTMLImageElement | ImageBitmap;
+
+/** Paint one listing pill. `thumb` is null until its 64px photo has loaded. */
+function drawPin(l: Listing, selected: boolean, thumb: ThumbSource | null): ImageData {
+  const pr = pixelRatio();
+  const scale = selected ? 1.12 : 1;
+  const label = `${l.featured ? "\u2605 " : ""}${formatPrice(l)}`;
+  const withThumb = hasPinThumb(l);
+
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = pinFont(PIN_FONT_SIZE);
+  const textW = Math.ceil(measure.measureText(label).width);
+  const padL = withThumb ? 5 + THUMB + 6 : 12;
+  const pillW = padL + textW + 12;
+  const w = Math.ceil((pillW + PIN_MARGIN * 2) * scale);
+  const h = Math.ceil((PIN_H + PIN_MARGIN * 2) * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(w * pr);
+  canvas.height = Math.ceil(h * pr);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(pr * scale, pr * scale);
+  const x = PIN_MARGIN;
+  const y = PIN_MARGIN;
+  const r = PIN_H / 2;
+
+  // soft drop shadow under the pill
+  ctx.save();
+  ctx.shadowColor = l.featured ? "rgba(217, 119, 6, 0.5)" : "rgba(120, 30, 25, 0.4)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  roundRect(ctx, x, y, pillW, PIN_H, r);
   if (l.featured) {
-    const star = document.createElement("span");
-    star.className = "featured-star";
-    star.textContent = "⭐";
-    el.appendChild(star);
+    const g = ctx.createLinearGradient(x, y, x + pillW, y + PIN_H);
+    g.addColorStop(0, PIN.featuredFrom);
+    g.addColorStop(1, PIN.featuredTo);
+    ctx.fillStyle = g;
+  } else {
+    ctx.fillStyle = PIN.fill;
   }
-  el.appendChild(document.createTextNode(formatPrice(l)));
-  return el;
+  ctx.fill();
+  ctx.restore();
+
+  if (l.featured || selected) {
+    roundRect(ctx, x - 1.5, y - 1.5, pillW + 3, PIN_H + 3, r + 1.5);
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.strokeStyle = selected ? PIN.selectedRing : PIN.featuredRing;
+    ctx.stroke();
+  }
+
+  if (withThumb) {
+    const cx = x + 5 + THUMB / 2;
+    const cy = y + PIN_H / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, THUMB / 2, 0, Math.PI * 2);
+    ctx.clip();
+    if (thumb) {
+      // object-fit: cover
+      const sw = "naturalWidth" in thumb ? thumb.naturalWidth : thumb.width;
+      const sh = "naturalHeight" in thumb ? thumb.naturalHeight : thumb.height;
+      const side = Math.min(sw, sh);
+      ctx.drawImage(thumb, (sw - side) / 2, (sh - side) / 2, side, side, cx - THUMB / 2, cy - THUMB / 2, THUMB, THUMB);
+    } else {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.fillRect(cx - THUMB / 2, cy - THUMB / 2, THUMB, THUMB);
+    }
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(cx, cy, THUMB / 2, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.stroke();
+  }
+
+  ctx.font = pinFont(PIN_FONT_SIZE);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = l.featured ? PIN.featuredText : PIN.text;
+  ctx.fillText(label, x + padL, y + PIN_H / 2 + 0.5);
+
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-interface MarkerEntry {
-  marker: maplibregl.Marker;
-  root: HTMLElement;
-  inner: HTMLElement;
-  signature: string;
-  coords: [number, number];
+/** cluster bubble with its (abbreviated) count */
+function drawCluster(label: string): ImageData {
+  const pr = pixelRatio();
+  const d = label.length <= 1 ? 34 : label.length <= 3 ? 40 : 48;
+  const size = d + 12;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = Math.ceil(size * pr);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(pr, pr);
+  const c = size / 2;
+  ctx.save();
+  ctx.shadowColor = "rgba(61, 24, 48, 0.35)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  ctx.beginPath();
+  ctx.arc(c, c, d / 2, 0, Math.PI * 2);
+  ctx.fillStyle = PIN.plum;
+  ctx.fill();
+  ctx.restore();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(245, 241, 234, 0.85)";
+  ctx.stroke();
+  ctx.font = pinFont(13);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = PIN.cream;
+  ctx.fillText(label, c, c + 0.5);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-function poiMarkerEl(p: Poi): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "poi-marker";
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
-  bubble.innerHTML = POI_SVGS[p.icon] ?? "";
-  el.appendChild(bubble);
+/** POI bubble (icon tile + white label), rasterised once per POI */
+async function drawPoi(p: Poi): Promise<ImageData> {
+  const pr = pixelRatio();
+  // an <img>-loaded svg needs its namespace
+  const svg = (POI_SVGS[p.icon] ?? "")
+    .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ')
+    .replace(/currentColor/g, PIN.plum);
+  const icon = new Image();
+  icon.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await icon.decode().catch(() => {});
+
+  const font = `600 11px ${pinFont(11).split("px ")[1]}`;
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = font;
+  const labelW = p.label ? Math.min(110, Math.ceil(measure.measureText(p.label).width)) + 8 : 0;
+  const w = 4 + 34 + labelW + 4;
+  const h = 34 + 10;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(w * pr);
+  canvas.height = Math.ceil(h * pr);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(pr, pr);
+  ctx.save();
+  ctx.shadowColor = "rgba(61, 24, 48, 0.18)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  roundRect(ctx, 4, 4, 34, 34, 12);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.fill();
+  ctx.restore();
+  if (icon.complete && icon.naturalWidth) ctx.drawImage(icon, 4 + 9, 4 + 9, 16, 16);
   if (p.label) {
-    const label = document.createElement("div");
-    label.className = "poi-label";
-    label.textContent = p.label;
-    el.appendChild(label);
+    ctx.font = font;
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(61, 24, 48, 0.7)";
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(p.label, 4 + 34 + 7, 4 + 17, 110);
   }
-  return el;
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
+
+function poiGeoJSON(pois: Poi[]): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: pois.map((p) => ({
+      type: "Feature",
+      properties: { icon: `poi|${p.id}` },
+      geometry: { type: "Point", coordinates: p.coords },
+    })),
+  };
+}
+
+/** Minimal style used when the OpenFreeMap style itself can't be fetched. */
+const FALLBACK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: { satellite: SATELLITE_SOURCE },
+  layers: [
+    { id: "background", type: "background", paint: { "background-color": "#efe9df" } },
+    { id: "satellite", type: "raster", source: "satellite" },
+  ],
+};
 
 interface Map3DProps {
   listings: Listing[];
   pois: Poi[];
   mapRef: RefObject<maplibregl.Map | null>;
+  selectedId?: string | null;
   onSelect?: (id: string) => void;
   onMapClick?: (coords: [number, number]) => void;
+  /** fired after every pan/zoom settles, with the visible [w, s, e, n] */
+  onMoveEnd?: (bbox: [number, number, number, number]) => void;
   pickMode?: boolean;
   draftCoords?: [number, number] | null;
 }
@@ -178,26 +376,31 @@ export default function Map3D({
   listings,
   pois,
   mapRef,
+  selectedId = null,
   onSelect,
   onMapClick,
+  onMoveEnd,
   pickMode = false,
   draftCoords = null,
 }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<Map<string, MarkerEntry>>(new Map());
-  const poiMarkersRef = useRef<maplibregl.Marker[]>([]);
   const draftMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const loadedRef = useRef(false);
+  // pill images added so far, so ones no feature uses any more can be dropped
+  const pinImagesRef = useRef<Set<string>>(new Set());
   const listingsRef = useRef(listings);
+  const selectedIdRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
   const onMapClickRef = useRef(onMapClick);
+  const onMoveEndRef = useRef(onMoveEnd);
 
   // Refreshed after every commit, not during render. The init effect below runs
   // once and reads these from maplibre callbacks, which always fire post-commit.
   useEffect(() => {
     listingsRef.current = listings;
+    selectedIdRef.current = selectedId;
     onSelectRef.current = onSelect;
     onMapClickRef.current = onMapClick;
+    onMoveEndRef.current = onMoveEnd;
   });
 
   // init once
@@ -220,28 +423,111 @@ export default function Map3D({
     mapRef.current = map;
     if (process.env.NODE_ENV !== "production") {
       (window as unknown as { __map?: maplibregl.Map }).__map = map;
-      map.on("error", (e) => console.error("[Map3D]", e.error));
     }
 
-    // POIs are static: build their DOM overlays once and never again. Listing
-    // markers are synced by the effect below (it runs right after this one on
-    // mount, so they also show before any tile arrives).
-    poiMarkersRef.current = pois.map((p) =>
-      new maplibregl.Marker({ element: poiMarkerEl(p), anchor: "center" })
-        .setLngLat(p.coords)
-        .addTo(map),
-    );
-
-    map.on("click", (e) => {
-      onMapClickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
+    // If the OpenFreeMap style document itself fails, nothing would ever load
+    // (no `style.load`, so no markers either). Fall back to bare imagery so
+    // listings still show; labels are the only loss.
+    let fellBack = false;
+    map.on("error", (e) => {
+      if (process.env.NODE_ENV !== "production") console.error("[Map3D]", e.error);
+      const url = (e.error as { url?: string } | undefined)?.url;
+      if (!fellBack && url === STYLE_URL && !map.isStyleLoaded()) {
+        fellBack = true;
+        map.setStyle(FALLBACK_STYLE, { diff: false });
+      }
     });
 
-    map.on("load", () => {
-      // translucent listing prisms
-      map.addSource("listing-prisms", {
-        type: "geojson",
-        data: prismGeoJSON(listingsRef.current),
+    // 64px photos for pill bubbles, shared by the selected/unselected variants.
+    // Loaded as <img crossorigin> (img-src) rather than map.loadImage's fetch
+    // (connect-src); both photo hosts send CORS headers, so the canvas the
+    // photo is drawn into stays readable.
+    const thumbs = new Map<string, Promise<ThumbSource | null>>();
+    const loadThumb = (url: string) => {
+      let p = thumbs.get(url);
+      if (!p) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.decoding = "async";
+        img.src = url;
+        p = img.decode().then(() => img, () => null);
+        thumbs.set(url, p);
+      }
+      return p;
+    };
+
+    // Paint marker images on demand: only features actually on screen ask.
+    map.on("styleimagemissing", (e) => {
+      const id = e.id;
+      if (map.hasImage(id)) return;
+      if (id.startsWith("cluster|")) {
+        map.addImage(id, drawCluster(id.slice(8)), { pixelRatio: pixelRatio() });
+        return;
+      }
+      if (!id.startsWith("pin|")) return;
+      const [, listingId, , sel] = id.split("|");
+      const l = listingsRef.current.find((x) => x.id === listingId);
+      if (!l) return;
+      const selected = sel === "1";
+      map.addImage(id, drawPin(l, selected, null), { pixelRatio: pixelRatio() });
+      pinImagesRef.current.add(id);
+      const url = hasPinThumb(l) ? sizedImageUrl(l.photo, 64) : null;
+      if (url) {
+        void loadThumb(url).then((img) => {
+          if (!img || !map.hasImage(id)) return;
+          try {
+            map.updateImage(id, drawPin(l, selected, img));
+          } catch {
+            // canvas tainted (photo host without CORS): keep the placeholder
+          }
+        });
+      }
+    });
+
+    const markerLayers = () =>
+      [LAYER_PINS, LAYER_CLUSTERS].filter((id) => map.getLayer(id));
+
+    map.on("click", (e) => {
+      const hit = markerLayers().length
+        ? map.queryRenderedFeatures(e.point, { layers: markerLayers() })[0]
+        : undefined;
+      if (hit?.layer.id === LAYER_CLUSTERS) {
+        const src = map.getSource(LISTING_SOURCE) as maplibregl.GeoJSONSource;
+        void src.getClusterExpansionZoom(hit.properties.cluster_id as number).then((zoom) => {
+          map.easeTo({
+            center: (hit.geometry as GeoJSON.Point).coordinates as [number, number],
+            zoom: zoom + 0.3,
+            duration: 700,
+          });
+        });
+        return;
+      }
+      if (hit?.layer.id === LAYER_PINS) {
+        onSelectRef.current?.(hit.properties.id as string);
+        return;
+      }
+      onMapClickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
+    });
+    for (const layer of [LAYER_PINS, LAYER_CLUSTERS]) {
+      map.on("mouseenter", layer, () => {
+        map.getCanvas().style.cursor = "pointer";
       });
+      map.on("mouseleave", layer, () => {
+        map.getCanvas().style.cursor = map.getCanvas().dataset.pick ? "crosshair" : "";
+      });
+    }
+
+    map.on("moveend", () => {
+      const b = map.getBounds();
+      onMoveEndRef.current?.([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+    });
+
+    // (Re)attach our sources and layers whenever a style finishes loading —
+    // the first one, or the fallback after a failed style fetch.
+    map.on("style.load", () => {
+      if (map.getSource(LISTING_SOURCE)) return;
+      const current = listingsRef.current;
+      map.addSource("listing-prisms", { type: "geojson", data: prismGeoJSON(current) });
       map.addLayer({
         id: "listing-prisms",
         type: "fill-extrusion",
@@ -253,8 +539,65 @@ export default function Map3D({
           "fill-extrusion-vertical-gradient": false,
         },
       });
-      loadedRef.current = true;
 
+      map.addSource("pois", { type: "geojson", data: poiGeoJSON(pois) });
+      map.addLayer({
+        id: LAYER_POIS,
+        type: "symbol",
+        source: "pois",
+        // neighbourhood landmarks; zoomed out they only crowd the clusters
+        minzoom: 13.5,
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-anchor": "left",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+        },
+      });
+      // POI art is static; draw it once the label font is ready
+      void document.fonts.ready.then(() =>
+        Promise.all(
+          pois.map(async (p) => {
+            const img = await drawPoi(p);
+            if (!map.hasImage(`poi|${p.id}`)) map.addImage(`poi|${p.id}`, img, { pixelRatio: pixelRatio() });
+          }),
+        ),
+      );
+
+      map.addSource(LISTING_SOURCE, {
+        type: "geojson",
+        data: listingGeoJSON(current, selectedIdRef.current),
+        cluster: true,
+        clusterRadius: 48,
+        // past this zoom every listing shows as its own pill
+        clusterMaxZoom: 14,
+      });
+      map.addLayer({
+        id: LAYER_CLUSTERS,
+        type: "symbol",
+        source: LISTING_SOURCE,
+        filter: ["has", "point_count"],
+        layout: {
+          "icon-image": ["concat", "cluster|", ["get", "point_count_abbreviated"]],
+          "icon-allow-overlap": true,
+        },
+      });
+      map.addLayer({
+        id: LAYER_PINS,
+        type: "symbol",
+        source: LISTING_SOURCE,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-anchor": "bottom",
+          "icon-offset": [0, -12],
+          "icon-allow-overlap": true,
+          "symbol-sort-key": ["coalesce", ["get", "rank"], 0],
+        },
+      });
+    });
+
+    map.on("load", () => {
       // cinematic settle, mirroring the video intro
       map.flyTo({
         center: CENTER,
@@ -266,84 +609,48 @@ export default function Map3D({
       });
     });
 
-    const entries = markersRef.current;
-    const poiMarkers = poiMarkersRef.current;
     return () => {
-      entries.forEach((entry) => entry.marker.remove());
-      entries.clear();
-      poiMarkers.forEach((mk) => mk.remove());
-      poiMarkersRef.current = [];
       draftMarkerRef.current?.remove();
       draftMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
-      loadedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // react to filtered listings: diff the marker set instead of rebuilding it
+  // react to filtered listings / selection
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const src = map.getSource(LISTING_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+    const data = listingGeoJSON(listings, selectedId);
+    src.setData(data);
+    // evict pills for old selections / edited prices so canvases don't pile up
+    const live = new Set(data.features.map((f) => f.properties!.icon as string));
+    for (const id of pinImagesRef.current) {
+      if (live.has(id)) continue;
+      if (map.hasImage(id)) map.removeImage(id);
+      pinImagesRef.current.delete(id);
+    }
+  }, [listings, selectedId, mapRef]);
 
-    const entries = markersRef.current;
-    const seen = new Set<string>();
-    for (const l of listings) {
-      seen.add(l.id);
-      const signature = markerSignature(l);
-      const existing = entries.get(l.id);
-      if (existing) {
-        if (existing.signature !== signature) {
-          const inner = priceMarkerInner(l);
-          existing.root.replaceChild(inner, existing.inner);
-          existing.inner = inner;
-          existing.signature = signature;
-        }
-        if (existing.coords[0] !== l.coords[0] || existing.coords[1] !== l.coords[1]) {
-          existing.coords = l.coords;
-          existing.marker.setLngLat(l.coords);
-        }
-        continue;
-      }
-      // bare root: maplibre owns its inline transform; no css of our own on it
-      const root = document.createElement("div");
-      const inner = priceMarkerInner(l);
-      root.appendChild(inner);
-      const id = l.id;
-      root.addEventListener("click", (event) => {
-        event.stopPropagation();
-        onSelectRef.current?.(id);
-      });
-      root.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onSelectRef.current?.(id);
-        }
-      });
-      const marker = new maplibregl.Marker({ element: root, anchor: "bottom", offset: [0, -18] })
-        .setLngLat(l.coords)
-        .addTo(map);
-      entries.set(id, { marker, root, inner, signature, coords: l.coords });
-    }
-    for (const [id, entry] of entries) {
-      if (!seen.has(id)) {
-        entry.marker.remove();
-        entries.delete(id);
-      }
-    }
-
-    if (loadedRef.current) {
-      const src = map.getSource("listing-prisms") as maplibregl.GeoJSONSource | undefined;
-      src?.setData(prismGeoJSON(listings));
-    }
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    (map.getSource("listing-prisms") as maplibregl.GeoJSONSource | undefined)?.setData(
+      prismGeoJSON(listings),
+    );
   }, [listings, mapRef]);
 
   // crosshair while picking a location
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.getCanvas().style.cursor = pickMode ? "crosshair" : "";
+    const canvas = map.getCanvas();
+    canvas.style.cursor = pickMode ? "crosshair" : "";
+    if (pickMode) canvas.dataset.pick = "1";
+    else delete canvas.dataset.pick;
   }, [pickMode, mapRef]);
 
   // draft pin for the property being added
