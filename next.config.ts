@@ -1,14 +1,13 @@
 import type { NextConfig } from "next";
-import { buildCsp } from "./lib/csp";
+import { buildBuilderCsp } from "./lib/csp";
 
 const isDev = process.env.NODE_ENV === "development";
 
-// The main app CSP is set per-request in proxy.ts with a nonce (so script-src
-// drops 'unsafe-inline'). The one exception is public/builder/builder.html: it
-// is a static file with an inline importmap that cannot receive a per-request
-// nonce, and proxy.ts excludes .html from its matcher. So the builder keeps the
-// relaxed 'unsafe-inline' CSP, scoped to /builder only, set here.
-const builderCsp = buildCsp({ isDev });
+// The main app CSP is set per-request in proxy.ts with a nonce. public/builder/
+// is static (proxy.ts excludes .html from its matcher), so its policy is set
+// here. It needs no nonce: builder.html has no inline script, only the bundled
+// js/builder.js from 'self' (scripts/build-builder.mjs).
+const builderCsp = buildBuilderCsp({ isDev });
 
 const SHARED_SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -38,8 +37,7 @@ const nextConfig: NextConfig = {
         headers: SHARED_SECURITY_HEADERS,
       },
       {
-        // Static builder carve-out: proxy.ts never runs for .html, so set its
-        // (relaxed, nonce-less) CSP here.
+        // Static builder: proxy.ts never runs for .html, so set its CSP here.
         source: "/builder/:path*",
         headers: [{ key: "Content-Security-Policy", value: builderCsp }],
       },

@@ -6,6 +6,14 @@ import type { DesignMeta, DesignStateV3 } from "@/lib/types";
 import type { Neighbor } from "@/lib/design";
 
 interface DesignerOverlayProps {
+  /**
+   * Which opening this is. The iframe (and the builder's WebGL context) stays
+   * mounted across opens; bumping this re-sends archit:init with the current
+   * props, so the builder starts over on the new design without a reload.
+   */
+  session: number;
+  /** keep the builder loaded but out of sight (e.g. behind the setup questions) */
+  hidden?: boolean;
   plot: { w: number; d: number };
   neighbors: Neighbor[];
   /** floors to pre-create in the builder; new designs only */
@@ -39,7 +47,28 @@ type BuilderMessage =
   | { type: "archit:close"; dirty: boolean }
   | { type: "archit:buy-template"; payload: { key: string; name: string } };
 
+function sendInit(
+  frame: HTMLIFrameElement | null,
+  p: Pick<DesignerOverlayProps, "plot" | "neighbors" | "floors" | "facing" | "existingDesign">,
+) {
+  frame?.contentWindow?.postMessage(
+    {
+      type: "archit:init",
+      payload: {
+        plot: p.plot,
+        neighbors: p.neighbors,
+        floors: p.floors,
+        facing: p.facing,
+        design: p.existingDesign,
+      },
+    },
+    location.origin,
+  );
+}
+
 export default function DesignerOverlay({
+  session,
+  hidden = false,
   plot,
   neighbors,
   floors,
@@ -50,6 +79,7 @@ export default function DesignerOverlay({
 }: DesignerOverlayProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const buyingRef = useRef(false);
+  const readyRef = useRef(false); // the builder has said archit:ready
   const propsRef = useRef({
     plot,
     neighbors,
@@ -73,6 +103,12 @@ export default function DesignerOverlay({
     };
   });
 
+  // Opening another design: hand it to the already-loaded builder. Before the
+  // first archit:ready there is nothing to tell yet; that handshake sends it.
+  useEffect(() => {
+    if (readyRef.current) sendInit(iframeRef.current, propsRef.current);
+  }, [session]);
+
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       const frame = iframeRef.current;
@@ -86,19 +122,8 @@ export default function DesignerOverlay({
       const p = propsRef.current;
       if (m.type === "archit:ready") {
         // handshake, not iframe onLoad — the module script boots async
-        frame.contentWindow?.postMessage(
-          {
-            type: "archit:init",
-            payload: {
-              plot: p.plot,
-              neighbors: p.neighbors,
-              floors: p.floors,
-              facing: p.facing,
-              design: p.existingDesign,
-            },
-          },
-          location.origin,
-        );
+        readyRef.current = true;
+        sendInit(frame, p);
       } else if (m.type === "archit:save") {
         // Reply only after the save settles — the builder keeps "dirty" and
         // shows "Saving…" until it hears back.
@@ -144,7 +169,10 @@ export default function DesignerOverlay({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-cream">
+    <div
+      className={`fixed inset-0 z-50 bg-cream ${hidden ? "invisible pointer-events-none" : ""}`}
+      aria-hidden={hidden || undefined}
+    >
       <iframe
         ref={iframeRef}
         src="/builder/builder.html?embed=1"

@@ -1,9 +1,9 @@
 // Content-Security-Policy, shared between proxy.ts (per-request, nonce-based —
 // the policy that guards every rendered page) and next.config.ts (the static
-// carve-out for public/builder/builder.html, whose inline importmap cannot
-// receive a per-request nonce). Keep the origin lists here in sync with the
-// code that reaches out to them — a missing origin shows up as a blocked
-// request in the console (and, for the basemap, as a silently blank map).
+// policy for public/builder/, which proxy.ts never sees). Keep the origin lists
+// here in sync with the code that reaches out to them — a missing origin shows
+// up as a blocked request in the console (and, for the basemap, as a silently
+// blank map).
 
 const SUPABASE = "https://tdbnwismmyllpufurqus.supabase.co"; // NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_WS = "wss://tdbnwismmyllpufurqus.supabase.co"; // realtime, if ever enabled
@@ -38,7 +38,6 @@ const TILES = [
   "https://server.arcgisonline.com", // satellite raster layer
 ];
 const NOMINATIM = "https://nominatim.openstreetmap.org"; // app/find/page.tsx geocoding
-const JSDELIVR = "https://cdn.jsdelivr.net"; // three.js ESM importmap in public/builder/builder.html
 // <SpeedInsights /> in app/layout.tsx. On Vercel the script is proxied same-origin
 // from /_vercel/speed-insights/script.js, but off-platform (and in dev) it loads
 // from va.vercel-scripts.com and beacons to vitals.vercel-insights.com. Both are
@@ -52,7 +51,6 @@ const SCRIPT_HOSTS = [
   ...YOUPI,
   ...CLERK,
   "https://challenges.cloudflare.com",
-  JSDELIVR,
   ...VERCEL_INSIGHTS,
 ];
 
@@ -61,9 +59,8 @@ export interface CspOptions {
   /**
    * When set, inline scripts are gated on this per-request nonce instead of
    * 'unsafe-inline' — Next.js stamps it onto its own framework/page scripts
-   * (and ClerkProvider onto its injected ones). Omit it only for the static
-   * builder carve-out, whose inline importmap has no nonce and therefore must
-   * keep 'unsafe-inline'. External SDK scripts (Clerk, YouPI, Vercel) load
+   * (and ClerkProvider onto its injected ones). Without it inline scripts
+   * fall back to 'unsafe-inline'. External SDK scripts (Clerk, YouPI, Vercel) load
    * by src from the allow-listed hosts above, so no 'strict-dynamic' is needed.
    */
   nonce?: string;
@@ -94,12 +91,40 @@ export function buildCsp({ isDev, nonce }: CspOptions): string {
     // blob:/data: cover maplibre's canvas + WebGL textures and builder screenshots.
     `img-src 'self' data: blob: https://images.unsplash.com ${SUPABASE} ${TILES.join(" ")} https://img.clerk.com`,
     `media-src 'self' blob:`,
-    `connect-src 'self'${isDev ? " ws://localhost:* http://localhost:*" : ""} ${SUPABASE} ${SUPABASE_WS} ${[...CLERK, ...CLERK_EXTRA, ...YOUPI, ...TILES, NOMINATIM, JSDELIVR, ...VERCEL_INSIGHTS].join(" ")}`,
+    `connect-src 'self'${isDev ? " ws://localhost:* http://localhost:*" : ""} ${SUPABASE} ${SUPABASE_WS} ${[...CLERK, ...CLERK_EXTRA, ...YOUPI, ...TILES, NOMINATIM, ...VERCEL_INSIGHTS].join(" ")}`,
     // YouPI checkout renders in an iframe; Clerk uses one for its handshake and
     // Cloudflare Turnstile for bot protection.
     `frame-src 'self' ${[...YOUPI, ...CLERK, "https://challenges.cloudflare.com"].join(" ")}`,
     // maplibre-gl spawns its tile workers from blob: URLs.
     `worker-src 'self' blob:`,
+    `manifest-src 'self'`,
+    ...(isDev ? [] : ["upgrade-insecure-requests"]),
+  ].join("; ");
+}
+
+/**
+ * Policy for the static 3D builder (public/builder/, framed by DesignerOverlay).
+ * Its only script is the esbuild bundle served from 'self' (three.js is
+ * vendored into it), so there is no inline script, no CDN and no nonce to
+ * thread through. It talks to nothing but our own /api/templates.
+ */
+export function buildBuilderCsp({ isDev }: { isDev: boolean }): string {
+  return [
+    `default-src 'self'`,
+    `base-uri 'self'`,
+    `object-src 'none'`,
+    `frame-ancestors 'self'`,
+    `form-action 'self'`,
+    `script-src 'self'`,
+    // the stylesheet is inline in builder.html; the walk overlay and plan set
+    // style attributes at runtime
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+    `font-src 'self' https://fonts.gstatic.com`,
+    // furniture thumbnails, exports and the design sheet are data:/blob: URLs
+    `img-src 'self' data: blob:`,
+    `connect-src 'self'`,
+    `worker-src 'none'`,
+    `frame-src 'none'`,
     `manifest-src 'self'`,
     ...(isDev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");

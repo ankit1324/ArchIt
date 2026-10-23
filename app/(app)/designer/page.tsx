@@ -309,8 +309,14 @@ export default function DesignerPage() {
   const [designs, setDesigns] = useState<Design[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
-  const [session, setSession] = useState(0); // bump to remount the builder
-  const [listOpen, setListOpen] = useState(true);
+  // The builder iframe mounts with the first design and then stays loaded (it
+  // owns a WebGL context): `builderSetup` is the setup it was last opened with,
+  // and bumping `session` hands it the next design without a reload.
+  const [builderSetup, setBuilderSetup] = useState<Setup | null>(null);
+  const [session, setSession] = useState(0);
+  // null = never toggled: open on desktop, collapsed to a pill on phones, where
+  // the open drawer would sit on top of the builder's own controls
+  const [listOpen, setListOpen] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
   const [paying, setPaying] = useState(false);
   const savingRef = useRef(false);
@@ -420,9 +426,15 @@ export default function DesignerPage() {
     }
   };
 
+  const openBuilder = (s: Setup) => {
+    setSetup(s);
+    setBuilderSetup(s);
+    setSession((v) => v + 1);
+  };
+
   const openDesign = (d: Design) => {
     setCurrentId(d.id);
-    setSetup({
+    openBuilder({
       name: d.name,
       w: d.plotW,
       d: d.plotD,
@@ -432,7 +444,6 @@ export default function DesignerPage() {
       budget: d.meta?.budget,
       notes: d.meta?.notes,
     });
-    setSession((s) => s + 1);
   };
 
   const newDesign = () => {
@@ -509,42 +520,55 @@ export default function DesignerPage() {
 
   return (
     <div className="h-full bg-cream">
-      {setup ? (
+      {builderSetup && (
         <DesignerOverlay
-          key={`${currentId ?? "new"}-${session}`}
-          plot={{ w: setup.w, d: setup.d }}
+          session={session}
+          hidden={!setup}
+          plot={{ w: builderSetup.w, d: builderSetup.d }}
           neighbors={[]}
-          floors={setup.floors}
-          facing={setup.facing}
+          floors={builderSetup.floors}
+          facing={builderSetup.facing}
           existingDesign={current?.design}
           onSave={saveDesign}
           onClose={() => router.push("/")}
         />
-      ) : (
-        <SetupDialog
-          onStart={(s) => {
-            setSetup(s);
-            setSession((v) => v + 1);
-          }}
-          onBack={() => router.push("/")}
-        />
+      )}
+      {!setup && (
+        <SetupDialog onStart={openBuilder} onBack={() => router.push("/")} />
       )}
 
       {/* saved designs drawer, floats above the builder */}
-      <div className="fixed left-3 top-16 z-[80] w-[230px]">
-        <div className="glass flex flex-col gap-2 rounded-3xl p-3">
+      <div
+        className={`fixed left-3 top-16 z-[80] w-[230px] max-[760px]:left-12 max-[760px]:top-2 ${listOpen ? "" : "max-[760px]:w-auto"}`}
+      >
+        <div className="glass flex flex-col gap-2 rounded-3xl p-3 max-[760px]:p-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[13px] font-bold text-plum">My designs</span>
+            <span
+              className={`text-[13px] font-bold text-plum ${listOpen ? "" : "max-[760px]:hidden"}`}
+            >
+              My designs
+            </span>
             <button
-              onClick={() => setListOpen((o) => !o)}
+              onClick={() =>
+                setListOpen(
+                  !(listOpen ?? !window.matchMedia("(max-width: 760px)").matches),
+                )
+              }
               className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5"
             >
-              {listOpen ? "Hide" : "Show"}
+              <span className="max-[760px]:hidden">
+                {listOpen === false ? "Show" : "Hide"}
+              </span>
+              <span className="hidden max-[760px]:inline">
+                {listOpen ? "Hide" : "My designs"}
+              </span>
             </button>
           </div>
 
-          {listOpen && (
-            <>
+          {listOpen !== false && (
+            <div
+              className={`flex flex-col gap-2 ${listOpen === null ? "max-[760px]:hidden" : ""}`}
+            >
               <button
                 onClick={newDesign}
                 className={`rounded-full py-2 text-[12.5px] font-bold transition-colors ${
@@ -605,7 +629,7 @@ export default function DesignerPage() {
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

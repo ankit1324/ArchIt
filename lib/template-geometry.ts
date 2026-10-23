@@ -4,7 +4,7 @@ import "server-only";
 // Re-run: node scripts/gen-templates.mjs   (verify: node scripts/gen-templates.mjs --check)
 // Geometry for the 20 PAID templates. This module must never be imported from a
 // client component: it is the thing customers pay for. Free templates keep their
-// geometry inline in builder.html.
+// geometry inline in builder/src/templates.js.
 //
 // Payload shape: plans/02-template-v2-contract.md. Every template below is v2.
 // The v1 tuple form is still part of the exported type so a not-yet-migrated

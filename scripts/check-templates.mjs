@@ -6,28 +6,28 @@
  *
  * Deliberately does NOT import anything from scripts/gen-templates.mjs: it reads
  * lib/template-geometry.ts (the artefact the API actually serves) and validates it
- * against the `C` catalog parsed out of public/builder/builder.html (the engine that
+ * against the `C` catalog parsed out of builder/src (the engine that
  * actually consumes it). If the generator's internal mirror of C ever drifts from
- * builder.html, this is what catches it.
+ * the builder, this is what catches it.
  *
  * `--conditions=react-server` makes `import "server-only"` resolve to its empty
  * build, exactly as it does in a Next.js server bundle.
  */
 
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { builderSource } from "./builder-source.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const { getTemplateGeometry } = await import(join(ROOT, "lib", "template-geometry.ts"));
 const { TEMPLATE_CATALOG } = await import(join(ROOT, "lib", "template-catalog.ts"));
 
-/* ---- parse C out of builder.html (source of truth for keys) ---- */
-const html = readFileSync(join(ROOT, "public", "builder", "builder.html"), "utf8");
+/* ---- parse C out of the builder engine (source of truth for keys) ---- */
+const html = builderSource();
 function section(name) {
   const start = html.indexOf(`\n  ${name}:{`);
-  if (start < 0) throw new Error(`C.${name} not found in builder.html`);
+  if (start < 0) throw new Error(`C.${name} not found in builder/src`);
   let i = html.indexOf("{", start), depth = 0, end = i;
   for (; i < html.length; i++) {
     if (html[i] === "{") depth++;

@@ -5,8 +5,9 @@ import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allTemplates, checkTemplate, loadFree } from '../scripts/check-plans.mjs';
+import { builderSource } from '../scripts/builder-source.mjs';
 
-const html = readFileSync(new URL('../public/builder/builder.html', import.meta.url), 'utf8');
+const html = builderSource();
 const catalogTs = readFileSync(new URL('../lib/template-catalog.ts', import.meta.url), 'utf8');
 const catalog = JSON.parse(catalogTs.slice(catalogTs.indexOf('=', catalogTs.indexOf('export const TEMPLATE_CATALOG')) + 1, catalogTs.indexOf('\n];') + 2));
 
@@ -17,7 +18,7 @@ for (const template of allTemplates()) {
   });
 }
 
-test('free templates in builder.html match the served catalog metadata', () => {
+test('free templates in the builder match the served catalog metadata', () => {
   for (const t of loadFree()) {
     const entry = catalog.find(c => c.key === t.key);
     assert.ok(entry, `${t.key} missing from lib/template-catalog.ts`);

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // bundled builder (scripts/build-builder.mjs); its sources in builder/src are linted
+    "public/builder/js/**",
   ]),
 ]);
 

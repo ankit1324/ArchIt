@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Quality gate for every builder template: the free plans inline in
- * public/builder/builder.html and the paid plans in lib/template-geometry.ts.
+ * the builder engine (builder/src) and the paid plans in lib/template-geometry.ts.
  *
  *   node scripts/check-plans.mjs                        summary of all templates, exit 1 on any error
  *   node scripts/check-plans.mjs <key> [--png out.png]  full report for one template
@@ -11,7 +11,7 @@
  *   --geometry <path>   read paid plans from another template-geometry.ts
  *
  * Geometry goes through footprint/wallLen/localToWorld/wallPoint lifted out of
- * builder.html, and rooms without explicit furniture through the engine's own
+ * the builder, and rooms without explicit furniture through the engine's own
  * furnishRoom/clampFurn, so what is checked is what the builder renders.
  *
  * ERROR  the builder would show something broken: overlapping rooms, a door into
@@ -27,9 +27,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import vm from "node:vm";
+import { builderSource } from "./builder-source.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const HTML = readFileSync(join(ROOT, "public", "builder", "builder.html"), "utf8");
+const HTML = builderSource();
 
 function between(src, start, end) {
   const i = src.indexOf(start);
@@ -64,7 +65,7 @@ if (Object.keys(ROOMS).length < 8 || Object.keys(FURN).length < 17 || DOOR_TYPES
 
 function fnSource(name) {
   const i = HTML.indexOf(`function ${name}(`);
-  if (i < 0) throw new Error(`function ${name} not found in builder.html`);
+  if (i < 0) throw new Error(`function ${name} not found in builder/src`);
   for (let k = HTML.indexOf("{", i), depth = 0; k < HTML.length; k++) {
     if (HTML[k] === "{") depth++;
     else if (HTML[k] === "}" && --depth === 0) return HTML.slice(i, k + 1);
@@ -87,7 +88,7 @@ export function loadFree(overrides = {}) {
   const ctx = vm.createContext({ Math, console, tRoom() {}, tRoomSpec() {} });
   let code = src + "\n;globalThis.__T = TEMPLATES;";
   for (const [key, text] of Object.entries(overrides)) {
-    // a draft for a key not in builder.html yet is checked as a new home template
+    // a draft for a key not in the builder yet is checked as a new home template
     code += `\nif(!__T[${JSON.stringify(key)}]) __T[${JSON.stringify(key)}] = {name:${JSON.stringify(key)}, cat:"indian", desc:"(new)"};`;
     code += `\n__T[${JSON.stringify(key)}].rooms = (${text}\n);`;
   }

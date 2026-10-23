@@ -86,3 +86,6 @@ omni-vid
 
 # scratch output from scripts/gen-templates.mjs
 .templates.extracted.json
+
+# bundled builder (scripts/build-builder.mjs)
+public/builder/js/

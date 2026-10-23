@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { builderSource } from '../scripts/builder-source.mjs';
 import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const html = readFileSync(new URL('../public/builder/builder.html', import.meta.url), 'utf8');
+const html = builderSource();
 const source = html.slice(html.indexOf('const TEMPLATES = {};'), html.indexOf('// Paid templates (12 office'));
 const defaults = {bedroom:[3.6,3],hall:[4.8,3.6],hallway:[3.6,1.4],kitchen:[3,2.4],bath:[2.4,1.8],veranda:[3.6,2.4],balcony:[3,1.5]};
 const open = r => ['veranda','balcony'].includes(r.type);
