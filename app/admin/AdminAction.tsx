@@ -40,7 +40,9 @@ export default function AdminAction({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  // Stay disabled until the refresh/redirect lands: `busy` clears as soon as
+  // the request returns, and a second click on the stale row would re-send.
+  const [refreshing, startTransition] = useTransition();
 
   const run = async (spec: ActionSpec) => {
     if (spec.confirm && !window.confirm(spec.confirm)) return;
@@ -86,7 +88,7 @@ export default function AdminAction({
           key={spec.action}
           type="button"
           onClick={() => run(spec)}
-          disabled={busy !== null}
+          disabled={busy !== null || refreshing}
           className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 ${TONES[spec.tone]}`}
         >
           {busy === spec.action ? "Working…" : spec.label}

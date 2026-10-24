@@ -24,6 +24,21 @@ export interface EditableListing {
   photos: string[];
 }
 
+type NumberField = "price" | "beds" | "baths" | "sqft" | "rooms" | "areaM" | "floors" | "lng" | "lat";
+
+/** [field, label, whole number ≥ 0?] — checked before saving. */
+const NUMBER_FIELDS: ReadonlyArray<readonly [NumberField, string, boolean]> = [
+  ["price", "Price", false],
+  ["beds", "Beds", true],
+  ["baths", "Baths", true],
+  ["sqft", "Sqft", true],
+  ["rooms", "Rooms", true],
+  ["areaM", "Area m²", true],
+  ["floors", "Floors", true],
+  ["lng", "Longitude", false],
+  ["lat", "Latitude", false],
+];
+
 const input = "w-full rounded-xl border border-plum/15 bg-white px-3 py-2 text-[14px]";
 const label = "flex flex-col gap-1 text-[12px] font-bold uppercase tracking-wide text-plum-soft";
 
@@ -39,7 +54,7 @@ export default function ListingEditForm({ id, initial }: { id: string; initial: 
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const set = <K extends keyof EditableListing>(k: K, value: EditableListing[K]) =>
     setV((prev) => ({ ...prev, [k]: value }));
-  const num = (k: "price" | "beds" | "baths" | "sqft" | "rooms" | "areaM" | "floors" | "lng" | "lat") => ({
+  const num = (k: NumberField) => ({
     type: "number" as const,
     step: k === "lng" || k === "lat" ? "any" : "1",
     value: Number.isFinite(v[k]) ? v[k] : "",
@@ -49,6 +64,28 @@ export default function ListingEditForm({ id, initial }: { id: string; initial: 
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    // An emptied number input is NaN, which JSON.stringify sends as null; the
+    // API then silently resets the field to its default (area 50 m², 1 floor…).
+    // Catch it here with a message instead.
+    const bad = NUMBER_FIELDS.find(([k, , int]) => {
+      const n = v[k];
+      return !Number.isFinite(n) || (int && (!Number.isInteger(n) || n < 0));
+    });
+    if (bad) {
+      setMessage({
+        ok: false,
+        text: bad[2] ? `${bad[1]} must be a whole number, 0 or more` : `${bad[1]} must be a number`,
+      });
+      return;
+    }
+    if (v.price < 0) {
+      setMessage({ ok: false, text: "Price can't be negative" });
+      return;
+    }
+    if (!v.address.trim()) {
+      setMessage({ ok: false, text: "Address is required" });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
