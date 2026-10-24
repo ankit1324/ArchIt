@@ -1,18 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { isAdmin } from "@/lib/admin";
+import { ageLabel, sumPaise } from "@/lib/admin-tools";
 import { db } from "@/lib/db";
 import { purposeLabel, rupees } from "@/lib/email-templates";
 import { REPORT_REASONS, isReportReason } from "@/lib/moderation";
 import { safeImageUrl } from "@/lib/url";
 import AdminAction from "./AdminAction";
-
-export const metadata: Metadata = {
-  title: "Admin",
-  robots: { index: false, follow: false },
-};
+import { cell, Empty, head, LoadError, Section, UserLink, when } from "./ui";
 
 interface PendingRow {
   id: string;
@@ -58,40 +54,68 @@ interface PurchaseRow {
   created_at: string;
 }
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+const DAY = 24 * 60 * 60 * 1000;
+/** Epoch ms `n` days before this request. */
+const daysAgo = (n: number) => Date.now() - n * DAY;
 
-function Section({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mt-10">
-      <h2 className="text-xl font-extrabold text-plum">
-        {title} <span className="text-plum-soft">({count})</span>
-      </h2>
-      <div className="mt-3">{children}</div>
-    </section>
+/** Row count only (no rows fetched); null when the query failed. */
+const listings = () => db.from("properties").select("id", { count: "exact", head: true });
+async function count(q: PromiseLike<{ count: number | null; error: unknown }>) {
+  const { count, error } = await q;
+  return error ? null : (count ?? 0);
+}
+
+function Stat({ label, value, hint, href }: { label: string; value: string; hint?: string; href?: string }) {
+  const body = (
+    <>
+      <div className="text-[12px] font-bold uppercase tracking-wide text-plum-soft">{label}</div>
+      <div className="mt-1 text-2xl font-extrabold">{value}</div>
+      {hint && <div className="mt-0.5 text-[12px] text-plum-soft">{hint}</div>}
+    </>
+  );
+  const cls = "block rounded-2xl bg-white/70 p-4";
+  return href ? (
+    <Link href={href} className={`${cls} transition-colors hover:bg-white`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-2xl bg-white/60 p-4 text-[14px] text-plum-soft">{children}</p>;
-}
+const fmt = (n: number | null) => (n == null ? "—" : n.toLocaleString("en-IN"));
 
 /**
- * Trust & safety and money ops in one page: the listing review queue, open
- * reports, payments owed back, and the latest purchases. Admins only
- * (lib/admin.ts); everyone else gets a 404.
+ * Overview: headline numbers, then the work queues — listings awaiting
+ * review, open reports, payments owed back — and the latest purchases.
+ * Admins only (lib/admin.ts); everyone else gets a 404.
  */
 export default async function AdminPage() {
   const { userId } = await auth();
   if (!(await isAdmin(userId))) notFound();
+
+  const weekAgo = new Date(daysAgo(7)).toISOString();
+  const monthAgo = daysAgo(30);
+  const [live, pendingCount, rejected, newThisWeek, allPurchases, oldestPending, userCount] =
+    await Promise.all([
+      count(listings().eq("status", "live")),
+      count(listings().eq("status", "pending")),
+      count(listings().eq("status", "rejected")),
+      count(listings().gte("created_at", weekAgo)),
+      db.from("purchases").select("amount, created_at").limit(10000),
+      db
+        .from("properties")
+        .select("created_at")
+        .eq("status", "pending")
+        .order("created_at")
+        .limit(1)
+        .maybeSingle<{ created_at: string }>(),
+      clerkClient()
+        .then((c) => c.users.getCount())
+        .catch(() => null),
+    ]);
+  const paid = (allPurchases.data ?? []) as { amount: number | null; created_at: string }[];
+  const paid30 = paid.filter((p) => Date.parse(p.created_at) >= monthAgo);
 
   const [pending, reports, refunds, purchases] = await Promise.all([
     db
@@ -124,27 +148,30 @@ export default async function AdminPage() {
       .limit(50)
       .returns<PurchaseRow[]>(),
   ]);
-  const failed = [pending, reports, refunds, purchases].filter((r) => r.error);
+  const failed = [pending, reports, refunds, purchases, allPurchases].filter((r) => r.error);
   for (const r of failed) console.error("admin page query failed:", r.error?.message);
 
-  const cell = "px-3 py-2 align-top";
-  const head = "px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-plum-soft";
-
   return (
-    <div className="h-full overflow-y-auto bg-cream text-plum">
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="flex items-baseline justify-between gap-4">
-          <h1 className="text-3xl font-extrabold tracking-wide">Admin</h1>
-          <Link href="/find" className="text-[14px] font-semibold underline">
-            Back to the map
-          </Link>
+    <>
+        <LoadError errors={failed.map((r) => r.error?.message)} />
+
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <Stat label="Live listings" value={fmt(live)} href="/admin/listings?status=live" />
+          <Stat
+            label="Awaiting review"
+            value={fmt(pendingCount)}
+            hint={pendingCount ? `oldest ${ageLabel(oldestPending.data?.created_at ?? null)}` : undefined}
+            href="/admin/listings?status=pending"
+          />
+          <Stat label="Hidden / rejected" value={fmt(rejected)} href="/admin/listings?status=rejected" />
+          <Stat label="New this week" value={fmt(newThisWeek)} href="/admin/listings" />
+          <Stat label="Users" value={fmt(userCount)} href="/admin/users" />
+          <Stat
+            label="Revenue"
+            value={rupees(sumPaise(paid))}
+            hint={`${paid.length} purchases · ${rupees(sumPaise(paid30))} last 30 days`}
+          />
         </div>
-        {failed.length > 0 && (
-          <p role="alert" className="mt-4 rounded-2xl bg-coral/15 p-3 text-[14px] font-semibold">
-            Some data failed to load ({failed.map((r) => r.error?.message).join("; ")}). Has the
-            latest migration been applied?
-          </p>
-        )}
 
         <Section title="Listings awaiting review" count={pending.data?.length ?? 0}>
           {pending.data?.length ? (
@@ -158,7 +185,7 @@ export default async function AdminPage() {
                     {Number(p.price).toLocaleString("en-IN")}
                   </div>
                   <div className="mt-1 text-[12px] text-plum-soft">
-                    Submitted {when(p.created_at)} by <code>{p.user_id ?? "unknown"}</code>
+                    Submitted {when(p.created_at)} by <UserLink id={p.user_id} />
                   </div>
                   {safeImageUrl(p.photo) && (
                     <a
@@ -205,8 +232,10 @@ export default async function AdminPage() {
                     {r.details ? ` — ${r.details}` : ""}
                   </div>
                   <div className="mt-1 text-[12px] text-plum-soft">
-                    {when(r.created_at)} by <code>{r.reporter_id}</code> · listing{" "}
-                    <code>{r.property_id}</code>
+                    {when(r.created_at)} by <UserLink id={r.reporter_id} /> · listing{" "}
+                    <Link href={`/admin/listings/${r.property_id}`} className="font-mono text-[12px] underline">
+                      {r.property_id}
+                    </Link>
                   </div>
                   <div className="mt-3">
                     <AdminAction
@@ -228,8 +257,8 @@ export default async function AdminPage() {
         <Section title="Refunds due" count={refunds.data?.length ?? 0}>
           <p className="mb-3 text-[13px] text-plum-soft">
             Payments the gateway settled for something the user already owned (the reconciler
-            marks these <code>refund_due</code>). Refund them from the YouPI-PG admin, then set
-            the order to <code>cancelled</code>.
+            marks these <code>refund_due</code>). Refund them from the YouPI-PG admin, then mark
+            them refunded here.
           </p>
           {refunds.data?.length ? (
             <div className="overflow-x-auto rounded-2xl bg-white/70">
@@ -242,6 +271,7 @@ export default async function AdminPage() {
                     <th className={head}>User</th>
                     <th className={head}>Payment</th>
                     <th className={head}>Order</th>
+                    <th className={head} />
                   </tr>
                 </thead>
                 <tbody>
@@ -253,9 +283,24 @@ export default async function AdminPage() {
                         {o.ref ? <div className="text-plum-soft">{o.ref}</div> : null}
                       </td>
                       <td className={cell}>{rupees(o.amount)}</td>
-                      <td className={cell}><code>{o.user_id}</code></td>
+                      <td className={cell}><UserLink id={o.user_id} /></td>
                       <td className={cell}><code>{o.payment_id}</code></td>
                       <td className={cell}><code>{o.order_id}</code></td>
+                      <td className={cell}>
+                        <AdminAction
+                          endpoint={`/api/admin/orders/${encodeURIComponent(o.order_id)}`}
+                          actions={[
+                            {
+                              action: "refunded",
+                              label: "Mark refunded",
+                              tone: "primary",
+                              confirm: `Mark ${rupees(o.amount)} to ${o.user_id} as refunded? Only do this after the money has been sent back in YouPI.`,
+                              askNote: true,
+                              notePrompt: "Refund reference (UTR or gateway refund id), optional",
+                            },
+                          ]}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -288,7 +333,7 @@ export default async function AdminPage() {
                         {p.ref ? <div className="text-plum-soft">{p.ref}</div> : null}
                       </td>
                       <td className={cell}>{p.amount == null ? "—" : rupees(p.amount)}</td>
-                      <td className={cell}><code>{p.user_id}</code></td>
+                      <td className={cell}><UserLink id={p.user_id} /></td>
                       <td className={cell}><code>{p.payment_id}</code></td>
                     </tr>
                   ))}
@@ -299,7 +344,6 @@ export default async function AdminPage() {
             <Empty>No purchases yet.</Empty>
           )}
         </Section>
-      </main>
-    </div>
+    </>
   );
 }

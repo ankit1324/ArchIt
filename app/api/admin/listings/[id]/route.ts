@@ -1,8 +1,12 @@
 import { requireAdmin } from "@/lib/admin";
-import { db } from "@/lib/db";
+import { logAdminAction } from "@/lib/admin-audit";
+import { db, listingToRow, type PropertyRow } from "@/lib/db";
 import { validateListingDecision } from "@/lib/moderation";
 import { afterResponse, notifyListingDecision } from "@/lib/notify";
 import { parseJsonBody } from "@/lib/request";
+import { removeUnreferencedUploads } from "@/lib/storage";
+import { safeImageUrl } from "@/lib/url";
+import { validateListing } from "@/lib/validators";
 
 /**
  * Approve or reject a listing from the /admin queue. Either decision can be
@@ -43,6 +47,13 @@ export async function POST(
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
 
+  await logAdminAction({
+    adminId,
+    action: decision.action,
+    targetType: "listing",
+    targetId: data.id,
+    note: decision.note,
+  });
   afterResponse(() =>
     notifyListingDecision({
       listerId: data.user_id,
@@ -52,4 +63,83 @@ export async function POST(
     }),
   );
   return Response.json({ id: data.id, status: data.status });
+}
+
+/**
+ * Edit any listing's details as an admin. Same validation as the lister's own
+ * edit, but status, owner (user_id) and the paid `featured` flag are left
+ * exactly as they are, and the edit does not send the listing back to review.
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const adminId = await requireAdmin();
+  if (adminId instanceof Response) return adminId;
+  const { id } = await params;
+  const l = await parseJsonBody(request, (v) => validateListing(v, safeImageUrl));
+  if (l instanceof Response) return l;
+
+  const { data: previous } = await db
+    .from("properties")
+    .select("photos")
+    .eq("id", id)
+    .maybeSingle<Pick<PropertyRow, "photos">>();
+  if (!previous) return Response.json({ error: "not found" }, { status: 404 });
+
+  // featured comes from the ledger, never from an edit
+  const { featured: _featured, ...next } = listingToRow(l);
+  void _featured;
+  const { data, error } = await db
+    .from("properties")
+    .update(next)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+  if (error) {
+    console.error(`PATCH /api/admin/listings/${id} failed:`, error.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
+  if (!data) return Response.json({ error: "not found" }, { status: 404 });
+
+  const kept = new Set(next.photos ?? []);
+  const dropped = (previous.photos ?? []).filter((p) => !kept.has(p));
+  if (dropped.length) await removeUnreferencedUploads(`PATCH /api/admin/listings/${id}`, dropped);
+  await logAdminAction({ adminId, action: "edit", targetType: "listing", targetId: id });
+  return Response.json({ id });
+}
+
+/** Permanently delete a listing (and its now-unreferenced photos). */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const adminId = await requireAdmin();
+  if (adminId instanceof Response) return adminId;
+  const { id } = await params;
+  const note = new URL(request.url).searchParams.get("note")?.trim().slice(0, 500) || null;
+
+  const { data, error } = await db
+    .from("properties")
+    .delete()
+    .eq("id", id)
+    .select("id, building_name, address, user_id, photos")
+    .maybeSingle<Pick<PropertyRow, "id" | "building_name" | "address" | "user_id" | "photos">>();
+  if (error) {
+    console.error(`DELETE /api/admin/listings/${id} failed:`, error.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
+  if (!data) return Response.json({ error: "not found" }, { status: 404 });
+
+  await removeUnreferencedUploads(`DELETE /api/admin/listings/${id}`, data.photos ?? []);
+  await logAdminAction({
+    adminId,
+    action: "delete",
+    targetType: "listing",
+    targetId: id,
+    note,
+    // the row is gone; keep enough to know what it was
+    details: { name: data.building_name || data.address, lister: data.user_id },
+  });
+  return new Response(null, { status: 204 });
 }

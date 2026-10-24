@@ -138,7 +138,8 @@ export interface Decision<A extends string> {
   note: string | null;
 }
 
-function validateDecision<A extends string>(
+/** `{ action, note }` body for an admin action; `action` must be in `actions`. */
+export function validateDecision<A extends string>(
   v: unknown,
   actions: readonly A[],
 ): Decision<A> | string {
