@@ -83,6 +83,31 @@ function Stat({ label, value, hint, href }: { label: string; value: string; hint
   );
 }
 
+/**
+ * Every purchase's amount and date, for the revenue tile. Paged: PostgREST
+ * caps a response at the project's max-rows (1000 on Supabase by default)
+ * whatever .limit() asks for, so a single select would quietly under-count.
+ */
+async function allPurchaseAmounts(): Promise<{
+  data: { amount: number | null; created_at: string }[];
+  error: { message: string } | null;
+}> {
+  const PAGE = 1000;
+  const data: { amount: number | null; created_at: string }[] = [];
+  for (let from = 0; from < 100 * PAGE; from += PAGE) {
+    const { data: rows, error } = await db
+      .from("purchases")
+      .select("amount, created_at")
+      .order("id")
+      .range(from, from + PAGE - 1)
+      .overrideTypes<{ amount: number | null; created_at: string }[], { merge: false }>();
+    if (error) return { data, error };
+    data.push(...(rows ?? []));
+    if (!rows || rows.length < PAGE) break;
+  }
+  return { data, error: null };
+}
+
 const fmt = (n: number | null) => (n == null ? "—" : n.toLocaleString("en-IN"));
 
 /**
@@ -102,7 +127,7 @@ export default async function AdminPage() {
       count(listings().eq("status", "pending")),
       count(listings().eq("status", "rejected")),
       count(listings().gte("created_at", weekAgo)),
-      db.from("purchases").select("amount, created_at").limit(10000),
+      allPurchaseAmounts(),
       db
         .from("properties")
         .select("created_at")
@@ -114,7 +139,7 @@ export default async function AdminPage() {
         .then((c) => c.users.getCount())
         .catch(() => null),
     ]);
-  const paid = (allPurchases.data ?? []) as { amount: number | null; created_at: string }[];
+  const paid = allPurchases.data;
   const paid30 = paid.filter((p) => Date.parse(p.created_at) >= monthAgo);
 
   const [pending, reports, refunds, purchases] = await Promise.all([
@@ -173,7 +198,8 @@ export default async function AdminPage() {
           />
         </div>
 
-        <Section title="Listings awaiting review" count={pending.data?.length ?? 0}>
+        {/* the true total: the list below stops at 100 */}
+        <Section title="Listings awaiting review" count={pendingCount ?? pending.data?.length ?? 0}>
           {pending.data?.length ? (
             <ul className="grid gap-3 sm:grid-cols-2">
               {pending.data.map((p) => (
