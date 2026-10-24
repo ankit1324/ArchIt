@@ -21,7 +21,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "maplibre-gl": "^5.24.0",
-    "next": "16.3.4",
+    "next": "16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "sharp": "^0.35.0"
