@@ -60,7 +60,9 @@ export default function MarketingLanding() {
   return <div className={`${styles.page} ${display.variable} ${body.variable}`}>
     <a className={styles.skip} href="#main-content">Skip to content</a>
     <header className={styles.header}>
-      <Link href="/" className={styles.logo} aria-label="ArchIt home"><svg viewBox="0 0 28 30" width="27" height="29" fill="none" aria-hidden="true"><path d="M3 13L14 3L25 13V27H3V13Z M18 4V1H23V8" stroke="currentColor" strokeWidth="1.8" /></svg>ArchIt<span className={styles.logoDot}>.</span></Link>
+      {/* prefetch={false}: this link points at the page it sits on, so the
+          viewport prefetch was an ~8KB RSC request on every landing visit */}
+      <Link href="/" prefetch={false} className={styles.logo} aria-label="ArchIt home"><svg viewBox="0 0 28 30" width="27" height="29" fill="none" aria-hidden="true"><path d="M3 13L14 3L25 13V27H3V13Z M18 4V1H23V8" stroke="currentColor" strokeWidth="1.8" /></svg>ArchIt<span className={styles.logoDot}>.</span></Link>
       <LandingNav />
     </header>
 
