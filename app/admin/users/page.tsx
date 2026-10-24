@@ -87,7 +87,8 @@ export default async function AdminUsers({
                     <tr key={u.id} className="border-t border-plum/10">
                       <td className={cell}>
                         <Link href={`/admin/users/${u.id}`} className="font-bold underline">
-                          {u.primaryEmailAddress?.emailAddress ?? name ?? u.id}
+                          {/* `||`: with no email, name is "" (not null) and must fall through to the id */}
+                          {u.primaryEmailAddress?.emailAddress || name || u.id}
                         </Link>{" "}
                         {isAdminUser(u) && <Badge label="admin" />} {u.banned && <Badge label="banned" />}
                         <div className="text-plum-soft">

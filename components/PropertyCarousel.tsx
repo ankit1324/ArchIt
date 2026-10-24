@@ -12,10 +12,13 @@ export default function PropertyCarousel({
   selectedId,
   onReset,
   onRetry,
+  emptyMessage,
 }: {
   listings: Listing[];
   onSelect: (id: string) => void;
   hasAny?: boolean;
+  /** replaces the "no match / clear filters" empty state (e.g. an empty map area) */
+  emptyMessage?: string;
   status?: "loading" | "ready" | "error";
   selectedId?: string | null;
   onReset?: () => void;
@@ -36,6 +39,9 @@ export default function PropertyCarousel({
   }, [selectedId, listings]);
   if (status === "loading") return <div role="status" className="rounded-2xl bg-cream/95 p-6 text-sm font-semibold text-plum">Loading properties…</div>;
   if (status === "error") return <div role="alert" className="pointer-events-auto rounded-2xl bg-cream/95 p-5 text-sm text-plum"><p className="font-bold">Properties couldn’t be loaded.</p><p className="mt-1 text-xs">Check your connection and try again.</p><button onClick={onRetry} className="mt-3 rounded-full bg-plum px-4 py-2 text-xs font-bold text-cream">Try again</button></div>;
+  if (listings.length === 0 && emptyMessage) {
+    return <div role="status" className="bg-cream/95 pointer-events-auto rounded-2xl px-5 py-4 text-[13px] font-semibold text-plum">{emptyMessage}</div>;
+  }
   if (listings.length === 0) {
     return (
       <div role="status" className="bg-cream/95 pointer-events-auto rounded-2xl px-5 py-4 text-[13px] font-semibold text-plum">

@@ -5,8 +5,14 @@
 // spinners already — this only covers the brief gap before those mount.
 export default function Loading() {
   return (
-    <div className="flex h-full min-h-screen items-center justify-center bg-cream">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-plum/20 border-t-plum" />
+    // role=status announces the wait to screen readers; motion-reduce stops
+    // the spin for users who asked the OS for less motion.
+    <div
+      role="status"
+      aria-label="Loading"
+      className="flex h-full min-h-screen items-center justify-center bg-cream"
+    >
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-plum/20 border-t-plum motion-reduce:animate-none" />
     </div>
   );
 }

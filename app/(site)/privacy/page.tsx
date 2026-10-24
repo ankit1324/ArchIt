@@ -1,11 +1,44 @@
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import {
+  BUSINESS,
+  filled,
+  hasSupportEmail,
+  legalEntityName,
+} from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "How ArchIt collects, uses, and protects your data.",
 };
+
+// Every business detail comes from lib/business.ts. Until a value is filled
+// in there, the line that needs it is omitted or reworded neutrally, so the
+// page never shows a raw "[PLACEHOLDER]".
+const registeredName = filled(BUSINESS.legalName);
+const address = filled(BUSINESS.address);
+const phone = filled(BUSINESS.supportPhone);
+const grievanceOfficer = filled(BUSINESS.grievanceOfficer);
+
+function SupportEmail() {
+  return (
+    <a
+      href={`mailto:${BUSINESS.supportEmail}`}
+      className="font-semibold text-plum underline hover:text-plum"
+    >
+      {BUSINESS.supportEmail}
+    </a>
+  );
+}
+
+function ContactPage() {
+  return (
+    <a href="/contact" className="underline hover:text-plum">
+      Contact page
+    </a>
+  );
+}
 
 export default function PrivacyPage() {
   return (
@@ -16,13 +49,13 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-2 text-sm text-plum-soft">
-          Last updated: [LAST UPDATED DATE]
+          Last updated: {BUSINESS.lastUpdated}
         </p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-relaxed text-plum-soft">
           <p>
             This Privacy Policy explains how{" "}
-            <strong className="text-plum">[LEGAL ENTITY NAME]</strong>{" "}
+            <strong className="text-plum">{legalEntityName}</strong>{" "}
             (&ldquo;ArchIt&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or
             &ldquo;our&rdquo;), operating the website and application at this
             domain, collects, uses, discloses, and safeguards information
@@ -186,7 +219,17 @@ export default function PrivacyPage() {
               correction of, or deletion of your personal data, and may
               withdraw consent for optional processing (such as marketing
               communications) at any time. To exercise these rights, contact
-              us at <strong className="text-plum">[SUPPORT EMAIL]</strong>.
+              us{" "}
+              {hasSupportEmail ? (
+                <>
+                  at <SupportEmail />
+                </>
+              ) : (
+                <>
+                  through our <ContactPage />
+                </>
+              )}
+              .
             </p>
           </section>
 
@@ -201,16 +244,36 @@ export default function PrivacyPage() {
             </p>
             <p className="mt-3">
               <strong className="text-plum">
-                [GRIEVANCE OFFICER NAME]
+                {grievanceOfficer ?? "Grievance Officer"}
               </strong>
+              {registeredName && (
+                <>
+                  <br />
+                  {registeredName}
+                </>
+              )}
+              {address && (
+                <>
+                  <br />
+                  {address}
+                </>
+              )}
               <br />
-              [LEGAL ENTITY NAME]
-              <br />
-              [REGISTERED ADDRESS]
-              <br />
-              Email: [SUPPORT EMAIL]
-              <br />
-              Phone: [SUPPORT PHONE]
+              {hasSupportEmail ? (
+                <>
+                  Email: <SupportEmail />
+                </>
+              ) : (
+                <>
+                  Contact: through our <ContactPage />
+                </>
+              )}
+              {phone && (
+                <>
+                  <br />
+                  Phone: {phone}
+                </>
+              )}
             </p>
           </section>
 
@@ -230,11 +293,16 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-bold text-plum">10. Contact Us</h2>
             <p className="mt-3">
-              For questions about this Privacy Policy, contact us at{" "}
-              <strong className="text-plum">[SUPPORT EMAIL]</strong> or see
-              our <a href="/contact" className="underline hover:text-plum">
-                Contact page
-              </a>
+              For questions about this Privacy Policy,{" "}
+              {hasSupportEmail ? (
+                <>
+                  contact us at <SupportEmail /> or see our <ContactPage />
+                </>
+              ) : (
+                <>
+                  contact us through our <ContactPage />
+                </>
+              )}
               .
             </p>
           </section>

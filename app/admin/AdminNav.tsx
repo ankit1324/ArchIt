@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/inbox", label: "Inbox" },
   { href: "/admin/listings", label: "Listings" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/log", label: "Audit log" },
@@ -13,9 +14,11 @@ const TABS = [
 export default function AdminNav() {
   const path = usePathname();
   return (
-    <nav className="mt-4 flex flex-wrap gap-2">
+    <nav aria-label="Admin sections" className="mt-4 flex flex-wrap gap-2">
       {TABS.map((t) => {
-        const active = t.href === "/admin" ? path === "/admin" : path.startsWith(t.href);
+        // whole-segment match, so /admin/log doesn't also light up for /admin/logins
+        const active =
+          t.href === "/admin" ? path === "/admin" : path === t.href || path.startsWith(`${t.href}/`);
         return (
           <Link
             key={t.href}

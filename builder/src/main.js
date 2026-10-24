@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {PAID_TEMPLATES, TEMPLATES, fetchPaidGeometry, loadTemplateCatalog, markTemplateOwned, showTemplatePicker, tRoom, tRoomSpec} from './templates.js';
 import {C} from './catalog.js';
 import {$, EMBED, toast} from './dom.js';
-import {dirty, freshState, linkFloor, setDirty, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
+import {dirty, freshState, linkFloor, sel, setDirty, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
 import {boundsOf, roofComponents, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
 import {blocksRoot, camera, controls, pmrem, renderer, scene, setContext, wallMats} from './scene.js';
 import {buildRoofGroups, rebuild3D, toggleRoofs} from './house3d.js';
@@ -39,7 +39,9 @@ function centreBlocks(blocks){
   blocks.forEach(b=>{ b.cx = clean(b.cx-dx); b.cz = clean(b.cz-dz); });
 }
 async function newProject(tpl='empty'){
+  if(walkActive) exitWalk();   // a template picked mid-walk must not keep the old room's walls
   const floorCount = EMBED ? (state?.floors?.length || 1) : 1;
+  let loaded = true;   // false when a paid template's geometry could not be fetched
   setState(freshState());
   while(state.floors.length < floorCount) state.floors.push({blocks:[]});
   if(TEMPLATES[tpl]){
@@ -48,7 +50,7 @@ async function newProject(tpl='empty'){
     // owned paid template: geometry only exists server-side
     const geometry = await fetchPaidGeometry(tpl);
     if(geometry) buildFromGeometry(geometry);
-    else { TEMPLATES.empty.build(); toast && toast('Could not load that template — starting from an empty room.'); }
+    else { loaded = false; TEMPLATES.empty.build(); toast && toast('Could not load that template — starting from an empty room.'); }
   }else{
     TEMPLATES.empty.build();
   }
@@ -62,15 +64,31 @@ async function newProject(tpl='empty'){
   setDirty(true);
   renderAll();
   setView('2d');
+  maybeStartTutorial();
+  return loaded;
+}
+// First visit only. The tour used to open on top of the template picker (and
+// restart from step 1 when a template was then picked): wait until the picker or
+// any other dialog has closed, and never restart a tour that is already running.
+function maybeStartTutorial(){
   let done = EMBED ? '1' : null;
   try{ done = done || localStorage.getItem('architTutDone') || localStorage.getItem('krausTutDone2'); }catch(e){}
-  if(!done) setTimeout(startTutorial, 450);
+  if(done) return;
+  setTimeout(function tryStart(){
+    if($('#tut').classList.contains('show')) return;
+    const dim = $('#dim');
+    if(!dim.classList.contains('show')){ startTutorial(); return; }
+    const mo = new MutationObserver(()=>{
+      if(!dim.classList.contains('show')){ mo.disconnect(); setTimeout(tryStart, 300); }
+    });
+    mo.observe(dim, {attributes:true, attributeFilter:['class']});
+  }, 450);
 }
 // Local-dev only handle. Everything in this file is module-scoped, which makes the
 // builder impossible to drive from a test harness or the devtools console.
 if(location.hostname === 'localhost' || location.hostname === '127.0.0.1'){
   window.__archit = {
-    get state(){ return state; }, get ui(){ return ui; }, get wallMats(){ return wallMats; },
+    get state(){ return state; }, get ui(){ return ui; }, get sel(){ return sel; }, get wallMats(){ return wallMats; },
     C, TEMPLATES, THREE, scene, blocksRoot, camera, controls, renderer,
     rebuild3D, renderAll, newProject, toggleRoofs, buildFromGeometry, tRoomSpec,
     buildRoofGroups, roofComponents, unionLoops, wallOpenings, wallNeighbors,
@@ -100,8 +118,9 @@ addEventListener('pagehide', e=>{
         await loadTemplateCatalog();
         markTemplateOwned(key);
         hideModal();
-        await newProject(key);
-        toast('Template unlocked');
+        // newProject already explained a failed geometry fetch: don't cover
+        // that toast with a false "unlocked"
+        if(await newProject(key)) toast('Template unlocked');
         return;
       }
       if(m?.type !== 'archit:init') return;

@@ -361,6 +361,9 @@ textarea.cmt:focus{border-color:var(--blue)}
   #bottombar .cell b{font-size:13.5px}
   #fsB{right:10px;bottom:10px}#zoomOut{right:10px;bottom:58px}#zoomIn{right:10px;bottom:106px}#fitPlan{right:10px;bottom:154px}
   #scalebar{bottom:64px;left:12px}
+  /* the view toggle sits over the top of the stage on phones and hid the toast:
+     show it just above the bottom bar instead */
+  #toast{top:auto;bottom:72px;width:max-content;max-width:calc(100% - 24px)}
   /* over the header-anchored view toggle (z 40) while it is open */
   #toolpop{left:8px;right:8px;top:auto;bottom:8px;transform:none;width:auto;max-height:calc(100% - 16px);overflow:auto;z-index:45}
   #toolpop.furni{width:auto}

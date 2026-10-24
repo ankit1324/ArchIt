@@ -2,7 +2,7 @@ import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
 import {$, escapeMarkup, round1, side, toast} from './dom.js';
 import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui} from './state.js';
-import {boundsOf, freeT, overlaps, sharedWall} from './geometry.js';
+import {boundsOf, freeT, overlaps, refitFurniture, sharedWall} from './geometry.js';
 import {openToolPop} from './tools.js';
 import {renderSelection} from './ui.js';
 
@@ -363,7 +363,7 @@ side.addEventListener('change', e=>{
       renderSidebar();
       return;
     }
-    commit(()=>{ b.w = nw; b.len = nl; });
+    commit(()=>{ b.w = nw; b.len = nl; refitFurniture(b); });   // keep furniture inside a shrunk room
     return;
   }
 });

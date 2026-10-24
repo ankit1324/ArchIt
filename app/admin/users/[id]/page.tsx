@@ -55,8 +55,11 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
     db.from("designs").select("id", { count: "exact", head: true }).eq("user_id", id),
     auditHistory({ type: "user", id }, 50),
   ]);
-  // a deleted Clerk user can still own rows here, so only 404 when there's nothing at all
-  if (!user && !listings.data?.length && !purchases.data?.length) notFound();
+  // a deleted Clerk user can still own rows (or admin history, e.g. banned and
+  // then deleted) here, so only 404 when there's nothing at all
+  if (!user && !listings.data?.length && !purchases.data?.length && !history.entries.length) {
+    notFound();
+  }
 
   const name = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") : "";
   const admin = user ? isAdminUser(user) : false;
@@ -67,7 +70,8 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
       <div className="mt-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold">
-            {user?.primaryEmailAddress?.emailAddress ?? name ?? id}{" "}
+            {/* `||`: with no email, name is "" (not null) and must fall through to the id */}
+            {user?.primaryEmailAddress?.emailAddress || name || id}{" "}
             {admin && <Badge label="admin" />} {user?.banned && <Badge label="banned" />}
           </h1>
           <p className="mt-1 text-[13px] text-plum-soft">

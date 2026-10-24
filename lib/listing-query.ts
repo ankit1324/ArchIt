@@ -13,8 +13,12 @@ export type BBox = [number, number, number, number];
  */
 export function parseBBox(raw: string | null): BBox | null | "invalid" {
   if (raw === null || raw === "") return null;
-  const parts = raw.split(",").map((p) => Number(p.trim()));
-  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return "invalid";
+  const raws = raw.split(",").map((p) => p.trim());
+  // Number("") is 0, so an empty part (",,," or "1,,2,3") would otherwise
+  // read as a coordinate of 0 instead of being rejected
+  if (raws.length !== 4 || raws.some((p) => p === "")) return "invalid";
+  const parts = raws.map(Number);
+  if (parts.some((n) => !Number.isFinite(n))) return "invalid";
   const [w, s, e, n] = parts;
   if (w < -180 || e > 180 || s < -90 || n > 90 || w > e || s > n) return "invalid";
   return [w, s, e, n];

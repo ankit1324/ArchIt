@@ -47,6 +47,15 @@ const CONFIRM_FAILED =
   "Payment could not be confirmed. If money was deducted, do not pay again—refresh the page or contact support.";
 const CONFIRM_PENDING =
   "Payment received — it’s still being confirmed. Your unlock will appear here shortly; refresh in a moment. Do not pay again.";
+const START_FAILED = "Could not start the payment. Nothing was charged — please try again in a moment.";
+
+/**
+ * paid     — a payment was just verified server-side
+ * unlocked — nothing to pay: already owned (409) or payments are switched off
+ *            (410, lib/paywall.ts — everything is free)
+ * failed   — cancelled, expired, failed or unconfirmed
+ */
+type CheckoutOutcome = "paid" | "unlocked" | "failed";
 
 function loadScript(portalUrl: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -84,13 +93,28 @@ async function openCheckout(
   purpose: FeePurpose,
   description: string,
   ref?: string,
-): Promise<boolean> {
-  const res = await fetch("/api/create-order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ purpose, ref }),
-  });
-  if (!res.ok) return false;
+): Promise<CheckoutOutcome> {
+  let res: Response;
+  try {
+    res = await fetch("/api/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ purpose, ref }),
+    });
+  } catch {
+    // offline / blocked: say so instead of rejecting into callers that only
+    // `finally` (the unlock button would just silently re-enable)
+    window.alert(START_FAILED);
+    return "failed";
+  }
+  // The server holds the truth: 409 = already in the ledger, 410 = paywall
+  // off (everything free). Either way the caller should show it unlocked and
+  // re-read, not tell the user their payment failed.
+  if (res.status === 409 || res.status === 410) return "unlocked";
+  if (!res.ok) {
+    window.alert(START_FAILED);
+    return "failed";
+  }
   const order = (await res.json()) as {
     paymentId: string;
     orderId: string;
@@ -98,15 +122,18 @@ async function openCheckout(
     portalUrl: string;
   };
 
-  if (!(await loadScript(order.portalUrl))) return false;
+  if (!(await loadScript(order.portalUrl))) {
+    window.alert(START_FAILED);
+    return "failed";
+  }
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<CheckoutOutcome>((resolve) => {
     let settled = false;
     let verificationStarted = false;
     const finish = (ok: boolean) => {
       if (settled) return;
       settled = true;
-      resolve(ok);
+      resolve(ok ? "paid" : "failed");
     };
 
     const verify = async () => {
@@ -160,7 +187,8 @@ async function openCheckout(
 
 /**
  * Charge a fixed platform fee. Resolves true only after the payment has been
- * verified server-side; false on cancel, expiry or failure. `ref` ties the
+ * verified server-side — or when there is nothing to pay (already owned, or
+ * payments switched off) — and false on cancel, expiry or failure. `ref` ties the
  * purchase to a thing (e.g. property id for contact unlocks) so it persists in
  * the ledger. Also records the unlock_started / unlock_completed funnel steps
  * (lib/analytics.ts) for every paid product in one place.
@@ -171,7 +199,8 @@ export async function payFee(
   ref?: string,
 ): Promise<boolean> {
   funnel("unlock_started", purpose);
-  const ok = await openCheckout(purpose, description, ref);
-  if (ok) funnel("unlock_completed", purpose);
-  return ok;
+  const outcome = await openCheckout(purpose, description, ref);
+  // only a real, verified payment completes the funnel
+  if (outcome === "paid") funnel("unlock_completed", purpose);
+  return outcome !== "failed";
 }
