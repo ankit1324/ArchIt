@@ -136,11 +136,16 @@ export async function PUT(
 
 /** Best-effort removal of a listing's uploaded photos. Never fails the request. */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  // same write budget as POST/PUT: each delete fans out into storage
+  // reference checks per photo, so it must not be an unmetered loop
+  if (!(await checkRateLimit(ipKey(request, "properties-write", userId), 30, 60_000))) {
+    return rateLimitedResponse();
+  }
   const { id } = await params;
 
   // Grab the photo URLs first (scoped to the lister) so the objects can be

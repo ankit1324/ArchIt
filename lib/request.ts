@@ -26,9 +26,21 @@ export async function parseJsonBody<T>(
     return Response.json({ error: "body too large" }, { status: 413 });
   }
 
+  // Content-Length is advisory (absent when chunked, or simply wrong), and
+  // request.json() buffers the whole body before parsing — so count the bytes
+  // as they arrive and stop at the cap instead of holding an unbounded body.
+  let raw: Uint8Array | null;
+  try {
+    raw = await readBodyCapped(request, maxBytes);
+  } catch {
+    return Response.json({ error: "invalid json" }, { status: 400 });
+  }
+  if (!raw) return Response.json({ error: "body too large" }, { status: 413 });
+
   let body: unknown;
   try {
-    body = await request.json();
+    // same decoding as Body.json(): UTF-8, leading BOM dropped
+    body = JSON.parse(new TextDecoder().decode(raw));
   } catch {
     return Response.json({ error: "invalid json" }, { status: 400 });
   }
