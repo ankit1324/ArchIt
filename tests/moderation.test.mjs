@@ -4,9 +4,11 @@ import test from "node:test";
 import {
   canViewListing,
   changesReviewedContent,
+  hasVerifiedAdminEmail,
   isAdminIdentity,
   onlyLive,
   onlyVisible,
+  parseAdminEmails,
   parseAdminIds,
   statusAfterEdit,
   validateListingDecision,
@@ -180,4 +182,29 @@ test("admin identity: env list or Clerk role, never anonymous", () => {
   assert.equal(isAdminIdentity("user_z", ids, { role: "Admin" }), false);
   assert.equal(isAdminIdentity(null, ids, { role: "admin" }), false);
   assert.equal(isAdminIdentity("", new Set([""])), false);
+});
+
+test("ADMIN_EMAILS: verified address grants admin, case-insensitively", () => {
+  const admins = parseAdminEmails(" Owner@Example.com, second@example.com ");
+  assert.equal(
+    hasVerifiedAdminEmail([{ emailAddress: "owner@example.COM", verification: { status: "verified" } }], admins),
+    true,
+  );
+});
+
+test("ADMIN_EMAILS: an unverified address never grants admin", () => {
+  const admins = parseAdminEmails("owner@example.com");
+  assert.equal(
+    hasVerifiedAdminEmail([{ emailAddress: "owner@example.com", verification: { status: "unverified" } }], admins),
+    false,
+  );
+  assert.equal(hasVerifiedAdminEmail([{ emailAddress: "owner@example.com", verification: null }], admins), false);
+  assert.equal(hasVerifiedAdminEmail([{ emailAddress: "owner@example.com" }], admins), false);
+});
+
+test("ADMIN_EMAILS: unlisted or empty list grants nothing", () => {
+  const verified = [{ emailAddress: "someone@example.com", verification: { status: "verified" } }];
+  assert.equal(hasVerifiedAdminEmail(verified, parseAdminEmails("owner@example.com")), false);
+  assert.equal(hasVerifiedAdminEmail(verified, parseAdminEmails(undefined)), false);
+  assert.equal(hasVerifiedAdminEmail(verified, parseAdminEmails("")), false);
 });

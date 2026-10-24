@@ -180,6 +180,26 @@ export function parseAdminIds(raw: string | undefined | null): Set<string> {
   );
 }
 
+/** ADMIN_EMAILS: comma/space-separated, compared case-insensitively. */
+export function parseAdminEmails(raw: string | undefined | null): Set<string> {
+  return new Set([...parseAdminIds(raw)].map((e) => e.toLowerCase()));
+}
+
+/**
+ * True when one of the user's Clerk email addresses is on the ADMIN_EMAILS
+ * list AND verified. An unverified address proves nothing: anyone can sign up
+ * claiming it, so it must never grant admin.
+ */
+export function hasVerifiedAdminEmail(
+  emails: ReadonlyArray<{ emailAddress: string; verification?: { status?: string | null } | null }>,
+  adminEmails: Set<string>,
+): boolean {
+  if (adminEmails.size === 0) return false;
+  return emails.some(
+    (e) => e.verification?.status === "verified" && adminEmails.has(e.emailAddress.toLowerCase()),
+  );
+}
+
 /** Admin by env list, or by Clerk publicMetadata.role === "admin". */
 export function isAdminIdentity(
   userId: string | null | undefined,
