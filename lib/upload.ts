@@ -2,6 +2,29 @@
 // app/api/upload/route.ts (enforcement).
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
 
+/**
+ * Most pixels an upload may decode to, summed over every frame of an
+ * animation. A few-KB PNG can declare a 30000×30000 canvas: past this the
+ * upload is refused, so neither the server's resize nor any viewer's browser
+ * (which is handed the original whenever thumbnails are missing) decodes it.
+ */
+export const MAX_INPUT_PIXELS = 40_000_000;
+
+/**
+ * Pixel count an image header declares (width × frame height × frames), as
+ * reported by sharp's metadata(); 0 when a dimension is missing.
+ */
+export function declaredPixels(meta: {
+  width?: number;
+  height?: number;
+  pageHeight?: number;
+  pages?: number;
+}): number {
+  const w = meta.width ?? 0;
+  const h = meta.pageHeight ?? meta.height ?? 0;
+  return w * h * Math.max(1, meta.pages ?? 1);
+}
+
 export const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",

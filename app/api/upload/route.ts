@@ -4,7 +4,13 @@ import sharp from "@/lib/sharp";
 import { db } from "@/lib/db";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { readBodyCapped } from "@/lib/request";
-import { detectImageType, EXT_BY_MIME, MAX_UPLOAD_BYTES } from "@/lib/upload";
+import {
+  declaredPixels,
+  detectImageType,
+  EXT_BY_MIME,
+  MAX_INPUT_PIXELS,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/upload";
 import { THUMB_WIDTHS, thumbObjectNames } from "@/lib/url";
 
 export async function POST(request: Request) {
@@ -52,6 +58,27 @@ export async function POST(request: Request) {
     return Response.json({ error: "only jpeg/png/webp/avif images" }, { status: 415 });
   }
 
+  // Magic bytes alone admit anything that merely starts like an image (a JPEG
+  // marker followed by HTML, say), and a tiny file can declare a huge canvas.
+  // Both used to be stored anyway: the failed thumbnail just fell back to the
+  // original, which every viewer's browser then fetched. Parse the header
+  // before anything is stored — it must be a real image within the pixel
+  // budget. Header only, so a truncated-but-valid photo still goes through as
+  // before (without thumbnails).
+  let meta: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
+  try {
+    meta = await sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  } catch (e) {
+    return /pixel limit/i.test((e as Error).message)
+      ? Response.json({ error: "image too large (max 40 megapixels)" }, { status: 413 })
+      : Response.json({ error: "unreadable image" }, { status: 415 });
+  }
+  const pixels = declaredPixels(meta);
+  if (pixels === 0) return Response.json({ error: "unreadable image" }, { status: 415 });
+  if (pixels > MAX_INPUT_PIXELS) {
+    return Response.json({ error: "image too large (max 40 megapixels)" }, { status: 413 });
+  }
+
   // Resized webp variants for markers (64px) and cards/panels (480px). Only
   // when every variant is stored does the original get the `-t` name that
   // tells readers they exist (lib/url.ts thumbnailUrl); otherwise it is saved
@@ -78,7 +105,7 @@ async function storeThumbnails(base: string, buf: Buffer): Promise<boolean> {
   try {
     const variants = await Promise.all(
       THUMB_WIDTHS.map((w) =>
-        sharp(buf, { limitInputPixels: 40_000_000 })
+        sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS })
           .rotate() // honour EXIF orientation before it is stripped
           .resize(w === 64 ? { width: 64, height: 64, fit: "cover" } : { width: w, withoutEnlargement: true })
           .webp({ quality: w === 64 ? 70 : 76 })

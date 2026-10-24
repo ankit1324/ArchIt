@@ -26,6 +26,17 @@ export const MAX_PHOTOS = 5;
 export const MAX_DESIGN_NAME = 100;
 /** Serialized `design` JSON cap (1 MB). */
 export const MAX_DESIGN_BYTES = 1024 * 1024;
+/**
+ * Largest count (beds, sqft, …) a listing may carry: the properties columns
+ * are Postgres INT, so anything bigger used to fail the insert with a 500.
+ */
+export const MAX_COUNT = 2_147_483_647;
+/**
+ * Largest price accepted. The column is NUMERIC (no practical ceiling), but
+ * prices come back through Number(): past 2^53 they silently lose digits, and
+ * no real listing is anywhere near ₹9e15.
+ */
+export const MAX_PRICE = Number.MAX_SAFE_INTEGER;
 
 const LISTING_TYPES: readonly ListingType[] = ["sale", "rent"];
 const PROPERTY_KINDS: readonly PropertyKind[] = [
@@ -49,11 +60,17 @@ function isFiniteNumber(v: unknown): v is number {
 
 type Field<T> = { ok: true; value: T } | { ok: false; error: string };
 
+/** Postgres text cannot hold U+0000: such a string fails the write with a 500. */
+function hasNul(v: string): boolean {
+  return v.includes("\u0000");
+}
+
 /** Optional string ≤ max; absent (undefined/null) is fine. */
 function optText(v: unknown, name: string, max = MAX_TEXT): Field<string | undefined> {
   if (v === undefined || v === null) return { ok: true, value: undefined };
   if (typeof v !== "string") return { ok: false, error: `${name} must be a string` };
   if (v.length > max) return { ok: false, error: `${name} too long (max ${max})` };
+  if (hasNul(v)) return { ok: false, error: `${name} contains invalid characters` };
   return { ok: true, value: v };
 }
 
@@ -76,6 +93,7 @@ function optCount(v: unknown, name: string): Field<number | undefined> {
   if (!isFiniteNumber(v) || !Number.isInteger(v) || v < 0) {
     return { ok: false, error: `${name} must be a non-negative integer` };
   }
+  if (v > MAX_COUNT) return { ok: false, error: `${name} too large (max ${MAX_COUNT})` };
   return { ok: true, value: v };
 }
 
@@ -95,12 +113,14 @@ export function validateListing(v: unknown, safeImageUrl: ImageUrlCheck): Listin
 
   if (typeof v.address !== "string" || !v.address.trim()) return "address required";
   if (v.address.length > MAX_TEXT) return `address too long (max ${MAX_TEXT})`;
+  if (hasNul(v.address)) return "address contains invalid characters";
 
   const city = optText(v.city, "city");
   if (!city.ok) return city.error;
 
   // `!l.price` used to reject a genuine ₹0 listing; only NaN/negative are bad.
   if (!isFiniteNumber(v.price) || v.price < 0) return "price must be a number >= 0";
+  if (v.price > MAX_PRICE) return "price too large";
 
   if (!isLngLat(v.coords)) return "coords must be [lng, lat] within range";
 
@@ -186,6 +206,7 @@ export function validateDesign(v: unknown, safeImageUrl: ImageUrlCheck): DesignI
   if (v.name !== undefined && v.name !== null && v.name !== "") {
     if (typeof v.name !== "string") return "name must be a string";
     if (v.name.length > MAX_DESIGN_NAME) return `name too long (max ${MAX_DESIGN_NAME})`;
+    if (hasNul(v.name)) return "name contains invalid characters";
     name = v.name;
   }
 
