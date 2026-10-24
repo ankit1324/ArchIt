@@ -24,10 +24,10 @@
     "next": "16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sharp": "^0.35.0"
+    "sharp": "^0.35.5"
   },
   "overrides": {
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.5",
     "postcss": "^8.5.18"
   },
   "devDependencies": {
