@@ -42,6 +42,18 @@ async function fetchListingPage(params: URLSearchParams, signal: AbortSignal): P
   return { listings: data, nextCursor: response.headers.get("X-Next-Cursor") };
 }
 
+/**
+ * Toast text for a failed listing write. The API's own messages are fine for
+ * validation errors ("price must be …"), but an expired session or a rate
+ * limit answer with bare "unauthorized" / "too many requests".
+ */
+function writeErrorMessage(action: "save" | "delete", status: number, msg: string | null): string {
+  if (status === 401) return `Your session has expired. Sign in again to ${action} the listing.`;
+  if (status === 403) return `You can only ${action} listings you added.`;
+  if (status === 429) return "Too many changes in a short time. Please wait a minute and try again.";
+  return `Could not ${action} the listing${msg ? `: ${msg}` : ""}. Please try again.`;
+}
+
 /** append `more` to `prev`, skipping ids already present (local edits win) */
 function appendNew(prev: Listing[], more: Listing[]): Listing[] {
   const seen = new Set(prev.map((l) => l.id));
@@ -71,6 +83,9 @@ export default function FindClient({
   const [searchArea, setSearchArea] = useState(false);
   const [areaListings, setAreaListings] = useState<Listing[] | null>(null);
   const [areaTruncated, setAreaTruncated] = useState(false);
+  // the last viewport fetch failed: the bar must not claim "In this map area"
+  // while it is really showing the full set (or a stale area)
+  const [areaFailed, setAreaFailed] = useState(false);
   const areaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const areaAbort = useRef<AbortController | null>(null);
   // seeded from ?property=<id> (a public /property/:id page links here); the
@@ -120,11 +135,13 @@ export default function FindClient({
       .then((page) => {
         if (controller.signal.aborted) return;
         setAreaListings(page.listings);
+        setAreaFailed(false);
         // more rows than one page in view: ask the user to zoom in
         setAreaTruncated(page.nextCursor !== null);
       })
       .catch(() => {
         // keep the previous area results; the next move retries
+        if (!controller.signal.aborted) setAreaFailed(true);
       });
   }, []);
 
@@ -147,6 +164,7 @@ export default function FindClient({
     areaAbort.current?.abort();
     setAreaListings(null);
     setAreaTruncated(false);
+    setAreaFailed(false);
     const map = mapRef.current;
     if (next && map) {
       const b = map.getBounds();
@@ -198,6 +216,8 @@ export default function FindClient({
 
   const selected = filtered.find((l) => l.id === selectedId) ?? null;
   const editing = source.find((l) => l.id === editingId) ?? null;
+  // the detail panel or the add/edit form is showing
+  const panelOpen = (addStage === "idle" && !!selected) || addStage === "form";
 
   // stable per `listings` so memoised cards don't re-render on every keystroke
   const flyToListing = useCallback((id: string) => {
@@ -397,9 +417,7 @@ export default function FindClient({
           .json()
           .then((j: { error?: string }) => j.error)
           .catch(() => null);
-        notify(`Could not save the listing${msg ? `: ${msg}` : ""}. Please try again.`, {
-          kind: "error",
-        });
+        notify(writeErrorMessage("save", res.status, msg ?? null), { kind: "error" });
         return;
       }
       const saved = (await res.json()) as Listing;
@@ -473,9 +491,7 @@ export default function FindClient({
           .json()
           .then((j: { error?: string }) => j.error)
           .catch(() => null);
-        notify(`Could not delete the listing${msg ? `: ${msg}` : ""}. Please try again.`, {
-          kind: "error",
-        });
+        notify(writeErrorMessage("delete", res.status, msg ?? null), { kind: "error" });
       }
     } catch {
       notify("Could not delete the listing. Check your connection and try again.", {
@@ -548,7 +564,7 @@ export default function FindClient({
             </div>
           )}
 
-          <div className={styles.mapControls}>
+          <div className={`${styles.mapControls} ${panelOpen ? styles.mapControlsShifted : ""}`}>
             <MapControls
               is3D={is3D}
               onZoomIn={() => mapRef.current?.zoomIn()}
@@ -557,9 +573,9 @@ export default function FindClient({
             />
           </div>
 
-          <div className={`${styles.results} ${(addStage === "idle" && selected) || addStage === "form" ? styles.resultsUnderSheet : ""}`}>
+          <div className={`${styles.results} ${panelOpen ? styles.resultsUnderSheet : ""}`}>
             <div className={styles.resultBar}>
-              <div aria-live="polite"><strong>{loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}` : "Explore properties"}</strong><span>{searchArea && areaTruncated ? "Zoom in to see every listing here" : query ? `Matching “${query}”` : searchArea ? "In this map area" : "Find your next place"}</span></div>
+              <div aria-live="polite"><strong>{loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}` : "Explore properties"}</strong><span>{searchArea && areaFailed ? (areaListings ? "Couldn’t refresh this map area" : "Couldn’t load this map area — showing all") : searchArea && areaTruncated ? "Zoom in to see every listing here" : query ? `Matching “${query}”` : searchArea ? "In this map area" : "Find your next place"}</span></div>
               <div className={styles.resultActions}>
                 <label className={styles.areaToggle}>
                   <input type="checkbox" checked={searchArea} onChange={toggleSearchArea} />
@@ -579,6 +595,12 @@ export default function FindClient({
               listings={deferredFiltered}
               onSelect={flyToListing}
               hasAny={listings.length > 0}
+              emptyMessage={
+                // nothing in view with no filters set: clearing won't help, moving will
+                searchArea && areaListings && !activeFilters && !query.trim()
+                  ? "No properties in this map area. Zoom out or move the map to see more."
+                  : undefined
+              }
               status={loadState}
               selectedId={selectedId}
               onReset={resetSearch}

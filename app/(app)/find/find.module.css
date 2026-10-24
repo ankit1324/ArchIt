@@ -22,7 +22,14 @@
 .resultBar > div:first-child { min-width: 0; }
 .areaToggle input { width: 15px; height: 15px; accent-color: var(--color-plum); }
 .detailPanel :global(.sheet-handle) { display: none; }
+/* the detail / add panel overlaps the result bar, the card strip and the zoom
+   controls: keep it opaque so they don't show through its text, and slide the
+   bar (sort, "search as I move") and the controls left of it on desktop so
+   they stay usable while it is open */
+.detailPanel > section { background: rgb(245 241 234 / .97); }
+.resultsUnderSheet, .mapControlsShifted { right: 328px; }
 @media (max-width: 1023px) {
+  .mapControlsShifted { right: 14px; }
   .filters { display: none; z-index: 40; top: 124px; bottom: 26px; width: min(300px, calc(100% - 28px)); background: var(--color-cream); }
   .filtersOpen { display: flex; }
   .closeFilters { display: block; padding: 10px; border-radius: 50%; }
@@ -37,7 +44,6 @@
   .detailPanel > * { width: 100%; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px; }
   .detailPanel :global(.sheet-handle) { display: block; flex: none; align-self: center; width: 64px; height: 22px; margin-bottom: -22px; position: relative; z-index: 1; touch-action: none; cursor: grab; }
   .detailPanel :global(.sheet-handle)::before { content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 99px; background: rgb(61 24 48 / .28); }
-  .detailPanel > section { background: rgb(245 241 234 / .97); }
   .formPanel { max-height: 82%; }
   .resultsUnderSheet { visibility: hidden; }
   .pickHint { top: 124px; left: 14px; right: 14px; }

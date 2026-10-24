@@ -9,6 +9,8 @@ import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
 import { MAX_REPORT_DETAILS, REPORT_REASONS, type ReportReason } from "@/lib/moderation";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
+import { contactLinks } from "@/lib/contact-links";
 import { safeImageUrl, thumbnailUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
@@ -40,10 +42,28 @@ function cachedDetail(id: string, userId: string | null | undefined): Listing | 
 }
 
 /**
+ * The API answers with terse machine strings ("unauthorized", "not found");
+ * say what happened and what to do instead.
+ */
+function reportErrorMessage(status: number, serverMsg: string | null): string {
+  if (status === 401) return "Your session has expired. Sign in again to report this listing.";
+  if (status === 404) return "This listing is no longer on the map, so it can’t be reported.";
+  if (status === 429) return "You’ve sent several reports recently. Please try again later.";
+  if (status === 400 && /own listing/i.test(serverMsg ?? "")) {
+    return "You can’t report your own listing.";
+  }
+  if (status === 400 && /details/i.test(serverMsg ?? "")) {
+    return "Please add a few words about what’s wrong.";
+  }
+  return "Could not send the report. Please try again.";
+}
+
+/**
  * "Report listing": a reason + optional details, POSTed to /api/reports for
  * the admin queue. Collapsed to a quiet text button until opened.
+ * Exported for UI checks; the panel renders it for signed-in non-listers.
  */
-function ReportListing({ listingId }: { listingId: string }) {
+export function ReportListing({ listingId }: { listingId: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason>("fraud");
   const [details, setDetails] = useState("");
@@ -98,7 +118,7 @@ function ReportListing({ listingId }: { listingId: string }) {
         .json()
         .then((j: { error?: string }) => j.error)
         .catch(() => null);
-      setError(msg || "Could not send the report. Please try again.");
+      setError(reportErrorMessage(res.status, msg ?? null));
       setState("idle");
     } catch {
       setError("Could not send the report. Please try again.");
@@ -154,6 +174,48 @@ function ReportListing({ listingId }: { listingId: string }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * The owner contact (shown to signed-in viewers while the paywall is off) as
+ * tappable Call / WhatsApp / Email buttons; the raw text stays visible too,
+ * since it often carries a name or a second number.
+ */
+function OwnerContact({ listing }: { listing: Listing }) {
+  const contact = listing.owner ?? "";
+  const name = listing.buildingName || listing.address;
+  const links = contactLinks(contact, `Hi, I saw your listing “${name}” on ArchIt.`);
+  return (
+    <div className="rounded-2xl bg-white/55 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-plum-soft">
+        Owner contact
+      </div>
+      <div className="break-words text-[13px] font-bold text-plum">{contact}</div>
+      {links.length > 0 && (
+        <div className="mt-2 flex gap-1.5">
+          {links.map((l) => (
+            <a
+              key={l.kind}
+              href={l.href}
+              // wa.me opens WhatsApp (app or web) in a new tab; tel:/mailto:
+              // hand off to the OS and must not leave a blank tab behind
+              {...(l.kind === "whatsapp" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              aria-label={`${l.label} ${l.display}`}
+              className={`flex-1 rounded-full py-2 text-center text-[12px] font-bold transition-opacity hover:opacity-90 ${
+                l.kind === "call"
+                  ? "bg-plum text-cream"
+                  : l.kind === "whatsapp"
+                    ? "bg-[#1f7a4d] text-white"
+                    : "bg-plum/10 text-plum"
+              }`}
+            >
+              {l.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -233,8 +295,10 @@ export default function PropertyDetailPanel({
   // past buyer) already has `owner` in hand.
   const thumb = thumbnailUrl(listing.photo, 480);
   const photo = thumb ?? safeImageUrl(listing.photo);
+  // never while the paywall is off: there is nothing to buy (the server
+  // returns `owner` to every signed-in viewer)
   const showUnlock =
-    !!userId && !canManage && !listing.owner && listing.hasOwner === true;
+    PAYWALL_ENABLED && !!userId && !canManage && !listing.owner && listing.hasOwner === true;
   return (
     <section className="glass no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-3xl p-4">
       <header className="flex items-start justify-between gap-2">
@@ -300,7 +364,6 @@ export default function PropertyDetailPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        {listing.owner && <Fact label="Owner" value={listing.owner} />}
         <Fact label="Type" value={listing.kind} />
         <Fact label="Beds" value={String(listing.beds)} />
         <Fact label="Baths" value={String(listing.baths)} />
@@ -312,6 +375,8 @@ export default function PropertyDetailPanel({
           value={`${listing.coords[1].toFixed(4)}, ${listing.coords[0].toFixed(4)}`}
         />
       </div>
+
+      {listing.owner && <OwnerContact listing={listing} />}
 
       {/* a listing that isn't live has no public page yet */}
       {!listing.status && (
