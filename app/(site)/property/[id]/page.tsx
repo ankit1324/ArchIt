@@ -7,59 +7,31 @@ import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { feeLabel } from "@/lib/fees";
 import { PAYWALL_ENABLED } from "@/lib/paywall";
-import { getPublicListing, type PublicListing } from "@/lib/public-listings";
+import ShareButtons from "@/components/ShareButtons";
+import {
+  cityName,
+  getPublicListing,
+  listMoreInCity,
+  type PublicListing,
+} from "@/lib/public-listings";
 import { SITE_URL } from "@/lib/site";
 import { formatPrice } from "@/lib/types";
-import { safeImageUrl } from "@/lib/url";
+import { dealLabel, headline, isDwelling, kindLabel, photosOf, shareLine, summary } from "./format";
 
 // Public, crawlable listing page. No auth and no owner contact: the contact
 // stays behind the paid unlock inside /find, which this page links into.
 
 type Props = { params: Promise<{ id: string }> };
 
-const KIND_LABEL: Record<string, string> = {
-  apartments: "Apartment",
-  house: "House",
-  land: "Plot",
-  room: "Room",
-  business: "Commercial space",
-  hotels: "Hotel",
-};
-
-function headline(l: PublicListing): string {
-  return l.buildingName || l.address;
-}
-
-function kindLabel(l: PublicListing): string {
-  return KIND_LABEL[l.kind] ?? "Property";
-}
-
-function photosOf(l: PublicListing): string[] {
-  return (l.photos ?? []).map((p) => safeImageUrl(p)).filter((p): p is string => !!p);
-}
-
-function summary(l: PublicListing): string {
-  const deal = l.type === "sale" ? "for sale" : "for rent";
-  const facts = [
-    l.beds ? `${l.beds} bed` : null,
-    l.baths ? `${l.baths} bath` : null,
-    l.sqft ? `${l.sqft.toLocaleString("en-IN")} sqft` : null,
-  ].filter(Boolean);
-  const where = [l.buildingName ? l.address : null, l.city].filter(Boolean).join(", ");
-  return `${kindLabel(l)} ${deal}${where ? ` in ${where}` : ""} at ${formatPrice(l)}${
-    facts.length ? ` · ${facts.join(" · ")}` : ""
-  }. Explore it on ArchIt's 3D map.`;
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const l = await getPublicListing(id);
   if (!l) return { title: "Listing not found", robots: { index: false } };
+  const city = cityName(l.city);
   const title = `${headline(l)} — ${l.type === "sale" ? "For sale" : "For rent"}${
-    l.city ? ` in ${l.city}` : ""
+    city ? ` in ${city}` : ""
   }`;
   const description = summary(l);
-  const photo = photosOf(l)[0];
   return {
     title,
     description,
@@ -71,8 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `/property/${l.id}`,
       title,
       description,
-      // no photo: the suite-wide app/opengraph-image.tsx card is used instead
-      ...(photo ? { images: [{ url: photo, alt: headline(l) }] } : {}),
+      // images: the colocated opengraph-image.tsx card (price, deal, city and
+      // the first photo). File-based metadata wins over this object anyway.
     },
     twitter: { card: "summary_large_image", title, description },
   };
@@ -82,6 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 function jsonLd(l: PublicListing) {
   const url = `${SITE_URL}/property/${l.id}`;
   const photos = photosOf(l);
+  const pin = /\b\d{6}\b/.exec(l.city ?? "")?.[0];
   return {
     "@context": "https://schema.org",
     "@type": "RealEstateListing",
@@ -106,15 +79,21 @@ function jsonLd(l: PublicListing) {
       address: {
         "@type": "PostalAddress",
         streetAddress: l.address,
-        ...(l.city ? { addressLocality: l.city } : {}),
+        // stored city is "Chandigarh, 160015": split it into locality + PIN
+        ...(cityName(l.city) ? { addressLocality: cityName(l.city) } : {}),
+        ...(pin ? { postalCode: pin } : {}),
         addressCountry: "IN",
       },
       geo: { "@type": "GeoCoordinates", latitude: l.coords[1], longitude: l.coords[0] },
+      // Accommodation-only properties, and only real values: a 0 here is
+      // "not entered", which schema.org consumers would read as a fact.
       ...(l.kind === "apartments" || l.kind === "house"
         ? {
-            numberOfBedrooms: l.beds,
-            numberOfBathroomsTotal: l.baths,
-            floorSize: { "@type": "QuantitativeValue", value: l.sqft, unitCode: "FTK" },
+            ...(l.beds > 0 ? { numberOfBedrooms: l.beds } : {}),
+            ...(l.baths > 0 ? { numberOfBathroomsTotal: l.baths } : {}),
+            ...(l.sqft > 0
+              ? { floorSize: { "@type": "QuantitativeValue", value: l.sqft, unitCode: "FTK" } }
+              : {}),
           }
         : {}),
     },
@@ -130,6 +109,45 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Compact card for the "More in <city>" grid. */
+function MoreCard({ l }: { l: PublicListing }) {
+  const sale = l.type === "sale";
+  const photo = photosOf(l)[0];
+  return (
+    <li>
+      <Link
+        href={`/property/${encodeURIComponent(l.id)}`}
+        className="group block overflow-hidden rounded-3xl bg-white/60 transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum"
+      >
+        <div className="relative aspect-[4/3] bg-gradient-to-br from-plum-soft to-plum">
+          {photo && (
+            <Image
+              src={photo}
+              alt=""
+              fill
+              sizes="(min-width: 896px) 200px, 50vw"
+              className="object-cover"
+            />
+          )}
+          <span
+            className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+              sale ? "bg-lime text-plum" : "bg-magenta-deep text-white"
+            }`}
+          >
+            {dealLabel(l)}
+          </span>
+        </div>
+        <div className="px-3 py-2.5">
+          <p className="text-[15px] font-extrabold">{formatPrice(l)}</p>
+          <p className="truncate text-[13px] font-semibold text-plum-soft group-hover:text-plum">
+            {headline(l)}
+          </p>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
 export default async function PropertyPage({ params }: Props) {
   // Rendered per request: proxy.ts gives /property the nonce CSP, and listing
   // edits/deletes show up immediately without a revalidation hook.
@@ -137,12 +155,17 @@ export default async function PropertyPage({ params }: Props) {
   const { id } = await params;
   const l = await getPublicListing(id);
   if (!l) notFound();
+  const more = await listMoreInCity(l);
 
   const sale = l.type === "sale";
   const photos = photosOf(l);
+  const city = cityName(l.city);
+  const dwelling = isDwelling(l);
   // /find is sign-in gated: proxy.ts sends signed-out visitors through sign-in
   // and back to this URL, where ?property= opens this listing's panel.
   const mapHref = `/find?property=${encodeURIComponent(l.id)}`;
+  // Shares always carry the canonical URL, never a preview/dev origin.
+  const shareUrl = `${SITE_URL}/property/${encodeURIComponent(l.id)}`;
   // JSON in a <script> body: escape "<" so listing text can never close the tag.
   const ld = JSON.stringify(jsonLd(l)).replace(/</g, "\\u003c");
 
@@ -150,16 +173,16 @@ export default async function PropertyPage({ params }: Props) {
     <div className="h-full overflow-y-auto bg-cream text-plum">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld }} />
       <Navbar />
-      <main className="mx-auto max-w-4xl px-6 pb-10 pt-8">
+      <main className="mx-auto max-w-4xl px-4 pb-10 pt-8 sm:px-6">
         <nav aria-label="Breadcrumb" className="text-[13px] font-semibold text-plum-soft">
           <Link href="/" className="hover:text-plum">ArchIt</Link>
           <span aria-hidden> / </span>
-          <span>{l.city || "Listings"}</span>
+          <span>{city || "Listings"}</span>
         </nav>
 
         <header className="mt-4 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-[30px] font-extrabold leading-tight sm:text-[36px]">{headline(l)}</h1>
+          <div className="min-w-0">
+            <h1 className="break-words text-[28px] font-extrabold leading-tight sm:text-[36px]">{headline(l)}</h1>
             <p className="mt-1 text-[15px] font-medium text-plum-soft">
               {l.buildingName ? `${l.address}, ` : ""}
               {l.city}
@@ -178,10 +201,22 @@ export default async function PropertyPage({ params }: Props) {
                 sale ? "bg-lime text-plum" : "bg-magenta-deep text-white"
               }`}
             >
-              {sale ? "For Sale" : "For Rent"}
+              {dealLabel(l)}
             </span>
           </div>
         </header>
+
+        {/* Above the fold on phones: the two things a shared-link visitor does. */}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <Link
+            href={mapHref}
+            prefetch={false}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-plum px-5 py-2 text-[14px] font-bold text-cream transition-opacity hover:opacity-90 sm:w-auto"
+          >
+            View on the 3D map →
+          </Link>
+          <ShareButtons url={shareUrl} title={shareLine(l)} />
+        </div>
 
         {photos.length > 0 ? (
           <div className="mt-6 grid gap-2 sm:grid-cols-[2fr_1fr]">
@@ -215,12 +250,13 @@ export default async function PropertyPage({ params }: Props) {
           <h2 id="facts-title" className="text-lg font-bold">Details</h2>
           <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Fact label="Type" value={kindLabel(l)} />
-            <Fact label="Beds" value={String(l.beds)} />
-            <Fact label="Baths" value={String(l.baths)} />
-            <Fact label="Floors" value={String(l.floors)} />
-            <Fact label="Built-up" value={`${l.sqft.toLocaleString("en-IN")} sqft`} />
-            <Fact label="Area" value={`${l.areaM} m²`} />
-            <Fact label="Rooms" value={String(l.rooms)} />
+            {/* A plot or shop has no beds/baths: skip rows that would read "0". */}
+            {dwelling && l.beds > 0 && <Fact label="Beds" value={String(l.beds)} />}
+            {dwelling && l.baths > 0 && <Fact label="Baths" value={String(l.baths)} />}
+            {l.floors > 0 && <Fact label="Floors" value={String(l.floors)} />}
+            {l.sqft > 0 && <Fact label="Built-up" value={`${l.sqft.toLocaleString("en-IN")} sqft`} />}
+            {l.areaM > 0 && <Fact label="Area" value={`${l.areaM.toLocaleString("en-IN")} m²`} />}
+            {dwelling && l.rooms > 0 && <Fact label="Rooms" value={String(l.rooms)} />}
             <Fact label="Location" value={`${l.coords[1].toFixed(4)}, ${l.coords[0].toFixed(4)}`} />
           </dl>
         </section>
@@ -229,8 +265,14 @@ export default async function PropertyPage({ params }: Props) {
           <div>
             <h2 className="text-lg font-bold">Interested in this {kindLabel(l).toLowerCase()}?</h2>
             <p className="mt-1 text-[14px] text-cream/85">
-              See it in 3D on the map and {PAYWALL_ENABLED ? <>unlock the owner&apos;s contact for {feeLabel("contact_owner")}</> : <>get the owner&apos;s contact</>}.
-              Listing is free; you only pay to reach the owner.
+              {PAYWALL_ENABLED ? (
+                <>
+                  See it in 3D on the map and unlock the owner&apos;s contact for {feeLabel("contact_owner")}.
+                  Listing is free; you only pay to reach the owner.
+                </>
+              ) : (
+                <>See it in 3D on the map and get the owner&apos;s contact. Free to sign up.</>
+              )}
             </p>
           </div>
           <Link
@@ -239,6 +281,34 @@ export default async function PropertyPage({ params }: Props) {
             className="mt-4 inline-block shrink-0 rounded-full bg-cream px-6 py-3 text-[14px] font-bold text-plum transition-opacity hover:opacity-90 sm:mt-0"
           >
             Open on the 3D map →
+          </Link>
+        </section>
+
+        {more.length > 0 && (
+          <section aria-labelledby="more-title" className="mt-10">
+            <h2 id="more-title" className="text-lg font-bold">More in {city}</h2>
+            <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {more.map((m) => (
+                <MoreCard key={m.id} l={m} />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="mt-10 flex flex-col items-start gap-3 rounded-3xl bg-lime p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-bold">Have a property{city ? ` in ${city}` : ""}?</h2>
+            <p className="mt-1 text-[14px] text-plum-soft">
+              List it free on ArchIt and let buyers explore it on the 3D map.
+            </p>
+          </div>
+          {/* /find is where "+ Add property" lives; signed-out visitors sign in first. */}
+          <Link
+            href="/find"
+            prefetch={false}
+            className="inline-block shrink-0 rounded-full bg-plum px-6 py-3 text-[14px] font-bold text-cream transition-opacity hover:opacity-90"
+          >
+            List your property free →
           </Link>
         </section>
       </main>
