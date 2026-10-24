@@ -2,12 +2,17 @@ import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { FEES } from "@/lib/fees";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
+import { BUSINESS, hasSupportEmail, legalEntityName } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Refund & Cancellation Policy",
   description: "When ArchIt payments can be cancelled or refunded.",
 };
 
+// Business details come from lib/business.ts; until the support email is
+// filled in there, refund requests are pointed at the /contact page instead of
+// printing a raw "[PLACEHOLDER]".
 export default function RefundsPage() {
   return (
     <div className="h-full overflow-y-auto bg-cream text-plum">
@@ -17,13 +22,13 @@ export default function RefundsPage() {
           Refund &amp; Cancellation Policy
         </h1>
         <p className="mt-2 text-sm text-plum-soft">
-          Last updated: [LAST UPDATED DATE]
+          Last updated: {BUSINESS.lastUpdated}
         </p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-relaxed text-plum-soft">
           <p>
             This policy explains when a payment made to{" "}
-            <strong className="text-plum">[LEGAL ENTITY NAME]</strong>{" "}
+            <strong className="text-plum">{legalEntityName}</strong>{" "}
             (&ldquo;ArchIt&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) for a
             paid feature can be cancelled or refunded. It forms part of our{" "}
             <a href="/terms" className="underline hover:text-plum">
@@ -60,6 +65,12 @@ export default function RefundsPage() {
                 floor-plan template for your account.
               </li>
             </ul>
+            {!PAYWALL_ENABLED && (
+              <p className="mt-3">
+                These features are currently free for every signed-in user,
+                and no payment is taken while that is the case.
+              </p>
+            )}
           </section>
 
           <section>
@@ -106,9 +117,25 @@ export default function RefundsPage() {
           <section>
             <h2 className="text-lg font-bold text-plum">4. How to request a refund</h2>
             <p className="mt-3">
-              Email{" "}
-              <strong className="text-plum">[SUPPORT EMAIL]</strong> within 7
-              days of the payment with the email address on your ArchIt
+              {hasSupportEmail ? (
+                <>
+                  Email{" "}
+                  <a
+                    href={`mailto:${BUSINESS.supportEmail}`}
+                    className="font-semibold text-plum underline hover:text-plum"
+                  >
+                    {BUSINESS.supportEmail}
+                  </a>
+                </>
+              ) : (
+                <>
+                  Contact us through our{" "}
+                  <a href="/contact" className="underline hover:text-plum">
+                    Contact page
+                  </a>
+                </>
+              )}{" "}
+              within 7 days of the payment with the email address on your ArchIt
               account, the approximate time of payment, the amount, and your
               UPI transaction reference (UTR) if you have it. We will respond
               within 5 working days. Approved refunds are returned to the
