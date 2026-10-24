@@ -1,6 +1,11 @@
 .page{height:100%;overflow:auto;background:#f8f7f2;color:#29372c;font-family:var(--landing-body),sans-serif;--accent:#ad4a31;--line:#d8dcd2;scroll-behavior:smooth;scroll-padding-top:100px}
 .page *{box-sizing:border-box}
-.page a{text-decoration:none;color:inherit}
+/* :where() keeps this reset at element specificity. As `.page a` (0,1,1) it
+   beat `.button{color:#fff}` (0,1,0) and painted the hero CTA in dark green on
+   rust (2.3:1, fails WCAG AA); white on --accent is 5.5:1. */
+:where(.page) a{text-decoration:none;color:inherit}
+/* WCAG 2.5.8: standalone text links get at least a 24px-tall hit area */
+.nav>a:not(.signIn),.footer nav a,.faq .textButton{display:inline-flex;align-items:center;min-height:24px}
 .page button{font:inherit;cursor:pointer}
 .page :is(a,button,summary):focus-visible{outline:3px solid var(--accent);outline-offset:5px}
 .page h1,.page h2,.page h3,.page p{margin:0}
