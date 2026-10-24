@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import maplibregl, { type StyleSpecification } from "maplibre-gl";
+// maplibre-gl 6 is ESM-only with no default export
+import * as maplibregl from "maplibre-gl";
+import type { StyleSpecification } from "maplibre-gl";
 // maplibre's own css first so the overrides in map.css win the cascade. Both
 // ride this lazy (ssr:false) chunk, so only /find pays for them.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -9,6 +11,15 @@ import "./map.css";
 import type { Listing, Poi } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { safeImageUrl, sizedImageUrl } from "@/lib/url";
+
+// maplibre-gl 6 finds its worker via import.meta.url, which the Next.js bundler
+// doesn't emit; serve the copy scripts/copy-maplibre-worker.mjs puts in public/.
+// Absolute URL: this chunk only loads in the browser (ssr: false).
+if (typeof window !== "undefined") {
+  maplibregl.setWorkerUrl(
+    new URL(`/vendor/maplibre/maplibre-gl-worker-${maplibregl.getVersion()}.mjs`, window.location.origin).href,
+  );
+}
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const CENTER: [number, number] = [76.7794, 30.741];
@@ -185,6 +196,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 type ThumbSource = HTMLImageElement | ImageBitmap;
 
+/** px between a pin's bottom edge and its listing point (see drawPin) */
+const PIN_LIFT = 12;
+
 /** Paint one listing pill. `thumb` is null until its 64px photo has loaded. */
 function drawPin(l: Listing, selected: boolean, thumb: ThumbSource | null): ImageData {
   const pr = pixelRatio();
@@ -202,7 +216,11 @@ function drawPin(l: Listing, selected: boolean, thumb: ThumbSource | null): Imag
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(w * pr);
-  canvas.height = Math.ceil(h * pr);
+  // PIN_LIFT of transparent space under the pill lifts it off its prism (the
+  // layer anchors icons at the bottom). This used to be icon-offset, but
+  // maplibre 6 stops perspective-scaling icons that carry an offset, which
+  // drew distant pins too large in the tilted view.
+  canvas.height = Math.ceil((h + PIN_LIFT) * pr);
   const ctx = canvas.getContext("2d")!;
   ctx.scale(pr * scale, pr * scale);
   const x = PIN_MARGIN;
@@ -415,6 +433,9 @@ export default function Map3D({
       pitch: 63,
       bearing: -32,
       maxPitch: 70,
+      // maplibre 6 overscales by 4 zoom levels by default, which re-places
+      // some basemap labels; keep v5's label placement
+      zoomLevelsToOverscale: undefined,
       attributionControl: { compact: true },
     });
     // `transformStyle` is a setStyle option (not a MapOptions one in this
@@ -457,8 +478,9 @@ export default function Map3D({
     };
 
     // Paint marker images on demand: only features actually on screen ask.
-    map.on("styleimagemissing", (e) => {
-      const id = e.id;
+    // (maplibre 6: images are supplied through the resolver; the
+    // `styleimagemissing` event is notify-only and can no longer provide one.)
+    map.setMissingStyleImageResolver((id) => {
       if (map.hasImage(id)) return;
       if (id.startsWith("cluster|")) {
         map.addImage(id, drawCluster(id.slice(8)), { pixelRatio: pixelRatio() });
@@ -590,7 +612,6 @@ export default function Map3D({
         layout: {
           "icon-image": ["get", "icon"],
           "icon-anchor": "bottom",
-          "icon-offset": [0, -12],
           "icon-allow-overlap": true,
           "symbol-sort-key": ["coalesce", ["get", "rank"], 0],
         },

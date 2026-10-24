@@ -89,3 +89,5 @@ omni-vid
 
 # bundled builder (scripts/build-builder.mjs)
 public/builder/js/
+# maplibre-gl worker copy (scripts/copy-maplibre-worker.mjs)
+public/vendor/maplibre/
