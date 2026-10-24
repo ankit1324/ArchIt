@@ -167,7 +167,10 @@ export default function FilterSidebar({
               <button
                 key={a}
                 aria-pressed={active}
-                onClick={() => set({ areaFrom: a - 15, areaTo: a + 15 })}
+                // a pressed chip toggles off, like the room and floor chips
+                onClick={() =>
+                  set(active ? { areaFrom: 0, areaTo: Infinity } : { areaFrom: a - 15, areaTo: a + 15 })
+                }
                 className={chip(active)}
               >
                 {a} m²

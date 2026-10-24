@@ -510,7 +510,10 @@ export default function Map3D({
       [LAYER_PINS, LAYER_CLUSTERS].filter((id) => map.getLayer(id));
 
     map.on("click", (e) => {
-      const hit = markerLayers().length
+      // while placing a new property every click places the pin: a click that
+      // lands on an existing pill must not select (and fly to) that listing
+      const picking = !!map.getCanvas().dataset.pick;
+      const hit = !picking && markerLayers().length
         ? map.queryRenderedFeatures(e.point, { layers: markerLayers() })[0]
         : undefined;
       if (hit?.layer.id === LAYER_CLUSTERS) {
