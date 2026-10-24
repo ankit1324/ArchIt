@@ -1,12 +1,19 @@
 import "server-only";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isAdminIdentity, parseAdminIds } from "./moderation";
+import {
+  hasVerifiedAdminEmail,
+  isAdminIdentity,
+  parseAdminEmails,
+  parseAdminIds,
+} from "./moderation";
 
 /**
- * Admin gate for /admin and /api/admin/*. An admin is either listed in
- * ADMIN_USER_IDS (comma-separated Clerk user ids — the bootstrap path) or has
- * `{"role": "admin"}` in their Clerk publicMetadata (set from the Clerk
- * dashboard, so admins can be added without a redeploy).
+ * Admin gate for /admin and /api/admin/*. An admin is any of:
+ *  - listed in ADMIN_USER_IDS (comma-separated Clerk user ids),
+ *  - signed in with a *verified* email listed in ADMIN_EMAILS (no Clerk
+ *    dashboard needed to bootstrap the first admin),
+ *  - `{"role": "admin"}` in their Clerk publicMetadata (set from the Clerk
+ *    dashboard, so admins can be added without a redeploy).
  */
 export async function isAdmin(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
@@ -14,7 +21,10 @@ export async function isAdmin(userId: string | null | undefined): Promise<boolea
   if (ids.has(userId)) return true;
   try {
     const user = await (await clerkClient()).users.getUser(userId);
-    return isAdminIdentity(userId, ids, user.publicMetadata);
+    return (
+      isAdminIdentity(userId, ids, user.publicMetadata) ||
+      hasVerifiedAdminEmail(user.emailAddresses, parseAdminEmails(process.env.ADMIN_EMAILS))
+    );
   } catch (e) {
     // Fail closed: a Clerk outage must not open the admin area.
     console.error("admin check: Clerk lookup failed:", e instanceof Error ? e.message : e);
