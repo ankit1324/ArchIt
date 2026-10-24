@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin";
+import { logAdminAction } from "@/lib/admin-audit";
 import { db } from "@/lib/db";
 import { validateReportDecision } from "@/lib/moderation";
 import { afterResponse, notifyListingDecision } from "@/lib/notify";
@@ -42,6 +43,13 @@ export async function POST(
       console.error(`POST /api/admin/reports/${id} dismiss failed:`, error.message);
       return Response.json({ error: "internal error" }, { status: 500 });
     }
+    await logAdminAction({
+      adminId,
+      action: "dismiss",
+      targetType: "report",
+      targetId: String(report.id),
+      note: decision.note,
+    });
     return Response.json({ id: report.id, status: "dismissed" });
   }
 
@@ -71,6 +79,14 @@ export async function POST(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
 
+  await logAdminAction({
+    adminId,
+    action: "takedown",
+    targetType: "listing",
+    targetId: report.property_id,
+    note: decision.note,
+    details: { report: report.id },
+  });
   if (listing) {
     afterResponse(() =>
       notifyListingDecision({

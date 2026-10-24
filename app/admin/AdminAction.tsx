@@ -9,6 +9,14 @@ interface ActionSpec {
   tone: "primary" | "danger" | "neutral";
   /** Prompt for a note (sent to the lister as the reason). */
   askNote?: boolean;
+  /** Prompt text for the note; defaults to the lister-reason wording. */
+  notePrompt?: string;
+  /** Ask "are you sure?" with this text before acting. */
+  confirm?: string;
+  /** DELETE the endpoint instead of POSTing `{ action, note }`. */
+  method?: "POST" | "DELETE";
+  /** Navigate here afterwards instead of refreshing (e.g. after a delete). */
+  redirectTo?: string;
 }
 
 const TONES: Record<ActionSpec["tone"], string> = {
@@ -35,19 +43,25 @@ export default function AdminAction({
   const [, startTransition] = useTransition();
 
   const run = async (spec: ActionSpec) => {
+    if (spec.confirm && !window.confirm(spec.confirm)) return;
     let note: string | null = null;
     if (spec.askNote) {
-      note = window.prompt(`${spec.label}: reason (emailed to the lister)`, "");
+      note = window.prompt(spec.notePrompt ?? `${spec.label}: reason (emailed to the lister)`, "");
       if (note === null) return; // cancelled
     }
     setBusy(spec.action);
     setError(null);
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: spec.action, note }),
-      });
+      const res =
+        spec.method === "DELETE"
+          ? await fetch(note ? `${endpoint}?note=${encodeURIComponent(note)}` : endpoint, {
+              method: "DELETE",
+            })
+          : await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: spec.action, note }),
+            });
       if (!res.ok) {
         const msg = await res
           .json()
@@ -56,7 +70,8 @@ export default function AdminAction({
         setError(msg || `Failed (${res.status})`);
         return;
       }
-      startTransition(() => router.refresh());
+      const to = spec.redirectTo;
+      startTransition(() => (to ? router.push(to) : router.refresh()));
     } catch {
       setError("Network error — try again");
     } finally {

@@ -17,14 +17,9 @@ import {
  */
 export async function isAdmin(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
-  const ids = parseAdminIds(process.env.ADMIN_USER_IDS);
-  if (ids.has(userId)) return true;
+  if (parseAdminIds(process.env.ADMIN_USER_IDS).has(userId)) return true;
   try {
-    const user = await (await clerkClient()).users.getUser(userId);
-    return (
-      isAdminIdentity(userId, ids, user.publicMetadata) ||
-      hasVerifiedAdminEmail(user.emailAddresses, parseAdminEmails(process.env.ADMIN_EMAILS))
-    );
+    return isAdminUser(await (await clerkClient()).users.getUser(userId));
   } catch (e) {
     // Fail closed: a Clerk outage must not open the admin area.
     console.error("admin check: Clerk lookup failed:", e instanceof Error ? e.message : e);
@@ -40,4 +35,16 @@ export async function requireAdmin(): Promise<string | Response> {
   const { userId } = await auth();
   if (userId && (await isAdmin(userId))) return userId;
   return Response.json({ error: "not found" }, { status: 404 });
+}
+
+/** Same rule as isAdmin, for a Clerk user already in hand (no extra lookup). */
+export function isAdminUser(user: {
+  id: string;
+  publicMetadata: Record<string, unknown> | null;
+  emailAddresses: ReadonlyArray<{ emailAddress: string; verification?: { status?: string | null } | null }>;
+}): boolean {
+  return (
+    isAdminIdentity(user.id, parseAdminIds(process.env.ADMIN_USER_IDS), user.publicMetadata) ||
+    hasVerifiedAdminEmail(user.emailAddresses, parseAdminEmails(process.env.ADMIN_EMAILS))
+  );
 }
