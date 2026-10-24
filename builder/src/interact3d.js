@@ -123,6 +123,9 @@ function rayFrom(e){
   return ray;
 }
 canvas.addEventListener('pointerdown', e=>{
+  // Walk mode: a click only grabs the mouse for looking (walk.js) — never
+  // select, drag or place anything through the first-person camera.
+  if(ui.walk){ downPos = null; drag3 = null; return; }
   downPos = [e.clientX, e.clientY];
   drag3 = null;
   if(!state || !sel) return;

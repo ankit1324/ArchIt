@@ -111,6 +111,13 @@ scene.add(blocksRoot);
 const contextRoot = new THREE.Group();
 scene.add(contextRoot);
 function setContext(plot, neighbors, facing){
+  // Every archit:init (each design DesignerOverlay opens in the kept-alive
+  // iframe) rebuilds the plot/neighbour context: free the old GPU buffers,
+  // materials and the facing label texture instead of just unparenting them.
+  contextRoot.traverse(o=>{
+    o.geometry?.dispose();
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m=>{ m?.map?.dispose(); m?.dispose(); });
+  });
   contextRoot.clear();
   if(plot && plot.w > 0 && plot.d > 0 && facing){
     // compass hint just outside the facing edge; builder -z = north

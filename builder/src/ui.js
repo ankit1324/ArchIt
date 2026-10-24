@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {closeToolPop, syncToolCursor} from './tools.js';
 import {C} from './catalog.js';
 import {$, chips, round1, stage, toast} from './dom.js';
-import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, setSel, state, ui, undo, undoStack} from './state.js';
+import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, undo, undoStack} from './state.js';
 import {FLH, boundsOf, clampFurn, designIssues, overlaps} from './geometry.js';
 import {camera, controls, requestRender, requestShadows, selOutline, wallMats} from './scene.js';
 import {partMat} from './materials.js';
@@ -92,7 +92,7 @@ function enterInterior(){
 }
 // walkthrough: WASD (and arrows when nothing is selected) move through the room
 document.addEventListener('keydown', e=>{
-  if(!ui.interior || ui.view!=='3d') return;
+  if(!ui.interior || ui.view!=='3d' || ui.walk) return;   // Walk mode moves itself
   if(e.target.matches('input,textarea')) return;
   const k = e.key.toLowerCase();
   let f = 0, sd = 0;
@@ -237,6 +237,9 @@ $('#fsB').addEventListener('click', ()=>{
 });
 document.addEventListener('keydown', e=>{
   if(e.target.matches('input,textarea')) return;
+  // Walk mode owns WASD/arrows (walk.js); editing shortcuts here would nudge or
+  // delete whatever was selected before (or clicked while grabbing the mouse).
+  if(ui.walk) return;
   if((e.metaKey||e.ctrlKey) && e.key==='z'){ e.preventDefault(); e.shiftKey? redo() : undo(); }
   if((e.metaKey||e.ctrlKey) && e.key==='y'){ e.preventDefault(); redo(); }
   if((e.key==='Delete'||e.key==='Backspace') && sel){
@@ -247,9 +250,13 @@ document.addEventListener('keydown', e=>{
     } else if(sel.kind==='furn'){
       const b = selBlock(), f = selFurn();
       if(b&&f) commit(()=>{ b.furniture = b.furniture.filter(x=>x.id!==f.id); setSel({kind:'block', blockId:b.id}); });
-    } else if(state.blocks.length>1){
+    } else if(sel.kind==='window'){
+      // a selected window deletes just the window, not the room it sits in
+      const b = selBlock(), w = selWin();
+      if(b&&w) commit(()=>{ b.windows = b.windows.filter(x=>x.id!==w.id); setSel({kind:'block', blockId:b.id}); });
+    } else if(sel.kind==='block' && state.blocks.length>1){
       const b = selBlock();
-      commit(()=>{ state.blocks = state.blocks.filter(x=>x.id!==b.id); setSel(null); });
+      if(b) commit(()=>{ state.blocks = state.blocks.filter(x=>x.id!==b.id); setSel(null); });
     }
   }
   const ARROW = {ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1]};

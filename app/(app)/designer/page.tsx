@@ -10,6 +10,7 @@ import { CloseIcon } from "@/components/icons";
 import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 
 interface Setup {
   name: string;
@@ -30,6 +31,16 @@ const SNAPSHOT_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
 };
+
+/** what a failed /api/designs write tells the user (shown in the builder toast) */
+function saveErrorMessage(status: number): string {
+  if (status === 401) return "you are signed out — sign in again, then save";
+  if (status === 402) return "the builder is locked for this account";
+  if (status === 404) return "this design no longer exists";
+  if (status === 413) return "the design is too large to save";
+  if (status === 400) return "the design data was rejected";
+  return `server error (${status}) — try again`;
+}
 
 /** blueprint-grid + colour-wash stage behind the designer's card screens */
 function Backdrop({
@@ -317,11 +328,17 @@ export default function DesignerPage() {
   // null = never toggled: open on desktop, collapsed to a pill on phones, where
   // the open drawer would sit on top of the builder's own controls
   const [listOpen, setListOpen] = useState<boolean | null>(null);
-  const [unlocked, setUnlocked] = useState<boolean | null>(null); // null = checking
+  // null = checking. With the paywall off the builder is free for everyone, so
+  // skip the round trip: a slow or failed /api/purchases would otherwise put the
+  // "Unlock the builder" card in front of a free product.
+  const [unlocked, setUnlocked] = useState<boolean | null>(
+    PAYWALL_ENABLED ? null : true,
+  );
   const [paying, setPaying] = useState(false);
   const savingRef = useRef(false);
 
   useEffect(() => {
+    if (!PAYWALL_ENABLED) return;
     fetch("/api/purchases?purpose=builder_unlock")
       .then((r) => (r.ok ? r.json() : { unlocked: false }))
       .then((d: { unlocked?: boolean }) => setUnlocked(!!d.unlocked))
@@ -406,8 +423,9 @@ export default function DesignerPage() {
             body: JSON.stringify(body),
           });
       if (!res.ok) {
-        window.alert("Could not save the design — try again.");
-        return { ok: false, error: `server responded ${res.status}` };
+        // The builder shows this in its own toast ("Could not save: …"), so no
+        // blocking alert on top of it.
+        return { ok: false, error: saveErrorMessage(res.status) };
       }
       const saved = (await res.json()) as Design;
       setDesigns((prev) =>
@@ -419,8 +437,8 @@ export default function DesignerPage() {
       celebrate(current ? "Design saved!" : "Design created!");
       return { ok: true };
     } catch (err) {
-      window.alert("Could not save the design — try again.");
-      return { ok: false, error: err instanceof Error ? err.message : "network error" };
+      console.warn("Design save failed", err);
+      return { ok: false, error: "check your connection and try again" };
     } finally {
       savingRef.current = false;
     }
@@ -453,10 +471,16 @@ export default function DesignerPage() {
 
   const deleteDesign = async (id: string) => {
     if (!window.confirm("Delete this design? This cannot be undone.")) return;
-    const res = await fetch(`/api/designs/${id}`, { method: "DELETE" });
-    if (res.ok || res.status === 404) {
-      setDesigns((prev) => prev.filter((d) => d.id !== id));
-      if (id === currentId) newDesign();
+    try {
+      const res = await fetch(`/api/designs/${id}`, { method: "DELETE" });
+      if (res.ok || res.status === 404) {
+        setDesigns((prev) => prev.filter((d) => d.id !== id));
+        if (id === currentId) newDesign();
+      } else {
+        window.alert(`Could not delete the design: ${saveErrorMessage(res.status)}`);
+      }
+    } catch {
+      window.alert("Could not delete the design — check your connection.");
     }
   };
 
@@ -537,9 +561,10 @@ export default function DesignerPage() {
         <SetupDialog onStart={openBuilder} onBack={() => router.push("/")} />
       )}
 
-      {/* saved designs drawer, floats above the builder */}
+      {/* saved designs drawer, floats above the builder; on desktop it sits
+          right of the builder's undo/redo buttons, which it used to cover */}
       <div
-        className={`fixed left-3 top-16 z-[80] w-[230px] max-[760px]:left-12 max-[760px]:top-2 ${listOpen ? "" : "max-[760px]:w-auto"}`}
+        className={`fixed left-[118px] top-[76px] z-[80] w-[230px] max-[760px]:left-12 max-[760px]:top-2 ${listOpen ? "" : "max-[760px]:w-auto"}`}
       >
         <div className="glass flex flex-col gap-2 rounded-3xl p-3 max-[760px]:p-1.5">
           <div className="flex items-center justify-between">
