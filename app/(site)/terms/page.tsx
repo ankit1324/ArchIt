@@ -2,11 +2,44 @@ import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { FEES } from "@/lib/fees";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
+import {
+  BUSINESS,
+  filled,
+  hasSupportEmail,
+  legalEntityName,
+} from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions",
   description: "The terms that govern your use of ArchIt.",
 };
+
+// Every business detail comes from lib/business.ts. Until a value is filled
+// in there, the sentence that needs it is omitted or reworded neutrally, so the
+// page never shows a raw "[PLACEHOLDER]".
+const address = filled(BUSINESS.address);
+const gstin = filled(BUSINESS.gstin);
+const jurisdictionCity = filled(BUSINESS.jurisdictionCity);
+
+function SupportEmail() {
+  return (
+    <a
+      href={`mailto:${BUSINESS.supportEmail}`}
+      className="font-semibold text-plum underline hover:text-plum"
+    >
+      {BUSINESS.supportEmail}
+    </a>
+  );
+}
+
+function ContactPage() {
+  return (
+    <a href="/contact" className="underline hover:text-plum">
+      Contact page
+    </a>
+  );
+}
 
 export default function TermsPage() {
   return (
@@ -17,19 +50,28 @@ export default function TermsPage() {
           Terms &amp; Conditions
         </h1>
         <p className="mt-2 text-sm text-plum-soft">
-          Last updated: [LAST UPDATED DATE]
+          Last updated: {BUSINESS.lastUpdated}
         </p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-relaxed text-plum-soft">
           <p>
             These Terms &amp; Conditions (&ldquo;Terms&rdquo;) form a legally
             binding agreement between you and{" "}
-            <strong className="text-plum">[LEGAL ENTITY NAME]</strong>{" "}
-            (&ldquo;ArchIt&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;), a
-            company/entity registered in India with its registered office at{" "}
-            <strong className="text-plum">[REGISTERED ADDRESS]</strong>{" "}
-            (GSTIN: <strong className="text-plum">[GST NUMBER]</strong>),
-            governing your access to and use of ArchIt&rsquo;s 3D map,
+            <strong className="text-plum">{legalEntityName}</strong>{" "}
+            (&ldquo;ArchIt&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;)
+            {address && (
+              <>
+                , a company/entity registered in India with its registered
+                office at <strong className="text-plum">{address}</strong>
+              </>
+            )}
+            {gstin && (
+              <>
+                {" "}
+                (GSTIN: <strong className="text-plum">{gstin}</strong>)
+              </>
+            )}
+            , governing your access to and use of ArchIt&rsquo;s 3D map,
             property listing, and house-design/builder services
             (collectively, the &ldquo;Services&rdquo;). By creating an
             account or using the Services, you agree to these Terms.
@@ -53,8 +95,17 @@ export default function TermsPage() {
               Account creation and sign-in are handled by our authentication
               partner, Clerk. You are responsible for maintaining the
               confidentiality of your login credentials and for all activity
-              under your account. Notify us immediately at{" "}
-              [SUPPORT EMAIL] if you suspect unauthorized use.
+              under your account. Notify us immediately{" "}
+              {hasSupportEmail ? (
+                <>
+                  at <SupportEmail />
+                </>
+              ) : (
+                <>
+                  through our <ContactPage />
+                </>
+              )}{" "}
+              if you suspect unauthorized use.
             </p>
           </section>
 
@@ -84,6 +135,12 @@ export default function TermsPage() {
               ArchIt offers the following one-time, paid features, paid by
               UPI through our self-hosted payment gateway:
             </p>
+            {!PAYWALL_ENABLED && (
+              <p className="mt-3">
+                These features are currently free for every signed-in user,
+                and no payment is taken while that is the case.
+              </p>
+            )}
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
                 <strong className="text-plum">Contact Unlock</strong> — ₹
@@ -155,7 +212,7 @@ export default function TermsPage() {
             <p className="mt-3">
               The ArchIt name, logo, software, map rendering, and design
               tools are the property of{" "}
-              <strong className="text-plum">[LEGAL ENTITY NAME]</strong> and
+              <strong className="text-plum">{legalEntityName}</strong> and
               are protected by applicable intellectual property laws. Except
               for your own User Content, nothing in these Terms grants you
               any right to use our trademarks, branding, or proprietary
@@ -201,7 +258,15 @@ export default function TermsPage() {
               We may suspend or terminate your account if you violate these
               Terms, engage in fraudulent activity, or misuse the Services.
               You may stop using the Services and request account deletion
-              at any time by contacting [SUPPORT EMAIL].
+              at any time by contacting{" "}
+              {hasSupportEmail ? (
+                <SupportEmail />
+              ) : (
+                <>
+                  us through our <ContactPage />
+                </>
+              )}
+              .
             </p>
           </section>
 
@@ -213,8 +278,16 @@ export default function TermsPage() {
               These Terms are governed by the laws of India. Any disputes
               arising out of or relating to these Terms or the Services
               shall be subject to the exclusive jurisdiction of the courts
-              at <strong className="text-plum">[JURISDICTION CITY]</strong>,
-              India.
+              {jurisdictionCity ? (
+                <>
+                  {" "}
+                  at <strong className="text-plum">{jurisdictionCity}</strong>,
+                  India
+                </>
+              ) : (
+                <> of India</>
+              )}
+              .
             </p>
           </section>
 
@@ -235,11 +308,15 @@ export default function TermsPage() {
             <h2 className="text-lg font-bold text-plum">12. Contact Us</h2>
             <p className="mt-3">
               Questions about these Terms can be directed to{" "}
-              <strong className="text-plum">[SUPPORT EMAIL]</strong> or via
-              our{" "}
-              <a href="/contact" className="underline hover:text-plum">
-                Contact page
-              </a>
+              {hasSupportEmail ? (
+                <>
+                  <SupportEmail /> or via our <ContactPage />
+                </>
+              ) : (
+                <>
+                  us via our <ContactPage />
+                </>
+              )}
               .
             </p>
           </section>
