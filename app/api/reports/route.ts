@@ -18,6 +18,11 @@ export async function POST(request: Request) {
   if (!(await checkRateLimit(ipKey(request, "reports", userId), 10, 60 * 60_000))) {
     return rateLimitedResponse();
   }
+  // Per network too: the per-user cap alone lets one person flood the admin
+  // queue (or mass-flag a competitor) by cycling throwaway accounts.
+  if (!(await checkRateLimit(ipKey(request, "reports-ip"), 30, 60 * 60_000))) {
+    return rateLimitedResponse();
+  }
   const input = await parseJsonBody(request, validateReport, { maxBytes: MAX_REPORT_BYTES });
   if (input instanceof Response) return input;
 

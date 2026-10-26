@@ -8,12 +8,14 @@ const LINKS: Array<{ label: string; href: string }> = [
 
 export default function Footer() {
   return (
-    <footer className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-6 py-8 text-[12.5px] font-semibold text-plum-soft">
+    // py-6 + per-link py-1.5 keeps the footer's height while giving each link a
+    // >=24px-tall hit area (WCAG 2.5.8); they sit close together when wrapped.
+    <footer className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 px-6 py-6 text-[12.5px] font-semibold text-plum-soft">
       {LINKS.map((l) => (
         <a
           key={l.label}
           href={l.href}
-          className="transition-colors hover:text-plum"
+          className="py-1.5 transition-colors hover:text-plum"
         >
           {l.label}
         </a>

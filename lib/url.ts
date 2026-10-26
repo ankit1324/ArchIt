@@ -5,6 +5,9 @@ export const ALLOWED_IMAGE_HOSTS = [
   "tdbnwismmyllpufurqus.supabase.co",
 ];
 
+/** Path prefix of public Supabase Storage objects (next.config.ts remotePatterns). */
+const PUBLIC_STORAGE_PATH = "/storage/v1/object/public/";
+
 /**
  * Returns `url` only when it is an absolute https URL on an allowlisted host,
  * otherwise null. Blocks user-controlled javascript:/data:/http URLs and
@@ -12,6 +15,10 @@ export const ALLOWED_IMAGE_HOSTS = [
  */
 export function safeImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
+  // The raw string (not the parser's normalised form) is what gets stored and
+  // rendered, so refuse control characters the URL parser would silently
+  // strip or escape — a NUL also makes Postgres reject the row (a 500).
+  if (/[\u0000-\u001f\u007f]/.test(url)) return null;
   let u: URL;
   try {
     u = new URL(url);
@@ -20,6 +27,15 @@ export function safeImageUrl(url: string | null | undefined): string | null {
   }
   if (u.protocol !== "https:") return null;
   if (!ALLOWED_IMAGE_HOSTS.includes(u.hostname)) return null;
+  // no userinfo or non-default port: neither is ever part of an image URL we
+  // issue or seed, and both let the "same host" check point somewhere else
+  if (u.username || u.password || u.port) return null;
+  // Mirror next.config.ts remotePatterns: on our Supabase project only public
+  // Storage objects are images. Anything else on that host (/rest/v1,
+  // /auth/v1, …) is not, and next/image refuses it outright.
+  if (u.hostname !== "images.unsplash.com" && !u.pathname.startsWith(PUBLIC_STORAGE_PATH)) {
+    return null;
+  }
   return url;
 }
 

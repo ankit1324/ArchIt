@@ -31,24 +31,33 @@ export async function POST(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!report) return Response.json({ error: "not found" }, { status: 404 });
+  // A closed report stays closed: re-dismissing would overwrite an "actioned"
+  // outcome, and a second takedown would re-email the lister.
+  const alreadyResolved = () =>
+    Response.json({ error: "this report was already resolved — reload the page" }, { status: 409 });
+  if (report.status !== "open") return alreadyResolved();
 
   const resolved = { resolved_at: new Date().toISOString(), resolved_by: adminId };
 
   if (decision.action === "dismiss") {
-    const { error } = await db
+    const { data: dismissed, error } = await db
       .from("listing_reports")
       .update({ ...resolved, status: "dismissed" })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", "open") // lost a race with another admin → 409, not a silent overwrite
+      .select("id");
     if (error) {
       console.error(`POST /api/admin/reports/${id} dismiss failed:`, error.message);
       return Response.json({ error: "internal error" }, { status: 500 });
     }
+    if (!dismissed?.length) return alreadyResolved();
     await logAdminAction({
       adminId,
       action: "dismiss",
       targetType: "report",
       targetId: String(report.id),
       note: decision.note,
+      details: { listing: report.property_id },
     });
     return Response.json({ id: report.id, status: "dismissed" });
   }
@@ -63,6 +72,9 @@ export async function POST(
       review_note: decision.note,
     })
     .eq("id", report.property_id)
+    // already hidden: just close the reports, don't re-email the lister or
+    // overwrite the earlier review note
+    .neq("status", "rejected")
     .select("building_name, address, user_id")
     .maybeSingle<{ building_name: string | null; address: string; user_id: string | null }>();
   if (takedownError) {
@@ -85,7 +97,7 @@ export async function POST(
     targetType: "listing",
     targetId: report.property_id,
     note: decision.note,
-    details: { report: report.id },
+    details: { report: report.id, ...(listing ? {} : { alreadyHidden: true }) },
   });
   if (listing) {
     afterResponse(() =>

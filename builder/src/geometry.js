@@ -181,6 +181,11 @@ function clampFurn(b, f){
   f.lz = Math.max(-mz, Math.min(mz, f.lz));
   return true;
 }
+// After a room is resized, pull its furniture back inside the new walls. A piece
+// that no longer fits at all is centred rather than left poking through a wall.
+function refitFurniture(b){
+  (b.furniture || []).forEach(f=>{ if(!clampFurn(b, f)){ f.lx = 0; f.lz = 0; } });
+}
 
 /* ---------- one roof per building (Phase 3) ----------
    Roofs used to be built inside buildBlockGroup, so an 11-room house rendered 11
@@ -388,4 +393,4 @@ function resolveWalk(prevX, prevZ, nextX, nextZ, radius, rects) {
   return { x: rx, z: rz };
 }
 
-export {FLH, boundsOf, clampFurn, designIssues, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};
+export {FLH, boundsOf, clampFurn, designIssues, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};

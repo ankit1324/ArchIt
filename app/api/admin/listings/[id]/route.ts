@@ -24,15 +24,19 @@ export async function POST(
   if (decision instanceof Response) return decision;
 
   const approved = decision.action === "approve";
+  const target = approved ? "live" : "rejected";
   const { data, error } = await db
     .from("properties")
     .update({
-      status: approved ? "live" : "rejected",
+      status: target,
       reviewed_at: new Date().toISOString(),
       reviewed_by: adminId,
       review_note: decision.note,
     })
     .eq("id", id)
+    // Only an actual change: a double-submit or a stale tab must not re-email
+    // the lister or add a second audit entry.
+    .neq("status", target)
     .select("id, building_name, address, user_id, status")
     .maybeSingle<{
       id: string;
@@ -45,7 +49,21 @@ export async function POST(
     console.error(`POST /api/admin/listings/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
-  if (!data) return Response.json({ error: "not found" }, { status: 404 });
+  if (!data) {
+    // Nothing updated: either no such listing, or it's already in that state.
+    const { data: existing, error: lookupError } = await db
+      .from("properties")
+      .select("id, status")
+      .eq("id", id)
+      .maybeSingle<{ id: string; status: string }>();
+    if (lookupError) {
+      console.error(`POST /api/admin/listings/${id} lookup failed:`, lookupError.message);
+      return Response.json({ error: "internal error" }, { status: 500 });
+    }
+    if (!existing) return Response.json({ error: "not found" }, { status: 404 });
+    // Idempotent: the page refreshes and shows the current state.
+    return Response.json({ id: existing.id, status: existing.status, unchanged: true });
+  }
 
   await logAdminAction({
     adminId,
@@ -80,16 +98,26 @@ export async function PATCH(
   const l = await parseJsonBody(request, (v) => validateListing(v, safeImageUrl));
   if (l instanceof Response) return l;
 
-  const { data: previous } = await db
+  const { data: previous, error: lookupError } = await db
     .from("properties")
-    .select("photos")
+    .select("*")
     .eq("id", id)
-    .maybeSingle<Pick<PropertyRow, "photos">>();
+    .maybeSingle<PropertyRow>();
+  if (lookupError) {
+    // a DB error is not a missing listing
+    console.error(`PATCH /api/admin/listings/${id} lookup failed:`, lookupError.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
   if (!previous) return Response.json({ error: "not found" }, { status: 404 });
 
   // featured comes from the ledger, never from an edit
   const { featured: _featured, ...next } = listingToRow(l);
   void _featured;
+  // what the edit actually changed, for the audit log
+  const changed = (Object.keys(next) as (keyof typeof next)[]).filter(
+    (k) => JSON.stringify(next[k] ?? null) !== JSON.stringify(previous[k] ?? null),
+  );
+  if (!changed.length) return Response.json({ id, unchanged: true });
   const { data, error } = await db
     .from("properties")
     .update(next)
@@ -102,10 +130,18 @@ export async function PATCH(
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
 
-  const kept = new Set(next.photos ?? []);
-  const dropped = (previous.photos ?? []).filter((p) => !kept.has(p));
+  const kept = new Set([...(next.photos ?? []), ...(next.photo ? [next.photo] : [])]);
+  // legacy rows keep their only photo in `photo` with photos null
+  const before = new Set([...(previous.photos ?? []), ...(previous.photo ? [previous.photo] : [])]);
+  const dropped = [...before].filter((p) => !kept.has(p));
   if (dropped.length) await removeUnreferencedUploads(`PATCH /api/admin/listings/${id}`, dropped);
-  await logAdminAction({ adminId, action: "edit", targetType: "listing", targetId: id });
+  await logAdminAction({
+    adminId,
+    action: "edit",
+    targetType: "listing",
+    targetId: id,
+    details: { name: next.building_name || next.address, changed },
+  });
   return Response.json({ id });
 }
 
@@ -123,15 +159,19 @@ export async function DELETE(
     .from("properties")
     .delete()
     .eq("id", id)
-    .select("id, building_name, address, user_id, photos")
-    .maybeSingle<Pick<PropertyRow, "id" | "building_name" | "address" | "user_id" | "photos">>();
+    .select("id, building_name, address, user_id, photo, photos")
+    .maybeSingle<Pick<PropertyRow, "id" | "building_name" | "address" | "user_id" | "photo" | "photos">>();
   if (error) {
     console.error(`DELETE /api/admin/listings/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
 
-  await removeUnreferencedUploads(`DELETE /api/admin/listings/${id}`, data.photos ?? []);
+  // legacy rows keep their only photo in `photo` with photos null
+  await removeUnreferencedUploads(`DELETE /api/admin/listings/${id}`, [
+    ...(data.photos ?? []),
+    ...(data.photo ? [data.photo] : []),
+  ]);
   await logAdminAction({
     adminId,
     action: "delete",

@@ -193,7 +193,10 @@ export default function AddPropertyForm({
           className={fieldInput}
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
-          placeholder="Full name"
+          // signed-in viewers get Call / WhatsApp / Email buttons from this
+          // (lib/contact-links.ts), so ask for a number or an address
+          placeholder="Name, phone or email"
+          aria-label="Owner name and phone or email"
         />
       </label>
 
@@ -383,7 +386,7 @@ export default function AddPropertyForm({
       )}
 
       {error && (
-        <p className="text-[12px] font-semibold text-coral">{error}</p>
+        <p role="alert" className="text-[12px] font-semibold text-coral">{error}</p>
       )}
 
       {/* ── Featured listing upsell (paid; hidden while the paywall is off) ── */}

@@ -18,9 +18,13 @@ export default function Navbar() {
         <span className="text-xl font-extrabold tracking-wide">ArchIt</span>
       </Link>
 
-      <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 md:flex">
+      <nav
+        aria-label="Main navigation"
+        className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 md:flex"
+      >
         {LINKS.map((l, i) => {
-          const cls = `text-[13.5px] font-semibold transition-colors hover:text-plum ${
+          // py-1.5: 20px-tall text -> 32px hit area (WCAG 2.5.8 asks for 24)
+          const cls = `py-1.5 text-[13.5px] font-semibold transition-colors hover:text-plum ${
             i === 0 ? "text-plum" : "text-plum-soft"
           }`;
           // ArchIt Lite is a separate deployment — plain anchor, no prefetch

@@ -2,7 +2,7 @@ import './walk.js';
 import {C} from './catalog.js';
 import {$, chips, escapeMarkup, ov, round1, stage, toast} from './dom.js';
 import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setDirty, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
-import {boundsOf, clampFurn, nearestWallT, overlaps, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
+import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
 import {renderAll, renderSelection} from './ui.js';
 import {placeFurniture} from './tools.js';
@@ -287,7 +287,10 @@ planSvg.addEventListener('pointerup', ()=>{
         b.cx = d2.cx0; b.cz = d2.cz0; b.len = d2.len0; b.w = d2.w0;
         toast('Rooms can’t overlap');
         changed = false;
-      } else changed = b.len!==d2.len0 || b.w!==d2.w0 || b.cx!==d2.cx0 || b.cz!==d2.cz0;
+      } else {
+        changed = b.len!==d2.len0 || b.w!==d2.w0 || b.cx!==d2.cx0 || b.cz!==d2.cz0;
+        if(changed) refitFurniture(b);   // a shrunk room keeps its furniture inside
+      }
     } else if(d2.kind==='part'){
       changed = Math.abs(d2.o.t-d2.t0) > 0.004;
     } else if(d2.kind==='furn'){
@@ -396,13 +399,11 @@ planSvg.addEventListener('click', e=>{
 function placeDoorByClick(blockId, e){
   const b = getBlock(blockId);
   const r = stage.getBoundingClientRect();
-  const bb = boundsOf(state.blocks);
-  const ox = r.width/2-bb.cx*S, oy = r.height/2-bb.cz*S;
-  const wx = (e.clientX-r.left-ox)/S, wz = (e.clientY-r.top-oy)/S;
-  // to local
-  const a = b.rot*Math.PI/2;
-  const lx = (wx-b.cx)*Math.cos(a) - (wz-b.cz)*Math.sin(a);
-  const lz = (wx-b.cx)*Math.sin(a) + (wz-b.cz)*Math.cos(a);
+  // the origin render2D actually drew with: in Interior mode the plan is centred
+  // on the focused room, not on the whole house, so recomputing it from all
+  // rooms put the door on the wrong wall
+  const wx = (e.clientX-r.left-planOff.ox)/S, wz = (e.clientY-r.top-planOff.oy)/S;
+  const [lx, lz] = worldToLocal(b, wx, wz);
   // nearest wall
   const cand = [
     {wall:0, dist:Math.abs(lz-b.w/2), t:(lx/b.len)+.5},

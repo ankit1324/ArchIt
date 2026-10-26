@@ -5,6 +5,8 @@ import MobileTabBar from "@/components/MobileTabBar";
 import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
 import { feeLabel } from "@/lib/fees";
 import { PAYWALL_ENABLED } from "@/lib/paywall";
+import type { MeSummary } from "@/lib/me";
+import MyStuff from "@/app/(app)/dashboard/MyStuff";
 
 // Self-hosted rather than next/font/google: a build that has to reach Google
 // Fonts is a build that can fail offline. See assets/fonts/README.md.
@@ -59,8 +61,12 @@ const PRODUCTS = [
   },
 ];
 
-/** signed-in home: the product dashboard, cream/plum app skin */
-export default function SuiteDashboard() {
+/**
+ * signed-in home: the product dashboard, cream/plum app skin. `me` (the
+ * user's own listings + designs, lib/me.ts) adds the "Your activity" panel;
+ * without it the dashboard renders exactly as before.
+ */
+export default function SuiteDashboard({ me }: { me?: MeSummary | null } = {}) {
   return (
     <div
       className={`${fraunces.variable} relative flex h-full flex-col overflow-y-auto overflow-x-hidden bg-cream pt-[env(safe-area-inset-top)]`}
@@ -176,6 +182,8 @@ export default function SuiteDashboard() {
             </article>
           ))}
         </section>
+
+        {me && <MyStuff me={me} />}
 
         <footer className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[11px] font-bold uppercase tracking-[0.2em] text-plum-soft">
           <span>Secured by Clerk</span>

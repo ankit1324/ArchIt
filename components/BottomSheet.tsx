@@ -42,7 +42,11 @@ export default function BottomSheet({
           setDrag(dy);
         }}
         onPointerUp={() => {
-          const dismiss = !moved.current || drag > 80;
+          // A tap is handled by onClick instead: dismissing here unmounts the
+          // sheet before the browser's click fires, and on touch screens that
+          // click then lands on the map underneath and selects whatever pin
+          // sits there. A drag produces no click, so it dismisses here.
+          const dismiss = moved.current && drag > 80;
           start.current = null;
           setDrag(0);
           if (dismiss) onDismiss();
@@ -50,6 +54,10 @@ export default function BottomSheet({
         onPointerCancel={() => {
           start.current = null;
           setDrag(0);
+        }}
+        onClick={() => {
+          // a short drag that snapped back is not a tap
+          if (!moved.current) onDismiss();
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {

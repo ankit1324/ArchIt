@@ -142,3 +142,41 @@ test("payFee passes the server-issued checkoutUrl and portalUrl to youpi.js", as
   assert.equal(opts.successUrl, undefined);
   assert.equal(opts.failedUrl, undefined);
 });
+
+test("payFee resolves true without a checkout when the server says there is nothing to pay", async () => {
+  // 409 = already in the ledger, 410 = paywall off (everything is free)
+  for (const status of [409, 410]) {
+    const calls = installYoupi(() => {});
+    const alerts = [];
+    const events = [];
+    global.window.alert = (msg) => alerts.push(msg);
+    global.window.dispatchEvent = (e) => events.push(e.detail.event);
+    global.fetch = async () => ({ ok: false, status, json: async () => ({}) });
+
+    const { payFee } = await import("../lib/checkout.ts");
+    assert.equal(await payFee("builder_unlock", "Test unlock"), true, String(status));
+    assert.equal(calls.pay.length, 0, "no gateway modal");
+    assert.deepEqual(alerts, []);
+    assert.deepEqual(events, ["unlock_started"], "only a real payment completes the funnel");
+  }
+});
+
+test("payFee alerts and resolves false when the order can't be opened", async () => {
+  for (const failing of [
+    async () => ({ ok: false, status: 502, json: async () => ({}) }),
+    async () => {
+      throw new TypeError("Failed to fetch");
+    },
+  ]) {
+    const calls = installYoupi(() => {});
+    const alerts = [];
+    global.window.alert = (msg) => alerts.push(msg);
+    global.fetch = failing;
+
+    const { payFee } = await import("../lib/checkout.ts");
+    assert.equal(await payFee("contact_owner", "Contact owner fee", "prop_1"), false);
+    assert.equal(calls.pay.length, 0);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /Nothing was charged/);
+  }
+});

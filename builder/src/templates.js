@@ -1,6 +1,6 @@
 import './tutorial.js';
 import {C} from './catalog.js';
-import {escapeMarkup} from './dom.js';
+import {EMBED, escapeMarkup} from './dom.js';
 import {firstRoom, footprint, localToWorld, newRoom, state, wallLen, wallPoint} from './state.js';
 import {boundsOf, clampFurn} from './geometry.js';
 import {dim, hideModal, modal, showModal} from './ui.js';
@@ -360,9 +360,15 @@ function tplCatCount(cat){
 }
 
 function renderTplModal(){
+  // With the paywall off (or everything bought) every paid layout reads as
+  // owned: don't advertise a price nobody is charged.
+  const paid = [...PAID_TEMPLATES.values()];
+  const pricing = paid.length && paid.every(t=>t.owned)
+    ? 'Every layout below is included. '
+    : 'Indian house layouts are free; office and speciality layouts are '+TEMPLATE_PRICE+' each, unlocked forever. ';
   return '<div class="tpl-modal"><h3>Choose a starting layout</h3>'+
     '<p class="hint">Start from a layout template or begin with an empty room. '+
-    'Indian house layouts are free; office and speciality layouts are '+TEMPLATE_PRICE+' each, unlocked forever. '+
+    pricing+
     'Previews show the actual room layout; dimensions include porches and balconies. Templates open in 2D for editing.</p>'+
     '<div class="tpl-tabs">'+
       '<button type="button" class="tpl-tab'+(activeTplCat==='indian'?' active':'')+'" data-tpl-cat="indian">Indian Houses ('+tplCatCount('indian')+')</button>'+
@@ -403,6 +409,21 @@ modal.addEventListener('click', e=>{
   // see the geometry until the server agrees a purchase exists.
   if(template.dataset.tplLocked){
     const entry = PAID_TEMPLATES.get(key);
+    // Standalone builder (no parent app): parent === window and nothing handles
+    // the message, so the click used to do nothing at all. Say so inside the
+    // dialog (a toast would sit underneath it).
+    if(!EMBED){
+      let note = modal.querySelector('.tpl-signin');
+      if(!note){
+        note = document.createElement('p');
+        note.className = 'hint tpl-signin'; note.style.color = '#e5476f'; note.style.fontWeight = '700';
+        modal.querySelector('.tpl-tabs')?.before(note);
+      }
+      note.textContent = 'Sign in to ArchIt and open the Designer to unlock '+(entry ? entry.name : 'this layout')+'.';
+      return;
+    }
+    // the bought layout replaces the current one as soon as checkout returns
+    if(templateReplaceWarning && !confirm('Replace the current layout with '+(entry ? entry.name : 'this layout')+' once it is unlocked? Save your current design first if you want to keep it.')) return;
     parent.postMessage({type:'archit:buy-template', payload:{key, name: entry ? entry.name : key}}, location.origin);
     return;
   }

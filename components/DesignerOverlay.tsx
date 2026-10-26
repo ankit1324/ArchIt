@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { payFee } from "@/lib/checkout";
+import { PAYWALL_ENABLED } from "@/lib/paywall";
 import type { DesignMeta, DesignStateV3 } from "@/lib/types";
 import type { Neighbor } from "@/lib/design";
 
@@ -151,7 +152,11 @@ export default function DesignerOverlay({
         const { key, name } = m.payload;
         if (buyingRef.current) return; // ignore double-clicks mid-checkout
         buyingRef.current = true;
-        void payFee("template_unlock", `Template — ${name}`, key)
+        // Paywall off: nothing to buy (the server serves every template), so
+        // never open a checkout — a stale "locked" card just loads the layout.
+        void (PAYWALL_ENABLED
+          ? payFee("template_unlock", `Template — ${name}`, key)
+          : Promise.resolve(true))
           .then((paid) => {
             if (!paid) return;
             frame.contentWindow?.postMessage(
