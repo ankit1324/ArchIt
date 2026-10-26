@@ -393,6 +393,14 @@ body.embed .embed-only{display:inline-flex;align-items:center}
 body.embed #saveMapB{background:#e5476f;border-color:#e5476f;color:#fff}
 body.embed #resetB{display:none}
 body.embed [data-export="share"], body.embed [data-export="openp"]{display:none}
+/* view mode (?embed=1&view=1): read-only viewer for a published design. Hide
+   every editing control; orbit, floor switching, 2D/3D, Interior/Walk and Close
+   stay. The handlers are guarded too (VIEW in builder/src), so this is not the
+   only lock. */
+body.view #saveMapB, body.view #resetB, body.view #shotB, body.view #helpB,
+body.view #toolbar, body.view #toolpop, body.view #chips, body.view .hs,
+body.view #undoB, body.view #redoB, body.view #warnCell{display:none!important}
+body.view #plan g{cursor:default!important}
 </style>
 
 <div id="loader" aria-label="Loading the builder">

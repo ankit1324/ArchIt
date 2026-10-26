@@ -15,8 +15,7 @@ import {
   type PublicListing,
 } from "@/lib/public-listings";
 import { SITE_URL } from "@/lib/site";
-import { formatPrice } from "@/lib/types";
-import { dealLabel, headline, isDwelling, kindLabel, photosOf, shareLine, summary } from "./format";
+import { dealLabel, dealTone, headline, isDwelling, kindLabel, photosOf, priceLabel, shareLine, summary } from "./format";
 
 // Public, crawlable listing page. No auth and no owner contact: the contact
 // stays behind the paid unlock inside /find, which this page links into.
@@ -28,7 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const l = await getPublicListing(id);
   if (!l) return { title: "Listing not found", robots: { index: false } };
   const city = cityName(l.city);
-  const title = `${headline(l)} — ${l.type === "sale" ? "For sale" : "For rent"}${
+  const title = `${headline(l)} — ${
+    l.type === "showcase" ? "Showcase" : l.type === "sale" ? "For sale" : "For rent"
+  }${
     city ? ` in ${city}` : ""
   }`;
   const description = summary(l);
@@ -64,15 +65,20 @@ function jsonLd(l: PublicListing) {
     description: summary(l),
     ...(l.createdAt ? { datePosted: l.createdAt } : {}),
     ...(photos.length ? { image: photos } : {}),
-    offers: {
-      "@type": "Offer",
-      price: l.price,
-      priceCurrency: "INR",
-      businessFunction:
-        l.type === "sale"
-          ? "http://purl.org/goodrelations/v1#Sell"
-          : "http://purl.org/goodrelations/v1#LeaseOut",
-    },
+    // a showcase listing is not on the market: no offer to describe
+    ...(l.type === "showcase"
+      ? {}
+      : {
+          offers: {
+            "@type": "Offer",
+            price: l.price,
+            priceCurrency: "INR",
+            businessFunction:
+              l.type === "sale"
+                ? "http://purl.org/goodrelations/v1#Sell"
+                : "http://purl.org/goodrelations/v1#LeaseOut",
+          },
+        }),
     about: {
       "@type": l.kind === "apartments" ? "Apartment" : l.kind === "house" ? "House" : "Place",
       name: `${kindLabel(l)} · ${headline(l)}`,
@@ -111,7 +117,6 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 /** Compact card for the "More in <city>" grid. */
 function MoreCard({ l }: { l: PublicListing }) {
-  const sale = l.type === "sale";
   const photo = photosOf(l)[0];
   return (
     <li>
@@ -130,15 +135,13 @@ function MoreCard({ l }: { l: PublicListing }) {
             />
           )}
           <span
-            className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-              sale ? "bg-lime text-plum" : "bg-magenta-deep text-white"
-            }`}
+            className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${dealTone(l)}`}
           >
             {dealLabel(l)}
           </span>
         </div>
         <div className="px-3 py-2.5">
-          <p className="text-[15px] font-extrabold">{formatPrice(l)}</p>
+          <p className="text-[15px] font-extrabold">{priceLabel(l)}</p>
           <p className="truncate text-[13px] font-semibold text-plum-soft group-hover:text-plum">
             {headline(l)}
           </p>
@@ -157,7 +160,6 @@ export default async function PropertyPage({ params }: Props) {
   if (!l) notFound();
   const more = await listMoreInCity(l);
 
-  const sale = l.type === "sale";
   const photos = photosOf(l);
   const city = cityName(l.city);
   const dwelling = isDwelling(l);
@@ -190,16 +192,12 @@ export default async function PropertyPage({ params }: Props) {
           </div>
           <div className="flex items-center gap-2">
             <span
-              className={`px-2 py-1 text-[20px] font-extrabold ${
-                sale ? "bg-lime text-plum" : "bg-magenta-deep text-white"
-              }`}
+              className={`px-2 py-1 text-[20px] font-extrabold ${dealTone(l)}`}
             >
-              {formatPrice(l)}
+              {priceLabel(l)}
             </span>
             <span
-              className={`rounded-full px-3 py-1 text-[12px] font-bold ${
-                sale ? "bg-lime text-plum" : "bg-magenta-deep text-white"
-              }`}
+              className={`rounded-full px-3 py-1 text-[12px] font-bold ${dealTone(l)}`}
             >
               {dealLabel(l)}
             </span>

@@ -27,7 +27,22 @@ export function kindLabel(l: PublicListing): string {
   return KIND_LABEL[l.kind] ?? "Property";
 }
 
+/**
+ * The price line: a showcase listing is not on the market, so it says so
+ * instead of repeating "Showcase" (which dealLabel already shows).
+ */
+export function priceLabel(l: PublicListing): string {
+  return l.type === "showcase" ? "Not for sale/rent" : formatPrice(l);
+}
+
+/** Pill colours by deal, as on the /find cards: sale lime, rent magenta, showcase violet. */
+export function dealTone(l: PublicListing): string {
+  if (l.type === "showcase") return "bg-violet-700 text-white";
+  return l.type === "sale" ? "bg-lime text-plum" : "bg-magenta-deep text-white";
+}
+
 export function dealLabel(l: PublicListing): string {
+  if (l.type === "showcase") return "Showcase";
   return l.type === "sale" ? "For Sale" : "For Rent";
 }
 
@@ -36,14 +51,16 @@ export function photosOf(l: PublicListing): string[] {
 }
 
 export function summary(l: PublicListing): string {
-  const deal = l.type === "sale" ? "for sale" : "for rent";
+  const deal = l.type === "showcase" ? "on show" : l.type === "sale" ? "for sale" : "for rent";
   const facts = [
     l.beds ? `${l.beds} bed` : null,
     l.baths ? `${l.baths} bath` : null,
     l.sqft ? `${l.sqft.toLocaleString("en-IN")} sqft` : null,
   ].filter(Boolean);
   const where = [l.buildingName ? l.address : null, l.city].filter(Boolean).join(", ");
-  return `${kindLabel(l)} ${deal}${where ? ` in ${where}` : ""} at ${formatPrice(l)}${
+  // a showcase listing has no price: "House on show in …", not "at Showcase"
+  const price = l.type === "showcase" ? "" : ` at ${formatPrice(l)}`;
+  return `${kindLabel(l)} ${deal}${where ? ` in ${where}` : ""}${price}${
     facts.length ? ` · ${facts.join(" · ")}` : ""
   }. Explore it on ArchIt's 3D map.`;
 }

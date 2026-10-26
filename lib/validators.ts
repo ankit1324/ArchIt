@@ -5,6 +5,7 @@ import type {
   DesignStateV3,
   Listing,
   ListingType,
+  ListingView,
   PropertyKind,
 } from "./types";
 
@@ -38,7 +39,10 @@ export const MAX_COUNT = 2_147_483_647;
  */
 export const MAX_PRICE = Number.MAX_SAFE_INTEGER;
 
-const LISTING_TYPES: readonly ListingType[] = ["sale", "rent"];
+const LISTING_TYPES: readonly ListingType[] = ["sale", "rent", "showcase"];
+const LISTING_VIEWS: readonly ListingView[] = ["photos", "3d"];
+/** design ids are gen_random_uuid() text; this only keeps the value inert */
+const DESIGN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const PROPERTY_KINDS: readonly PropertyKind[] = [
   "apartments",
   "house",
@@ -101,7 +105,13 @@ function optCount(v: unknown, name: string): Field<number | undefined> {
 // Listings
 // ---------------------------------------------------------------------------
 
-export type ListingInput = Omit<Listing, "id" | "mine" | "featured" | "hasOwner">;
+export type ListingInput = Omit<
+  Listing,
+  "id" | "mine" | "featured" | "hasOwner" | "status" | "designSnapshot" | "designPublished" | "designId"
+> & {
+  /** absent = keep the stored attachment, null = detach, a string = attach */
+  designId?: string | null;
+};
 
 /**
  * Validate a POST/PUT /api/properties body. Server-stamped fields (`id`,
@@ -125,7 +135,7 @@ export function validateListing(v: unknown, safeImageUrl: ImageUrlCheck): Listin
   if (!isLngLat(v.coords)) return "coords must be [lng, lat] within range";
 
   if (typeof v.type !== "string" || !LISTING_TYPES.includes(v.type as ListingType)) {
-    return "type must be sale or rent";
+    return "type must be sale, rent or showcase";
   }
   if (typeof v.kind !== "string" || !PROPERTY_KINDS.includes(v.kind as PropertyKind)) {
     return `kind must be one of ${PROPERTY_KINDS.join(", ")}`;
@@ -160,10 +170,28 @@ export function validateListing(v: unknown, safeImageUrl: ImageUrlCheck): Listin
   const buildingName = optText(v.buildingName, "buildingName");
   if (!buildingName.ok) return buildingName.error;
 
+  // attached design: whether it may be attached (owned + published) is a DB
+  // question the route answers (lib/listing-presentation.ts); this only
+  // checks the shape
+  let designId: string | null | undefined;
+  if (v.designId === null) designId = null;
+  else if (v.designId !== undefined) {
+    if (typeof v.designId !== "string" || !DESIGN_ID.test(v.designId)) return "invalid designId";
+    designId = v.designId;
+  }
+  let defaultView: ListingView | undefined;
+  if (v.defaultView !== undefined && v.defaultView !== null) {
+    if (typeof v.defaultView !== "string" || !LISTING_VIEWS.includes(v.defaultView as ListingView)) {
+      return "defaultView must be photos or 3d";
+    }
+    defaultView = v.defaultView as ListingView;
+  }
+
   return {
     address: v.address,
     city: city.value ?? "",
-    price: v.price,
+    // a showcase listing is not on the market: its price is always stored as 0
+    price: v.type === "showcase" ? 0 : v.price,
     coords: v.coords,
     type: v.type as ListingType,
     kind: v.kind as PropertyKind,
@@ -172,6 +200,8 @@ export function validateListing(v: unknown, safeImageUrl: ImageUrlCheck): Listin
     ...(photo !== undefined ? { photo } : {}),
     ...(owner.value !== undefined ? { owner: owner.value } : {}),
     ...(buildingName.value !== undefined ? { buildingName: buildingName.value } : {}),
+    ...(designId !== undefined ? { designId } : {}),
+    ...(defaultView !== undefined ? { defaultView } : {}),
   };
 }
 

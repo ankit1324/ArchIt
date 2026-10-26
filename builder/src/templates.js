@@ -1,6 +1,6 @@
 import './tutorial.js';
 import {C} from './catalog.js';
-import {EMBED, escapeMarkup} from './dom.js';
+import {EMBED, VIEW, escapeMarkup} from './dom.js';
 import {firstRoom, footprint, localToWorld, newRoom, state, wallLen, wallPoint} from './state.js';
 import {boundsOf, clampFurn} from './geometry.js';
 import {dim, hideModal, modal, showModal} from './ui.js';
@@ -380,6 +380,7 @@ function renderTplModal(){
 
 let templateReplaceWarning = false;
 async function showTemplatePicker(replace=false){
+  if(VIEW) return;
   templateReplaceWarning = replace;
   activeTplCat = 'indian';
   showModal(renderTplModal());

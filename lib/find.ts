@@ -1,4 +1,4 @@
-import type { Filters, Listing } from "./types";
+import type { Filters, Listing, PublishedDesign } from "./types";
 
 export const DEFAULT_FILTERS: Filters = {
   type: null,
@@ -12,9 +12,26 @@ export const DEFAULT_FILTERS: Filters = {
 
 export type ListingSort = "recommended" | "price-asc" | "price-desc" | "area-desc";
 
-export function matchesQuery(listing: Listing, query: string): boolean {
-  const text = [listing.buildingName, listing.address, listing.city].join(" ").toLocaleLowerCase();
+/** which pins the /find map shows */
+export type MapLayer = "listings" | "designs" | "both";
+
+export const MAP_LAYERS: readonly MapLayer[] = ["listings", "designs", "both"];
+
+export const showsListings = (layer: MapLayer) => layer !== "designs";
+export const showsDesigns = (layer: MapLayer) => layer !== "listings";
+
+function matchesWords(fields: Array<string | undefined>, query: string): boolean {
+  const text = fields.join(" ").toLocaleLowerCase();
   return query.trim().toLocaleLowerCase().split(/\s+/).every((word) => text.includes(word));
+}
+
+export function matchesQuery(listing: Listing, query: string): boolean {
+  return matchesWords([listing.buildingName, listing.address, listing.city], query);
+}
+
+/** search over a published design's name, place and author */
+export function matchesDesignQuery(design: PublishedDesign, query: string): boolean {
+  return matchesWords([design.name, design.place, design.authorName], query);
 }
 
 export function findListings(listings: Listing[], filters: Filters, query: string, sort: ListingSort): Listing[] {
@@ -22,7 +39,8 @@ export function findListings(listings: Listing[], filters: Filters, query: strin
     if (!matchesQuery(l, query)) return false;
     if (filters.type && l.type !== filters.type) return false;
     if (filters.kind && l.kind !== filters.kind) return false;
-    if (l.price < filters.price[0] || l.price > filters.price[1]) return false;
+    // showcase listings carry price 0 (not for sale/rent), so price ranges ignore them
+    if (l.type !== "showcase" && (l.price < filters.price[0] || l.price > filters.price[1])) return false;
     if (filters.rooms !== null && (filters.rooms === 5 ? l.rooms < 5 : l.rooms !== filters.rooms)) return false;
     if (l.areaM < filters.areaFrom || l.areaM > filters.areaTo) return false;
     if (filters.floorArea === "less5" && l.floors > 5) return false;
@@ -30,6 +48,10 @@ export function findListings(listings: Listing[], filters: Filters, query: strin
     if (filters.floorArea === "more10" && l.floors <= 10) return false;
     return true;
   }).sort((a, b) => {
+    if (sort === "price-asc" || sort === "price-desc") {
+      const showcase = Number(a.type === "showcase") - Number(b.type === "showcase");
+      if (showcase) return showcase; // showcase listings sort last on price sorts
+    }
     if (sort === "price-asc") return a.price - b.price;
     if (sort === "price-desc") return b.price - a.price;
     if (sort === "area-desc") return b.areaM - a.areaM;

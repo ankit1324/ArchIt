@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, listingForViewer, OWNED_COLUMNS } from "@/lib/db";
+import { db, designAttachCheck, listingToRow, OWNED_COLUMNS } from "@/lib/db";
 import type { PropertyRow } from "@/lib/db";
+import { validateListingWrite } from "@/lib/listing-presentation";
+import { presentListings } from "@/lib/properties";
 import { isAdmin } from "@/lib/admin";
 import { canViewListing, changesReviewedContent, statusAfterEdit } from "@/lib/moderation";
 import { hasPurchase, type EntitlementResult } from "@/lib/entitlements";
@@ -65,7 +67,8 @@ export async function GET(
     }
   }
 
-  const listing = listingForViewer(data, userId);
+  // attached design: visitors see it only while it is published
+  const [listing] = await presentListings([data], userId, `GET /api/properties/${id}`);
   // tells the panel whether there is anything to unlock, without leaking it
   listing.hasOwner = Boolean(data.owner);
   if (!includeOwner || !listing.owner) delete listing.owner;
@@ -98,30 +101,63 @@ export async function PUT(
   if (!boost.ok) return Response.json({ error: boost.error }, { status: 500 });
 
   // photos dropped in this edit are cleaned up after the write; the reviewed
-  // fields decide whether the edit sends the listing back into review
+  // fields decide whether the edit sends the listing back into review.
+  // design_id / default_view are read too: an edit that omits them keeps them.
   const { data: previous } = await db
     .from("properties")
-    .select("photo, photos, status, building_name, owner, address, city")
+    .select("photo, photos, status, building_name, owner, address, city, design_id, default_view")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle<
-      Pick<PropertyRow, "photo" | "photos" | "building_name" | "owner" | "address" | "city"> & {
+      Pick<
+        PropertyRow,
+        | "photo"
+        | "photos"
+        | "building_name"
+        | "owner"
+        | "address"
+        | "city"
+        | "design_id"
+        | "default_view"
+      > & {
         status: string | null;
       }
     >();
+  // no row for this lister: the scoped update below answers 404
+  const storedDesignId = previous?.design_id ?? null;
 
-  const next = listingToRow(l);
+  // designId: absent = keep the stored one, null = detach, the stored id =
+  // keep (even if since unpublished), anything else must be the caller's own
+  // published design
+  let newDesign: Awaited<ReturnType<typeof designAttachCheck>> = null;
+  if (typeof l.designId === "string" && l.designId !== storedDesignId) {
+    try {
+      newDesign = await designAttachCheck(l.designId, userId);
+    } catch (e) {
+      console.error(`PUT /api/properties/${id} design check failed:`, e instanceof Error ? e.message : e);
+      return Response.json({ error: "internal error" }, { status: 500 });
+    }
+  }
+  const v = validateListingWrite(l, storedDesignId, newDesign, previous?.default_view ?? null);
+  if (!v.ok) return Response.json({ error: v.error }, { status: v.status });
+
+  const next = listingToRow({ ...l, price: v.price });
+  // a newly attached design is new content on a reviewed listing, like a photo
+  const reviewedChange =
+    !previous || changesReviewedContent(previous, next) || v.designId !== storedDesignId;
   const { data, error } = await db
     .from("properties")
     .update({
       ...next,
+      design_id: v.designId,
+      default_view: v.defaultView,
       featured: boost.granted,
-      status: statusAfterEdit(previous?.status, !previous || changesReviewedContent(previous, next)),
+      status: statusAfterEdit(previous?.status, reviewedChange),
     })
     .eq("id", id)
     .eq("user_id", userId)
     .select(OWNED_COLUMNS)
-    .maybeSingle();
+    .maybeSingle<PropertyRow>();
   if (error) {
     console.error(`PUT /api/properties/${id} failed:`, error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
@@ -131,7 +167,8 @@ export async function PUT(
   const dropped = (previous?.photos ?? []).filter((p) => !kept.has(p));
   if (dropped.length) await removeUnreferencedUploads(`PUT /api/properties/${id}`, dropped);
   // the user_id filter above proved the caller is the lister
-  return Response.json({ ...listingForViewer(data, userId), owner: l.owner ?? undefined });
+  const [listing] = await presentListings([data], userId, `PUT /api/properties/${id}`);
+  return Response.json({ ...listing, owner: l.owner ?? undefined });
 }
 
 /** Best-effort removal of a listing's uploaded photos. Never fails the request. */

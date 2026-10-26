@@ -1,6 +1,6 @@
 import './walk.js';
 import {C} from './catalog.js';
-import {$, chips, escapeMarkup, ov, round1, stage, toast} from './dom.js';
+import {$, VIEW, chips, escapeMarkup, ov, round1, stage, toast} from './dom.js';
 import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setDirty, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
 import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
@@ -54,7 +54,7 @@ function render2D(){
 
   // hotspots (+) around blocks — html overlay (hidden in interior focus mode)
   ov.querySelectorAll('.hs').forEach(e=>e.remove());
-  if(!focus){
+  if(!focus && !VIEW){
   computeHotspots();
   hotspots.filter(h=>state.blocks.length===1 || (sel?.kind==='block' && h.blockId===sel.blockId)).forEach(h=>{
     const b = getBlock(h.blockId); const [w,d]=footprint(b);
@@ -164,7 +164,7 @@ function redrawBlock2D(b){
 /* -------- 2D dragging -------- */
 planSvg.addEventListener('pointerdown', e=>{
   // placing a door or a piece of furniture: the click handler takes the tap
-  if(!state || ui.tool==='door-place' || ui.tool==='furn-place') return;
+  if(VIEW || !state || ui.tool==='door-place' || ui.tool==='furn-place') return;
   const hg = e.target.closest('[data-hdl]');
   const dg = e.target.closest('[data-door]');
   const wg = e.target.closest('[data-win]');
@@ -207,7 +207,7 @@ planSvg.addEventListener('pointerdown', e=>{
   }
 });
 planSvg.addEventListener('pointermove', e=>{
-  if(!drag2) return;
+  if(VIEW || !drag2) return;
   const dx = e.clientX-drag2.x0, dy = e.clientY-drag2.y0;
   if(!drag2.moved && dx*dx+dy*dy < 16) return;
   if(!drag2.moved){
@@ -256,7 +256,7 @@ planSvg.addEventListener('pointermove', e=>{
 });
 planSvg.addEventListener('pointercancel', ()=>{ if(drag2){ drag2 = null; ov.style.visibility = ''; renderAll(); } });
 planSvg.addEventListener('pointerup', ()=>{
-  if(!drag2) return;
+  if(VIEW || !drag2) return;
   const d2 = drag2;
   drag2 = null;
   if(!d2.moved){
@@ -370,7 +370,7 @@ function arcSweep(hx,hy,tx,ty,ex,ey){
   return cross>0 ? 1 : 0;
 }
 planSvg.addEventListener('click', e=>{
-  if(justDragged2) return;
+  if(VIEW || justDragged2) return;
   if(ui.tool==='furn-place'){
     const bg = e.target.closest('.blk');
     e.stopImmediatePropagation();
@@ -397,6 +397,7 @@ planSvg.addEventListener('click', e=>{
 }, true);
 
 function placeDoorByClick(blockId, e){
+  if(VIEW) return;
   const b = getBlock(blockId);
   const r = stage.getBoundingClientRect();
   // the origin render2D actually drew with: in Interior mode the plan is centred

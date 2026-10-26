@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { safeImageUrl } from "@/lib/url";
+import { hasLocation } from "@/lib/showcase";
 import type { Design, DesignMeta, DesignStateV3 } from "@/lib/types";
 import DesignerOverlay, { type SaveResult } from "@/components/DesignerOverlay";
+import PublishDialog from "@/components/PublishDialog";
 import { CloseIcon } from "@/components/icons";
 import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
@@ -328,6 +331,9 @@ export default function DesignerPage() {
   // null = never toggled: open on desktop, collapsed to a pill on phones, where
   // the open drawer would sit on top of the builder's own controls
   const [listOpen, setListOpen] = useState<boolean | null>(null);
+  // the publish / move-pin dialog is open for this design
+  const [publishing, setPublishing] = useState<Design | null>(null);
+  const [unpublishingId, setUnpublishingId] = useState<string | null>(null);
   // null = checking. With the paywall off the builder is free for everyone, so
   // skip the round trip: a slow or failed /api/purchases would otherwise put the
   // "Unlock the builder" card in front of a free product.
@@ -470,7 +476,11 @@ export default function DesignerPage() {
   };
 
   const deleteDesign = async (id: string) => {
-    if (!window.confirm("Delete this design? This cannot be undone.")) return;
+    const published = designs.find((d) => d.id === id)?.publishedAt;
+    const warning = published
+      ? "Delete this design? It leaves the showcase and the map, listings stop showing it, and this cannot be undone."
+      : "Delete this design? This cannot be undone.";
+    if (!window.confirm(warning)) return;
     try {
       const res = await fetch(`/api/designs/${id}`, { method: "DELETE" });
       if (res.ok || res.status === 404) {
@@ -483,6 +493,54 @@ export default function DesignerPage() {
       window.alert("Could not delete the design — check your connection.");
     }
   };
+
+  const replaceDesign = (saved: Design) =>
+    setDesigns((prev) => prev.map((d) => (d.id === saved.id ? saved : d)));
+
+  /** confirm, then POST a publish-route body for `d` (one at a time) */
+  const changePublishState = async (
+    d: Design,
+    body: { published: boolean; location?: false },
+    confirmText: string,
+    what: string,
+  ) => {
+    if (unpublishingId) return;
+    if (!window.confirm(confirmText)) return;
+    setUnpublishingId(d.id);
+    try {
+      const res = await fetch(`/api/designs/${encodeURIComponent(d.id)}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        window.alert(`Could not ${what}: ${saveErrorMessage(res.status)}`);
+        return;
+      }
+      replaceDesign((await res.json()) as Design);
+    } catch {
+      window.alert(`Could not ${what} — check your connection.`);
+    } finally {
+      setUnpublishingId(null);
+    }
+  };
+
+  const unpublishDesign = (d: Design) =>
+    changePublishState(
+      d,
+      { published: false },
+      `Unpublish “${d.name}”? It leaves the showcase and the map, and listings stop showing it.`,
+      "unpublish the design",
+    );
+
+  // keeps it in the showcase gallery, takes it off the /find map
+  const removePin = (d: Design) =>
+    changePublishState(
+      d,
+      { published: true, location: false },
+      `Remove the map pin of “${d.name}”? It stays in the showcase but leaves the map.`,
+      "remove the map pin",
+    );
 
   if (unlocked !== true) {
     return (
@@ -573,6 +631,12 @@ export default function DesignerPage() {
             >
               My designs
             </span>
+            <Link
+              href="/showcase"
+              className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5 hover:text-plum ${listOpen ? "" : "max-[760px]:hidden"}`}
+            >
+              Showcase
+            </Link>
             <button
               onClick={() =>
                 setListOpen(
@@ -614,43 +678,83 @@ export default function DesignerPage() {
                 {designs.map((d) => (
                   <div
                     key={d.id}
-                    className={`flex items-center gap-2 rounded-2xl p-1.5 transition-colors ${
+                    className={`flex flex-col gap-1 rounded-2xl p-1.5 transition-colors ${
                       d.id === currentId ? "bg-plum/10" : "hover:bg-white/55"
                     }`}
                   >
-                    <button
-                      onClick={() => openDesign(d)}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    >
-                      <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-white/60">
-                        {safeImageUrl(d.snapshot) && (
-                          <Image
-                            src={safeImageUrl(d.snapshot)!}
-                            alt=""
-                            fill
-                            sizes="48px"
-                            className="object-cover"
-                          />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-semibold text-plum">
-                          {d.name}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openDesign(d)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      >
+                        <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-white/60">
+                          {safeImageUrl(d.snapshot) && (
+                            <Image
+                              src={safeImageUrl(d.snapshot)!}
+                              alt=""
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          )}
                         </span>
-                        {d.meta?.budget ? (
-                          <span className="block text-[10.5px] font-medium text-plum-soft">
-                            ₹{d.meta.budget.toLocaleString("en-IN")}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12px] font-semibold text-plum">
+                            {d.name}
                           </span>
-                        ) : null}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => deleteDesign(d.id)}
-                      aria-label={`Delete ${d.name}`}
-                      className="shrink-0 rounded-full p-1 text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral"
-                    >
-                      <CloseIcon width={12} height={12} />
-                    </button>
+                          {d.meta?.budget ? (
+                            <span className="block text-[10.5px] font-medium text-plum-soft">
+                              ₹{d.meta.budget.toLocaleString("en-IN")}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => deleteDesign(d.id)}
+                        aria-label={`Delete ${d.name}`}
+                        className="shrink-0 rounded-full p-1 text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral"
+                      >
+                        <CloseIcon width={12} height={12} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 pl-14">
+                      {d.publishedAt ? (
+                        <>
+                          <span className="rounded-full bg-lime/70 px-1.5 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider text-plum">
+                            Published
+                          </span>
+                          <button
+                            onClick={() => setPublishing(d)}
+                            className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum"
+                          >
+                            {hasLocation(d.plotCenter[0], d.plotCenter[1]) ? "Move pin" : "Add pin"}
+                          </button>
+                          {hasLocation(d.plotCenter[0], d.plotCenter[1]) && (
+                            <button
+                              onClick={() => removePin(d)}
+                              disabled={unpublishingId === d.id}
+                              className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum disabled:opacity-50"
+                            >
+                              Remove pin
+                            </button>
+                          )}
+                          <button
+                            onClick={() => unpublishDesign(d)}
+                            disabled={unpublishingId === d.id}
+                            className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral disabled:opacity-50"
+                          >
+                            {unpublishingId === d.id ? "Saving…" : "Unpublish"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setPublishing(d)}
+                          className="rounded-full bg-white/70 px-2 py-0.5 text-[10.5px] font-bold text-plum transition-colors hover:bg-white"
+                        >
+                          Publish
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -658,6 +762,19 @@ export default function DesignerPage() {
           )}
         </div>
       </div>
+
+      {publishing && (
+        <PublishDialog
+          key={publishing.id}
+          design={publishing}
+          onDone={(saved) => {
+            replaceDesign(saved);
+            setPublishing(null);
+            celebrate(publishing.publishedAt ? "Pin saved!" : "Published to the showcase!");
+          }}
+          onCancel={() => setPublishing(null)}
+        />
+      )}
     </div>
   );
 }

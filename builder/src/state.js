@@ -1,4 +1,4 @@
-import './dom.js';
+import {VIEW} from './dom.js';
 import {C} from './catalog.js';
 import {renderAll} from './ui.js';
 import {clampRot} from './templates.js';
@@ -96,6 +96,7 @@ function wallDir(wall){ return wall===0?[1,0] : wall===2?[-1,0] : wall===1?[0,-1
 /* ============================== undo ============================== */
 function snapshot(){ return JSON.stringify({state, sel}); }
 function commit(fn){
+  if(VIEW) return;                      // read-only viewer: no edit reaches the state
   nudgeEnd(false);                      // an in-flight arrow-key burst lands first
   undoStack.push(snapshot()); if(undoStack.length>60) undoStack.shift();
   redoStack.length = 0;
@@ -104,12 +105,13 @@ function commit(fn){
   renderAll();
 }
 function restore(s){ const o = JSON.parse(s); state = o.state; sel = o.sel; linkFloor(); renderAll(); }
-function undo(){ nudgeEnd(false); if(!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); }
-function redo(){ nudgeEnd(false); if(!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); }
+function undo(){ nudgeEnd(false); if(VIEW || !undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); }
+function redo(){ nudgeEnd(false); if(VIEW || !redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); }
 // Arrow-key nudges are coalesced: one undo snapshot per burst (first keydown),
 // the 3D groups are moved live, and the real rebuild happens on keyup / 300 ms idle.
 let nudge = null;
 function nudgeBegin(){
+  if(VIEW) return;
   if(!nudge) nudge = {snap:snapshot(), timer:null};
   clearTimeout(nudge.timer); nudge.timer = setTimeout(nudgeEnd, 300);
 }

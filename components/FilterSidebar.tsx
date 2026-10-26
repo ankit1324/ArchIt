@@ -21,6 +21,8 @@ const KINDS: { id: PropertyKind; label: string; Icon: ComponentType<ComponentPro
   { id: "hotels", label: "Hotels", Icon: HotelsIcon },
 ];
 
+const TYPE_LABELS = { all: "All", sale: "Buy", rent: "Rent", showcase: "Showcase" } as const;
+
 const ROOMS = [1, 2, 3, 4, 5];
 const AREA_CHIPS = [25, 45, 65];
 const FLOOR_CHIPS: { id: NonNullable<Filters["floorArea"]>; label: string }[] = [
@@ -77,8 +79,8 @@ export default function FilterSidebar({
   return (
     <aside className="no-scrollbar pointer-events-auto flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto">
       <div className="flex items-center justify-between text-xs font-semibold"><span>{activeCount ? `${activeCount} active filters` : "All properties"}</span><button onClick={onReset} className="rounded-lg px-2 py-2 underline underline-offset-4">Reset all</button></div>
-      <div className="grid grid-cols-3 gap-1 rounded-full bg-plum/5 p-1" aria-label="Listing type">
-        {([null, "sale", "rent"] as const).map((type) => <button key={type ?? "all"} aria-pressed={filters.type === type} onClick={() => set({ type })} className={chip(filters.type === type)}>{type === "sale" ? "Buy" : type === "rent" ? "Rent" : "All"}</button>)}
+      <div className="grid grid-cols-4 gap-1 rounded-full bg-plum/5 p-1" aria-label="Listing type">
+        {([null, "sale", "rent", "showcase"] as const).map((type) => <button key={type ?? "all"} aria-pressed={filters.type === type} onClick={() => set({ type })} className={`${chip(filters.type === type)} px-0! text-[11px]!`}>{TYPE_LABELS[type ?? "all"]}</button>)}
       </div>
       {/* property type */}
       <div className="grid grid-cols-3 gap-2">
@@ -102,13 +104,16 @@ export default function FilterSidebar({
         })}
       </div>
 
-      <Panel title={filters.type === "rent" ? "Monthly rent (₹)" : "Price range (₹)"}>
-        <PriceHistogram
-          listings={allListings}
-          value={filters.price}
-          onChange={(price) => set({ price })}
-        />
-      </Panel>
+      {/* showcase listings have no price, so the range never applies to them */}
+      {filters.type !== "showcase" && (
+        <Panel title={filters.type === "rent" ? "Monthly rent (₹)" : "Price range (₹)"}>
+          <PriceHistogram
+            listings={allListings.filter((l) => l.type !== "showcase")}
+            value={filters.price}
+            onChange={(price) => set({ price })}
+          />
+        </Panel>
+      )}
 
       <Panel title="Property rooms">
         <div className="flex justify-between gap-1.5">

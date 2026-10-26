@@ -108,11 +108,13 @@ export default async function AdminListings({
                       </Link>
                       <div className="text-plum-soft">
                         {l.building_name ? `${l.address}, ` : ""}
-                        {l.city} · {l.kind} · {l.type === "sale" ? "Sale" : "Rent"}
+                        {l.city} · {l.kind} · {l.type === "sale" ? "Sale" : l.type === "showcase" ? "Showcase" : "Rent"}
                         {l.featured ? " · ★ featured" : ""}
                       </div>
                     </td>
-                    <td className={cell}>₹{Number(l.price).toLocaleString("en-IN")}</td>
+                    <td className={cell}>
+                      {l.type === "showcase" ? "—" : `₹${Number(l.price).toLocaleString("en-IN")}`}
+                    </td>
                     <td className={cell}><Badge label={l.status} /></td>
                     <td className={cell}><UserLink id={l.user_id} /></td>
                     <td className={cell}>{when(l.created_at)}</td>

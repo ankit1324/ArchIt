@@ -1,5 +1,5 @@
 import './persistence.js';
-import {$} from './dom.js';
+import {$, VIEW} from './dom.js';
 
 /* ============================== tutorial ============================== */
 const TUT_STEPS = [
@@ -69,7 +69,7 @@ function tutShow(i){
   }
   tutCard.style.left = x+'px'; tutCard.style.top = y+'px';
 }
-function startTutorial(){ tut.classList.add('show'); tutShow(0); }
+function startTutorial(){ if(VIEW) return; tut.classList.add('show'); tutShow(0); }
 function endTutorial(){
   tut.classList.remove('show'); tutI = -1;
   try{ localStorage.setItem('architTutDone','1'); }catch(e){}

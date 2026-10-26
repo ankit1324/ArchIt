@@ -3,9 +3,18 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import type { Filters, Listing } from "@/lib/types";
+import type { Filters, Listing, PublishedDesign } from "@/lib/types";
 import { POIS } from "@/lib/listings";
-import { DEFAULT_FILTERS, countFilters, findListings, type ListingSort } from "@/lib/find";
+import {
+  DEFAULT_FILTERS,
+  countFilters,
+  findListings,
+  matchesDesignQuery,
+  showsDesigns,
+  showsListings,
+  type ListingSort,
+  type MapLayer,
+} from "@/lib/find";
 import type { BBox } from "@/lib/listing-query";
 import styles from "./find.module.css";
 import Navbar from "@/components/Navbar";
@@ -20,12 +29,19 @@ import AddPropertyForm, {
 import { payFee } from "@/lib/checkout";
 import { celebrate, notify } from "@/components/Celebration";
 import BottomSheet from "@/components/BottomSheet";
+import DesignPinCard from "@/components/DesignPinCard";
+import DesignViewer from "@/components/DesignViewer";
 
 // maplibre (~1MB) stays out of the page chunk; the listings it shows arrive
 // with the HTML, so the map is the only thing still loading after hydration
 const Map3D = dynamic(() => import("@/components/Map3D"), { ssr: false });
 
 type AddStage = "idle" | "picking" | "form";
+
+const NO_LISTINGS: Listing[] = [];
+const NO_DESIGNS: PublishedDesign[] = [];
+/** published designs pinned on the map (same cap as the server render) */
+const MAP_DESIGN_LIMIT = 200;
 
 export interface ListingPage {
   listings: Listing[];
@@ -63,9 +79,15 @@ function appendNew(prev: Listing[], more: Listing[]): Listing[] {
 export default function FindClient({
   initialPage,
   initialSelectedId = null,
+  initialDesigns = null,
+  initialDesignId = null,
 }: {
   initialPage: ListingPage | null;
   initialSelectedId?: string | null;
+  /** published designs with a map pin; null when the server render failed */
+  initialDesigns?: PublishedDesign[] | null;
+  /** ?design=<id> deep link from a /showcase viewer */
+  initialDesignId?: string | null;
 }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [query, setQuery] = useState("");
@@ -102,6 +124,28 @@ export default function FindClient({
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbort = useRef<AbortController | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  // Designs layer: published designs pinned on the map (the showcase)
+  const [designs, setDesigns] = useState<PublishedDesign[]>(() => initialDesigns ?? []);
+  const [layer, setLayer] = useState<MapLayer>("both");
+  const [selectedDesignId, setSelectedDesignId] = useState<string | null>(initialDesignId);
+  // the read-only 3D viewer open over the map
+  const [viewerDesignId, setViewerDesignId] = useState<string | null>(null);
+
+  // the server render could not read the designs: fetch them from here
+  useEffect(() => {
+    if (initialDesigns) return;
+    const controller = new AbortController();
+    fetch(`/api/showcase?limit=${MAP_DESIGN_LIMIT}&located=1`, { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`showcase ${r.status}`);
+        const data = (await r.json()) as unknown;
+        if (Array.isArray(data)) setDesigns(data as PublishedDesign[]);
+      })
+      .catch(() => {
+        // the Designs layer just stays empty; listings are unaffected
+      });
+    return () => controller.abort();
+  }, [initialDesigns]);
 
   // The server rendered the first page. Page through the rest in the
   // background (each page lands as it arrives); a retry starts from scratch.
@@ -214,16 +258,30 @@ export default function FindClient({
     );
   }, [filtered]);
 
-  const selected = filtered.find((l) => l.id === selectedId) ?? null;
+  const mapListings = showsListings(layer) ? deferredFiltered : NO_LISTINGS;
+  // the search box also matches design names, places and authors
+  const filteredDesigns = useMemo(
+    () =>
+      showsDesigns(layer)
+        ? designs.filter((d) => d.plotCenter && matchesDesignQuery(d, query))
+        : NO_DESIGNS,
+    [designs, layer, query],
+  );
+  const deferredDesigns = useDeferredValue(filteredDesigns);
+  const selectedDesign = filteredDesigns.find((d) => d.id === selectedDesignId) ?? null;
+
+  const selected = showsListings(layer) ? (filtered.find((l) => l.id === selectedId) ?? null) : null;
   const editing = source.find((l) => l.id === editingId) ?? null;
   // the detail panel or the add/edit form is showing
-  const panelOpen = (addStage === "idle" && !!selected) || addStage === "form";
+  const panelOpen =
+    (addStage === "idle" && (!!selected || !!selectedDesign)) || addStage === "form";
 
   // stable per `listings` so memoised cards don't re-render on every keystroke
   const flyToListing = useCallback((id: string) => {
     const l = source.find((x) => x.id === id);
     if (!l) return;
     setFiltersOpen(false);
+    setSelectedDesignId(null);
     setSelectedId(id);
     const map = mapRef.current;
     if (!map) return;
@@ -233,6 +291,27 @@ export default function FindClient({
     const offsetY = sheet ? -map.getContainer().clientHeight * 0.28 : 0;
     map.flyTo({ center: l.coords, zoom: 16.4, duration: 1600, offset: [0, offsetY] });
   }, [source]);
+
+  const flyToDesignAt = useCallback((center: [number, number]) => {
+    const map = mapRef.current;
+    if (!map) return false;
+    const sheet = window.innerWidth < 1024;
+    const offsetY = sheet ? -map.getContainer().clientHeight * 0.28 : 0;
+    map.flyTo({ center, zoom: 16.4, duration: 1600, offset: [0, offsetY] });
+    return true;
+  }, []);
+
+  const selectDesign = useCallback((id: string) => {
+    const d = designs.find((x) => x.id === id);
+    if (!d?.plotCenter) return;
+    setFiltersOpen(false);
+    setSelectedId(null);
+    setSelectedDesignId(id);
+    flyToDesignAt(d.plotCenter);
+  }, [designs, flyToDesignAt]);
+
+  // ?design=<id> opens that design's card; Map3D flies to it on load
+  // (instead of its intro) since it is the selected design by then
 
   const searchPlace = async (query: string, signal: AbortSignal): Promise<boolean> => {
     const map = mapRef.current;
@@ -399,6 +478,10 @@ export default function FindClient({
         photo: photos[0],
         photos,
         featured: d.featured,
+        // null detaches; the server keeps an already-attached design even if
+        // it was unpublished since, and checks a new one is ours + published
+        designId: d.designId,
+        defaultView: d.defaultView,
       };
 
       const res = editing
@@ -514,7 +597,10 @@ export default function FindClient({
 
       <main className={`${styles.canvas} relative mx-[max(0.5rem,env(safe-area-inset-left))] mb-[max(0.5rem,env(safe-area-inset-bottom))] min-h-0 flex-1 overflow-hidden rounded-[22px] bg-cream-soft sm:mx-3 sm:mb-[max(0.75rem,env(safe-area-inset-bottom))]`}>
         <Map3D
-          listings={deferredFiltered}
+          listings={mapListings}
+          designs={deferredDesigns}
+          selectedDesignId={selectedDesignId}
+          onSelectDesign={selectDesign}
           pois={POIS}
           mapRef={mapRef}
           selectedId={selectedId}
@@ -570,12 +656,14 @@ export default function FindClient({
               onZoomIn={() => mapRef.current?.zoomIn()}
               onZoomOut={() => mapRef.current?.zoomOut()}
               onToggleDimension={toggleDimension}
+              layer={layer}
+              onLayerChange={setLayer}
             />
           </div>
 
           <div className={`${styles.results} ${panelOpen ? styles.resultsUnderSheet : ""}`}>
             <div className={styles.resultBar}>
-              <div aria-live="polite"><strong>{loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}` : "Explore properties"}</strong><span>{searchArea && areaFailed ? (areaListings ? "Couldn’t refresh this map area" : "Couldn’t load this map area — showing all") : searchArea && areaTruncated ? "Zoom in to see every listing here" : query ? `Matching “${query}”` : searchArea ? "In this map area" : "Find your next place"}</span></div>
+              <div aria-live="polite"><strong>{layer === "designs" ? `${filteredDesigns.length} ${filteredDesigns.length === 1 ? "design" : "designs"}` : loadState === "ready" ? `${filtered.length} ${filtered.length === 1 ? "property" : "properties"}${layer === "both" && filteredDesigns.length ? ` · ${filteredDesigns.length} ${filteredDesigns.length === 1 ? "design" : "designs"}` : ""}` : "Explore properties"}</strong><span>{searchArea && areaFailed ? (areaListings ? "Couldn’t refresh this map area" : "Couldn’t load this map area — showing all") : searchArea && areaTruncated ? "Zoom in to see every listing here" : query ? `Matching “${query}”` : searchArea ? "In this map area" : "Find your next place"}</span></div>
               <div className={styles.resultActions}>
                 <label className={styles.areaToggle}>
                   <input type="checkbox" checked={searchArea} onChange={toggleSearchArea} />
@@ -591,7 +679,7 @@ export default function FindClient({
                 </select>
               </div>
             </div>
-            <PropertyCarousel
+            {showsListings(layer) && <PropertyCarousel
               listings={deferredFiltered}
               onSelect={flyToListing}
               hasAny={listings.length > 0}
@@ -605,7 +693,7 @@ export default function FindClient({
               selectedId={selectedId}
               onReset={resetSearch}
               onRetry={() => { setLoadState("loading"); setLoadAttempt((n) => n + 1); }}
-            />
+            />}
           </div>
 
           {/* panels render last so they paint above the carousel strip and
@@ -634,11 +722,26 @@ export default function FindClient({
                 onEdit={() => openEdit(selected)}
                 onDelete={() => deleteProperty(selected.id)}
                 deleting={deleting}
+                onOpen3D={setViewerDesignId}
+              />
+            </BottomSheet>
+          )}
+
+          {addStage === "idle" && !selected && selectedDesign && (
+            <BottomSheet className={styles.detailPanel} onDismiss={() => setSelectedDesignId(null)}>
+              <DesignPinCard
+                design={selectedDesign}
+                onClose={() => setSelectedDesignId(null)}
+                onOpen3D={() => setViewerDesignId(selectedDesign.id)}
               />
             </BottomSheet>
           )}
         </div>
       </main>
+
+      {viewerDesignId && (
+        <DesignViewer designId={viewerDesignId} onClose={() => setViewerDesignId(null)} />
+      )}
     </div>
   );
 }

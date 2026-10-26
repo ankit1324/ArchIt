@@ -59,6 +59,8 @@ export function listingSearchFilter(q: string): string | null {
 
 export const USER_ACTIONS = ["ban", "unban"] as const;
 export const ORDER_ACTIONS = ["refunded"] as const;
+/** published designs are public user content: an admin can take one down */
+export const DESIGN_ACTIONS = ["unpublish"] as const;
 
 export function validateUserAction(v: unknown) {
   return validateDecision(v, USER_ACTIONS);
@@ -66,6 +68,10 @@ export function validateUserAction(v: unknown) {
 
 export function validateOrderAction(v: unknown) {
   return validateDecision(v, ORDER_ACTIONS);
+}
+
+export function validateDesignAction(v: unknown) {
+  return validateDecision(v, DESIGN_ACTIONS);
 }
 
 /**

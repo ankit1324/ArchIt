@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   canViewListing,
   changesReviewedContent,
+  designEditNeedsReview,
   hasVerifiedAdminEmail,
   isAdminIdentity,
   onlyLive,
@@ -207,4 +208,16 @@ test("ADMIN_EMAILS: unlisted or empty list grants nothing", () => {
   assert.equal(hasVerifiedAdminEmail(verified, parseAdminEmails("owner@example.com")), false);
   assert.equal(hasVerifiedAdminEmail(verified, parseAdminEmails(undefined)), false);
   assert.equal(hasVerifiedAdminEmail(verified, parseAdminEmails("")), false);
+});
+
+test("designEditNeedsReview: snapshot, geometry or name changes re-queue attached listings", () => {
+  const row = { name: "Home", snapshot: "https://x/a.webp", design: { v: 3, state: { blocks: [{ id: 1 }] } } };
+  assert.equal(designEditNeedsReview(row, { ...row }), false);
+  assert.equal(designEditNeedsReview(row, { ...row, design: { v: 3, state: { blocks: [{ id: 1 }] } } }), false);
+  assert.equal(designEditNeedsReview(row, { ...row, snapshot: "https://x/b.webp" }), true);
+  assert.equal(designEditNeedsReview(row, { ...row, design: { v: 3, state: { blocks: [{ id: 2 }] } } }), true);
+  assert.equal(designEditNeedsReview(row, { ...row, name: "Other" }), true);
+  assert.equal(designEditNeedsReview({ ...row, snapshot: null }, { ...row, snapshot: undefined }), false);
+  // unknown previous state: fail towards review
+  assert.equal(designEditNeedsReview(null, row), true);
 });

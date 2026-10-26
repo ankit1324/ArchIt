@@ -7,6 +7,7 @@ const LINKS: Array<{ label: string; href: string }> = [
   { label: "Home", href: "/" },
   { label: "Find", href: "/find" },
   { label: "Designer", href: "/designer" },
+  { label: "Showcase", href: "/showcase" },
   { label: "ArchIt Lite", href: "https://archit-lit.chaudharyankit.in/" },
 ];
 

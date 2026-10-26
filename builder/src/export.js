@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {hideModal, modal, renderAll, resetCam, showModal} from './ui.js';
 import {C} from './catalog.js';
-import {$, escapeMarkup, round1, toast} from './dom.js';
+import {$, VIEW, escapeMarkup, round1, toast} from './dom.js';
 import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
 import {boundsOf} from './geometry.js';
 import {camera, controls, renderer, requestShadows, scene, wallMats} from './scene.js';
@@ -198,6 +198,7 @@ function openProjectFile(){
   inp.click();
 }
 $('#shotB').addEventListener('click', ()=>{
+  if(VIEW) return;
   showModal(`
     <h3>Save &amp; export</h3>
     <p class="hint">Save images, a full design sheet, or the project file to continue later on any device.</p>
@@ -211,7 +212,7 @@ $('#shotB').addEventListener('click', ()=>{
 });
 modal.addEventListener('click', e=>{
   const ex = e.target.closest('[data-export]');
-  if(!ex) return;
+  if(!ex || VIEW) return;
   hideModal();
   if(ex.dataset.export==='3d') save3D();
   else if(ex.dataset.export==='2d') save2D();

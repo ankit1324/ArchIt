@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { Listing, ListingType, PropertyKind } from "@/lib/types";
+import type { Design, Listing, ListingType, ListingView, PropertyKind } from "@/lib/types";
 import { feeLabel } from "@/lib/fees";
 import { PAYWALL_ENABLED } from "@/lib/paywall";
 import { MAX_UPLOAD_BYTES, SUPPORTED_MIME_TYPES } from "@/lib/upload";
@@ -32,7 +33,20 @@ export interface PropertyDraft {
   areaM: number;
   /** true when the user opted-in and paid the featured-listing fee */
   featured: boolean;
+  /** attached published design; null = none (detaches on edit) */
+  designId: string | null;
+  /** what the listing opens on; "photos" whenever no design is attached */
+  defaultView: ListingView;
 }
+
+const INTENTS: { id: ListingType; label: string }[] = [
+  { id: "sale", label: "Sale" },
+  { id: "rent", label: "Rent" },
+  { id: "showcase", label: "Showcase only" },
+];
+
+/** the owner's designs that can be offered in the attach select */
+type OwnerDesign = Pick<Design, "id" | "name" | "publishedAt">;
 
 interface AddPropertyFormProps {
   coords: [number, number];
@@ -75,7 +89,10 @@ export default function AddPropertyForm({
   }
   const [address, setAddress] = useState(editing?.address ?? initialAddress);
   const [city, setCity] = useState(editing?.city ?? initialCity);
-  const [price, setPrice] = useState(editing ? String(editing.price) : "");
+  // showcase listings store price 0; start blank if the owner switches intent
+  const [price, setPrice] = useState(
+    editing && editing.type !== "showcase" ? String(editing.price) : "",
+  );
   const [type, setType] = useState<ListingType>(editing?.type ?? "sale");
   const [kind, setKind] = useState<PropertyKind>(editing?.kind ?? "apartments");
   const [beds, setBeds] = useState(String(editing?.beds ?? 2));
@@ -88,6 +105,43 @@ export default function AddPropertyForm({
   const [keptPhotos, setKeptPhotos] = useState<string[]>(
     editing?.photos ?? (editing?.photo ? [editing.photo] : []),
   );
+  const [designId, setDesignId] = useState<string | null>(editing?.designId ?? null);
+  const [defaultView, setDefaultView] = useState<ListingView>(
+    editing?.defaultView ?? "photos",
+  );
+  // null while loading; the owner's designs from /api/designs
+  const [ownerDesigns, setOwnerDesigns] = useState<OwnerDesign[] | null>(null);
+  const [designsFailed, setDesignsFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/designs", { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("designs unavailable");
+        const data: unknown = await r.json();
+        if (!Array.isArray(data)) throw new Error("bad designs response");
+        if (!controller.signal.aborted) {
+          setOwnerDesigns(
+            (data as Design[]).map(({ id, name, publishedAt }) => ({ id, name, publishedAt })),
+          );
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setDesignsFailed(true);
+      });
+    return () => controller.abort();
+  }, []);
+
+  // only published designs can be newly attached (the server re-checks); the
+  // stored attachment stays listed even if it was unpublished since
+  const storedDesignId = editing?.designId ?? null;
+  const publishedDesigns = (ownerDesigns ?? []).filter(
+    (d) => d.publishedAt && d.id !== storedDesignId,
+  );
+  const storedDesign = ownerDesigns?.find((d) => d.id === storedDesignId);
+  const storedUnpublished =
+    !!storedDesignId &&
+    (editing?.designPublished === false || (!!storedDesign && !storedDesign.publishedAt));
   const photoCount = keptPhotos.length + photoFiles.length;
 
   // object URLs for new-file thumbnails, derived from the files; stale ones
@@ -128,8 +182,9 @@ export default function AddPropertyForm({
 
   const submit = () => {
     if (saving) return;
-    const p = Number(price);
-    if (!p || p <= 0) return setError("Enter a price");
+    const showcase = type === "showcase";
+    const p = showcase ? 0 : Number(price);
+    if (!showcase && (!p || p <= 0)) return setError("Enter a price");
     if (!shownAddress.trim()) return setError("Enter an address");
     onSave(
       {
@@ -146,6 +201,8 @@ export default function AddPropertyForm({
         floors: Math.max(1, Number(floors) || 1),
         areaM: Math.max(1, Number(areaM) || 1),
         featured,
+        designId,
+        defaultView: designId ? defaultView : "photos",
       },
       photoFiles,
       keptPhotos,
@@ -232,8 +289,27 @@ export default function AddPropertyForm({
         />
       </label>
 
-      <div className="flex items-center gap-1.5">
-        <label className={`${field} flex-1`}>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Listing intent">
+        {INTENTS.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={type === id}
+            className={toggle(type === id)}
+            onClick={() => setType(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {type === "showcase" ? (
+        <p className="px-1 text-[11px] font-medium text-plum-soft">
+          Shown on the map as “not for sale/rent” — no price needed. Showcase
+          listings are reviewed like any other.
+        </p>
+      ) : (
+        <label className={field}>
           <span className={fieldLabel}>₹</span>
           <input
             className={fieldInput}
@@ -242,15 +318,10 @@ export default function AddPropertyForm({
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder={type === "rent" ? "per month" : "price"}
+            aria-label={type === "rent" ? "Monthly rent" : "Price"}
           />
         </label>
-        <button className={toggle(type === "sale")} onClick={() => setType("sale")}>
-          Sale
-        </button>
-        <button className={toggle(type === "rent")} onClick={() => setType("rent")}>
-          Rent
-        </button>
-      </div>
+      )}
 
       <label className={field}>
         <span className={fieldLabel}>Type</span>
@@ -384,6 +455,65 @@ export default function AddPropertyForm({
           ))}
         </div>
       )}
+
+      <label className={field}>
+        <span className={fieldLabel}>3D design</span>
+        <select
+          className={`${fieldInput} appearance-none`}
+          value={designId ?? ""}
+          onChange={(e) => setDesignId(e.target.value || null)}
+          aria-label="Attach a 3D design"
+        >
+          <option value="">None</option>
+          {storedDesignId && (
+            <option value={storedDesignId}>
+              {storedDesign?.name ?? "Attached design"}
+              {storedUnpublished ? " (unpublished — hidden from visitors)" : ""}
+            </option>
+          )}
+          {publishedDesigns.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {ownerDesigns === null && !designsFailed ? (
+        <p className="px-1 text-[11px] font-medium text-plum-soft">Loading your designs…</p>
+      ) : designsFailed ? (
+        <p className="px-1 text-[11px] font-medium text-plum-soft">
+          Couldn’t load your designs — the current attachment is kept.
+        </p>
+      ) : (
+        publishedDesigns.length === 0 &&
+        !storedDesignId && (
+          <p className="px-1 text-[11px] font-medium text-plum-soft">
+            No published designs yet —{" "}
+            <Link href="/designer" className="font-bold text-plum underline underline-offset-2">
+              publish one in the designer
+            </Link>{" "}
+            to attach it.
+          </p>
+        )
+      )}
+
+      <div className="flex items-center gap-1.5" role="group" aria-label="Open first with">
+        <span className={`${fieldLabel} px-1 text-[12.5px] ${designId ? "" : "opacity-50"}`}>
+          Open first with
+        </span>
+        {(["photos", "3d"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            disabled={!designId}
+            aria-pressed={!!designId && defaultView === v}
+            className={`${toggle(!!designId && defaultView === v)} disabled:cursor-not-allowed disabled:opacity-50`}
+            onClick={() => setDefaultView(v)}
+          >
+            {v === "photos" ? "Photos" : "3D"}
+          </button>
+        ))}
+      </div>
 
       {error && (
         <p role="alert" className="text-[12px] font-semibold text-coral">{error}</p>

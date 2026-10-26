@@ -5,6 +5,12 @@ import './catalog.js';
 // no tutorial, no share links. See DesignerOverlay.tsx for the other side.
 const EMBED = new URLSearchParams(location.search).has('embed');
 if(EMBED) document.body.classList.add('embed');
+// ?embed=1&view=1 → read-only viewer for someone else's published design (the
+// /showcase pages and the /find design viewer). Every mutating path returns
+// early on VIEW and nothing is ever posted back as a save; body.view hides the
+// editing chrome (builder.html). Only meaningful inside embed mode.
+const VIEW = EMBED && new URLSearchParams(location.search).has('view');
+if(VIEW) document.body.classList.add('view');
 
 /* ============================== helpers ============================== */
 const $ = s => document.querySelector(s);
@@ -20,4 +26,4 @@ function escapeMarkup(value){
   return String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-export {$, EMBED, chips, escapeMarkup, ov, round1, side, stage, toast};
+export {$, EMBED, VIEW, chips, escapeMarkup, ov, round1, side, stage, toast};

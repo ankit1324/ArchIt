@@ -1,6 +1,6 @@
 import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
-import {$, escapeMarkup, round1, side, toast} from './dom.js';
+import {$, VIEW, escapeMarkup, round1, side, toast} from './dom.js';
 import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui} from './state.js';
 import {boundsOf, freeT, overlaps, refitFurniture, sharedWall} from './geometry.js';
 import {openToolPop} from './tools.js';
@@ -43,6 +43,7 @@ function stdSelect(id, map, key, onPick){
   return selectHTML(id, optionsFrom(map, state[key]), curLabel(map, state[key]));
 }
 function applyModernPreset(key){
+  if(VIEW) return;
   const preset = MODERN_PRESETS[key];
   if(!preset) return;
   commit(()=>{
@@ -122,7 +123,7 @@ function renderPanel(){
   let area = 0; state.blocks.forEach(bl=>area += bl.w*bl.len);
   side.innerHTML = `
     <div class="sum">
-      <h2>My house <sup>?</sup></h2>
+      <h2>${VIEW ? 'This house' : 'My house <sup>?</sup>'}</h2>
       <p>Floor ${state.floor+1} of ${state.floors.length}</p>
     </div>
     <div class="stats">
@@ -131,8 +132,8 @@ function renderPanel(){
       <div class="row"><span>Area</span><b>${round1(area)} m²</b></div>
       <div class="row"><span>Size</span><b>${round1(bb.w)} m × ${round1(bb.d)} m</b></div>
     </div>
-    ${ui.view==='2d' ? '<div class="plan-hint"><b>Plan room by room</b><br>Select a room to edit its dimensions. Drag to move; use corner handles to resize. The fit button brings the full plan back into view.</div>' : ''}
-    <div class="acc">
+    ${ui.view==='2d' && !VIEW ? '<div class="plan-hint"><b>Plan room by room</b><br>Select a room to edit its dimensions. Drag to move; use corner handles to resize. The fit button brings the full plan back into view.</div>' : ''}
+    ${VIEW ? '' : `<div class="acc">
       ${secs.map(([id,name,body])=>`
         <div class="sec ${ui.openSecs.has(id)?'open':''}" data-sec="${id}">
           <button type="button">
@@ -141,7 +142,7 @@ function renderPanel(){
           </button>
           <div class="body">${ui.openSecs.has(id)? body() : ''}</div>
         </div>`).join('')}
-    </div>`;
+    </div>`}`;
 }
 
 function renderBlockPanel(b){
@@ -287,6 +288,7 @@ function renderFurnPanel(b, f){
 
 /* sidebar event delegation */
 side.addEventListener('click', e=>{
+  if(VIEW) return;   // view mode renders no controls in the sidebar
   const secBtn = e.target.closest('.sec > button');
   if(secBtn){
     const id = secBtn.parentElement.dataset.sec;
@@ -341,6 +343,7 @@ side.addEventListener('click', e=>{
   if(a==='swingdoor'){ const d = selDoor(); if(d) commit(()=>{ d.out = !d.out || undefined; }); }
 });
 side.addEventListener('change', e=>{
+  if(VIEW) return;
   const el = e.target;
   if(el.dataset.act==='rname'){
     const b = selBlock(); if(!b) return;

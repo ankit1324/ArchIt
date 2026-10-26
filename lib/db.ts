@@ -7,6 +7,7 @@ import type {
   DesignStateV3,
   Listing,
   ListingType,
+  ListingView,
   PropertyKind,
 } from "./types";
 
@@ -51,7 +52,10 @@ export const PUBLIC_COLUMNS =
 // is stripped before the row is returned — it must never appear in a response
 // body (rowToListing drops it). status is only echoed to the lister
 // (listingForViewer), since everyone else only ever sees live rows.
-export const OWNED_COLUMNS = `${PUBLIC_COLUMNS}, user_id, status`;
+// design_id / default_view ride along so routes can apply the attached-design
+// rules (lib/listing-presentation.ts presentListing) before anything reaches
+// the client: visitors only see a design while it is published.
+export const OWNED_COLUMNS = `${PUBLIC_COLUMNS}, user_id, status, design_id, default_view`;
 
 export type PublicPropertyRow = Omit<PropertyRow, "owner">;
 
@@ -79,13 +83,18 @@ export interface PropertyRow {
   featured: boolean;
   /** moderation state; public queries only return 'live' (lib/moderation.ts) */
   status: ListingStatus;
+  /** attached design; set by the routes after validation, never by listingToRow */
+  design_id: string | null;
+  /** what the listing opens on; set by the routes, never by listingToRow */
+  default_view: ListingView;
 }
 
 // user_id and status deliberately excluded: routes stamp them server-side,
-// never from the client body
+// never from the client body. design_id / default_view are excluded too: the
+// listing routes write them after validateListingWrite (absent = keep).
 export function listingToRow(
-  l: Omit<Listing, "id">,
-): Omit<PropertyRow, "id" | "user_id" | "status"> {
+  l: Omit<Listing, "id" | "designId">,
+): Omit<PropertyRow, "id" | "user_id" | "status" | "design_id" | "default_view"> {
   return {
     building_name: l.buildingName ?? null,
     owner: l.owner ?? null,
@@ -120,11 +129,20 @@ export interface DesignRow {
   design: DesignStateV3;
   snapshot: string | null;
   meta: DesignMeta | null;
+  /** NULL = private; set only by the publish route (and admin unpublish) */
+  published_at: string | null;
+  /** display name captured at publish time */
+  author_name: string | null;
+  /** short label for the picked spot */
+  place: string | null;
 }
 
 // user_id deliberately excluded: routes stamp it from the Clerk session,
-// never from the client body (same rule as listings)
-export function designToRow(d: Omit<Design, "id">): Omit<DesignRow, "id" | "user_id"> {
+// never from the client body (same rule as listings).
+// published_at / author_name / place are written only by the publish route.
+export function designToRow(
+  d: Omit<Design, "id">,
+): Omit<DesignRow, "id" | "user_id" | "published_at" | "author_name" | "place"> {
   return {
     name: d.name,
     plot_lng: d.plotCenter[0],
@@ -147,7 +165,21 @@ export function rowToDesign(r: DesignRow): Design {
     design: r.design,
     snapshot: r.snapshot ?? undefined,
     meta: r.meta ?? undefined,
+    publishedAt: r.published_at ?? undefined,
+    place: r.place ?? undefined,
   };
+}
+
+/**
+ * For PUT /api/designs/[id]: the designer sends plotCenter [0, 0] for
+ * standalone designs, so an update must never touch the stored location —
+ * a published design's map pin moves only via the publish route.
+ */
+export function designUpdateRow(
+  d: Omit<Design, "id">,
+): Omit<ReturnType<typeof designToRow>, "plot_lng" | "plot_lat"> {
+  const { name, plot_w, plot_d, design, snapshot, meta } = designToRow(d);
+  return { name, plot_w, plot_d, design, snapshot, meta };
 }
 
 export function rowToListing(r: PublicPropertyRow): Listing {
@@ -187,6 +219,47 @@ export function listingForViewer(
   const listing: Listing = { ...rowToListing(r), mine };
   if (mine && r.status && r.status !== "live") listing.status = r.status;
   return listing;
+}
+
+export type AttachedDesign = { published: boolean; snapshot: string | null };
+
+/**
+ * Publish state + snapshot of the designs attached to listings, keyed by id —
+ * one query for a whole page (see presentListing). Throws on a DB error.
+ */
+export async function attachedDesigns(
+  ids: (string | null | undefined)[],
+): Promise<Map<string, AttachedDesign>> {
+  const unique = [...new Set(ids.filter((id): id is string => !!id))];
+  const out = new Map<string, AttachedDesign>();
+  if (!unique.length) return out;
+  const { data, error } = await db
+    .from("designs")
+    .select("id, published_at, snapshot")
+    .in("id", unique);
+  if (error) throw new Error(error.message);
+  for (const d of data as Pick<DesignRow, "id" | "published_at" | "snapshot">[]) {
+    out.set(d.id, { published: !!d.published_at, snapshot: d.snapshot });
+  }
+  return out;
+}
+
+/**
+ * What validateListingWrite needs to know about a design being attached:
+ * null when it does not exist. Throws on a DB error.
+ */
+export async function designAttachCheck(
+  designId: string,
+  userId: string,
+): Promise<{ owned: boolean; published: boolean } | null> {
+  const { data, error } = await db
+    .from("designs")
+    .select("id, user_id, published_at")
+    .eq("id", designId)
+    .maybeSingle<Pick<DesignRow, "id" | "user_id" | "published_at">>();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { owned: ownsRow(data, userId), published: !!data.published_at };
 }
 
 /** True when `row` belongs to the given session user. Server-side only. */
