@@ -27,6 +27,20 @@ export function kindLabel(l: PublicListing): string {
   return KIND_LABEL[l.kind] ?? "Property";
 }
 
+/**
+ * The price line: a showcase listing is not on the market, so it says so
+ * instead of repeating "Showcase" (which dealLabel already shows).
+ */
+export function priceLabel(l: PublicListing): string {
+  return l.type === "showcase" ? "Not for sale/rent" : formatPrice(l);
+}
+
+/** Pill colours by deal, as on the /find cards: sale lime, rent magenta, showcase violet. */
+export function dealTone(l: PublicListing): string {
+  if (l.type === "showcase") return "bg-violet-700 text-white";
+  return l.type === "sale" ? "bg-lime text-plum" : "bg-magenta-deep text-white";
+}
+
 export function dealLabel(l: PublicListing): string {
   if (l.type === "showcase") return "Showcase";
   return l.type === "sale" ? "For Sale" : "For Rent";

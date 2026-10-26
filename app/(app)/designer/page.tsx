@@ -497,33 +497,50 @@ export default function DesignerPage() {
   const replaceDesign = (saved: Design) =>
     setDesigns((prev) => prev.map((d) => (d.id === saved.id ? saved : d)));
 
-  const unpublishDesign = async (d: Design) => {
+  /** confirm, then POST a publish-route body for `d` (one at a time) */
+  const changePublishState = async (
+    d: Design,
+    body: { published: boolean; location?: false },
+    confirmText: string,
+    what: string,
+  ) => {
     if (unpublishingId) return;
-    if (
-      !window.confirm(
-        `Unpublish “${d.name}”? It leaves the showcase and the map, and listings stop showing it.`,
-      )
-    )
-      return;
+    if (!window.confirm(confirmText)) return;
     setUnpublishingId(d.id);
     try {
-      // exactly { published: false } — the route rejects a location here
       const res = await fetch(`/api/designs/${encodeURIComponent(d.id)}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ published: false }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        window.alert(`Could not unpublish the design: ${saveErrorMessage(res.status)}`);
+        window.alert(`Could not ${what}: ${saveErrorMessage(res.status)}`);
         return;
       }
       replaceDesign((await res.json()) as Design);
     } catch {
-      window.alert("Could not unpublish the design — check your connection.");
+      window.alert(`Could not ${what} — check your connection.`);
     } finally {
       setUnpublishingId(null);
     }
   };
+
+  const unpublishDesign = (d: Design) =>
+    changePublishState(
+      d,
+      { published: false },
+      `Unpublish “${d.name}”? It leaves the showcase and the map, and listings stop showing it.`,
+      "unpublish the design",
+    );
+
+  // keeps it in the showcase gallery, takes it off the /find map
+  const removePin = (d: Design) =>
+    changePublishState(
+      d,
+      { published: true, location: false },
+      `Remove the map pin of “${d.name}”? It stays in the showcase but leaves the map.`,
+      "remove the map pin",
+    );
 
   if (unlocked !== true) {
     return (
@@ -712,12 +729,21 @@ export default function DesignerPage() {
                           >
                             {hasLocation(d.plotCenter[0], d.plotCenter[1]) ? "Move pin" : "Add pin"}
                           </button>
+                          {hasLocation(d.plotCenter[0], d.plotCenter[1]) && (
+                            <button
+                              onClick={() => removePin(d)}
+                              disabled={unpublishingId === d.id}
+                              className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum disabled:opacity-50"
+                            >
+                              Remove pin
+                            </button>
+                          )}
                           <button
                             onClick={() => unpublishDesign(d)}
                             disabled={unpublishingId === d.id}
                             className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral disabled:opacity-50"
                           >
-                            {unpublishingId === d.id ? "Unpublishing…" : "Unpublish"}
+                            {unpublishingId === d.id ? "Saving…" : "Unpublish"}
                           </button>
                         </>
                       ) : (

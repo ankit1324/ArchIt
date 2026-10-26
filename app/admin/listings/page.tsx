@@ -112,7 +112,9 @@ export default async function AdminListings({
                         {l.featured ? " · ★ featured" : ""}
                       </div>
                     </td>
-                    <td className={cell}>₹{Number(l.price).toLocaleString("en-IN")}</td>
+                    <td className={cell}>
+                      {l.type === "showcase" ? "—" : `₹${Number(l.price).toLocaleString("en-IN")}`}
+                    </td>
                     <td className={cell}><Badge label={l.status} /></td>
                     <td className={cell}><UserLink id={l.user_id} /></td>
                     <td className={cell}>{when(l.created_at)}</td>

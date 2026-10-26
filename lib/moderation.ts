@@ -63,6 +63,25 @@ export function changesReviewedContent(before: ReviewedRow, after: ReviewedRow):
   return REVIEWED_FIELDS.some((f) => norm(before[f]) !== norm(after[f]));
 }
 
+/** What a visitor sees of a design attached to a listing. */
+export const ATTACHED_DESIGN_FIELDS = ["name", "snapshot", "design"] as const;
+type AttachedDesignRow = Partial<Record<(typeof ATTACHED_DESIGN_FIELDS)[number], unknown>>;
+
+/**
+ * True when a design save changes what visitors see on a listing it is
+ * attached to (its name, snapshot or geometry). Compare two rows as read back
+ * from the database (both jsonb-normalised), not a request body against a row.
+ * A null `before` (the pre-read failed) counts as a change: fail towards review.
+ */
+export function designEditNeedsReview(
+  before: AttachedDesignRow | null | undefined,
+  after: AttachedDesignRow,
+): boolean {
+  if (!before) return true;
+  const norm = (v: unknown) => JSON.stringify(v ?? null);
+  return ATTACHED_DESIGN_FIELDS.some((f) => norm(before[f]) !== norm(after[f]));
+}
+
 /**
  * Status a listing takes after its lister edits it. A rejected listing goes
  * back into the queue (the lister fixed it). A live listing stays live for

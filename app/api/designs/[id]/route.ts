@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, designUpdateRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
+import { designEditNeedsReview } from "@/lib/moderation";
 import { parseJsonBody } from "@/lib/request";
 import { removeUnreferencedUploads } from "@/lib/storage";
 import { safeImageUrl } from "@/lib/url";
@@ -24,13 +25,14 @@ export async function PUT(
   });
   if (d instanceof Response) return d;
   // Each save uploads a fresh snapshot; remember the old one so it can be
-  // dropped once the row no longer points at it.
+  // dropped once the row no longer points at it. name/design are read too:
+  // a change to what visitors see re-queues listings that attach this design.
   const { data: previous } = await db
     .from("designs")
-    .select("snapshot")
+    .select("snapshot, name, design")
     .eq("id", id)
     .eq("user_id", userId)
-    .maybeSingle<{ snapshot: string | null }>();
+    .maybeSingle<{ snapshot: string | null; name: string; design: unknown }>();
   const { data, error } = await db
     .from("designs")
     // designUpdateRow drops plot_lng/plot_lat: a published design's map pin
@@ -46,6 +48,21 @@ export async function PUT(
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
+  // An approved listing showing this design must not change under the
+  // reviewer: like a listing's own photo edit (statusAfterEdit), a new
+  // snapshot/geometry/name sends the owner's live listings that attach it
+  // back to review. Best effort: the design is already saved.
+  if (designEditNeedsReview(previous, data)) {
+    const { error: requeueError } = await db
+      .from("properties")
+      .update({ status: "pending" })
+      .eq("user_id", userId)
+      .eq("design_id", id)
+      .eq("status", "live");
+    if (requeueError) {
+      console.error(`PUT /api/designs/${id}: listing re-review failed:`, requeueError.message);
+    }
+  }
   if (previous?.snapshot && previous.snapshot !== data.snapshot) {
     await removeUnreferencedUploads(`PUT /api/designs/${id}`, [previous.snapshot]);
   }

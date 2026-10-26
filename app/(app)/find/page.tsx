@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { listProperties } from "@/lib/properties";
 import { isDesignId } from "@/lib/showcase";
-import { listPublishedDesigns } from "@/lib/showcase-db";
+import { getPublishedDesign, listPublishedDesigns } from "@/lib/showcase-db";
 import FindClient from "./FindClient";
 
 /** published designs pinned on the map: located only, newest first */
@@ -19,7 +19,8 @@ export default async function FindPage({
   const { userId } = await auth();
   // deep links from a public /property/:id page or a /showcase/:id viewer
   const { property, design } = await searchParams;
-  const [initialPage, initialDesigns] = await Promise.all([
+  const designId = isDesignId(design) ? design : null;
+  const [initialPage, mapDesigns, linkedDesign] = await Promise.all([
     listProperties({ userId }).catch((error: Error) => {
       // the client retries from the browser and shows its error state
       console.error("/find initial listings failed:", error.message);
@@ -32,13 +33,25 @@ export default async function FindPage({
         return null;
       },
     ),
+    // a deep-linked design may be older than the newest MAP_DESIGN_LIMIT: read
+    // it on its own so ?design= never silently misses (null when private)
+    designId
+      ? getPublishedDesign(designId, userId).catch((error: Error) => {
+          console.error("/find linked design failed:", error.message);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
+  const initialDesigns =
+    mapDesigns && linkedDesign?.plotCenter && !mapDesigns.some((d) => d.id === linkedDesign.id)
+      ? [...mapDesigns, linkedDesign]
+      : mapDesigns;
   return (
     <FindClient
       initialPage={initialPage}
       initialSelectedId={typeof property === "string" ? property : null}
       initialDesigns={initialDesigns}
-      initialDesignId={isDesignId(design) ? design : null}
+      initialDesignId={designId}
     />
   );
 }

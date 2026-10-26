@@ -111,7 +111,11 @@ export type PublishBody =
   | {
       ok: true;
       published: boolean;
-      location: { lng: number; lat: number; place: string | null } | null;
+      /**
+       * null = keep the stored spot; "clear" = remove the map pin (the body
+       * sent `location: false`); an object = move the pin there
+       */
+      location: { lng: number; lat: number; place: string | null } | "clear" | null;
     }
   | { ok: false; error: string };
 
@@ -120,6 +124,8 @@ export function parsePublishBody(body: unknown): PublishBody {
   const { published, location } = body as { published?: unknown; location?: unknown };
   if (typeof published !== "boolean") return { ok: false, error: "published must be a boolean" };
   if (location === undefined || location === null) return { ok: true, published, location: null };
+  // explicit removal of the map pin; allowed with publish and unpublish alike
+  if (location === false) return { ok: true, published, location: "clear" };
   if (!published) return { ok: false, error: "location is only accepted when publishing" };
   if (typeof location !== "object" || Array.isArray(location)) {
     return { ok: false, error: "Invalid location" };
@@ -162,10 +168,18 @@ export function publishUpdate(
   authorName: string | null,
   now: string,
 ): PublishPatch {
-  if (!parsed.published) return { published_at: null, author_name: null };
+  // [0, 0] is "no location" (hasLocation): the design leaves the /find map
+  const clear = { plot_lng: 0, plot_lat: 0, place: null };
+  if (!parsed.published) {
+    return parsed.location === "clear"
+      ? { published_at: null, author_name: null, ...clear }
+      : { published_at: null, author_name: null };
+  }
   const patch: PublishPatch = { author_name: authorName || "ArchIt user" };
   if (!currentPublishedAt) patch.published_at = now;
-  if (parsed.location) {
+  if (parsed.location === "clear") {
+    Object.assign(patch, clear);
+  } else if (parsed.location) {
     patch.plot_lng = parsed.location.lng;
     patch.plot_lat = parsed.location.lat;
     patch.place = parsed.location.place;

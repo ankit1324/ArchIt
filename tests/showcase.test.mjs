@@ -230,3 +230,36 @@ test("publishUpdate falls back to a generic author name", () => {
   assert.equal(publishUpdate({ published: true, location: null }, null, null, NOW).author_name, "ArchIt user");
   assert.equal(publishUpdate({ published: true, location: null }, null, "", NOW).author_name, "ArchIt user");
 });
+
+test("parsePublishBody: location false asks to remove the map pin", () => {
+  assert.deepEqual(parsePublishBody({ published: true, location: false }), { ok: true, published: true, location: "clear" });
+  assert.deepEqual(parsePublishBody({ published: false, location: false }), { ok: true, published: false, location: "clear" });
+  assert.equal(parsePublishBody({ published: true, location: true }).ok, false);
+  assert.equal(parsePublishBody({ published: true, location: 0 }).ok, false);
+});
+
+test("publishUpdate clears the stored spot on location clear", () => {
+  assert.deepEqual(publishUpdate({ published: true, location: "clear" }, EARLIER, "Ankit", NOW), {
+    author_name: "Ankit",
+    plot_lng: 0,
+    plot_lat: 0,
+    place: null,
+  });
+  assert.deepEqual(publishUpdate({ published: true, location: "clear" }, null, "Ankit", NOW), {
+    author_name: "Ankit",
+    published_at: NOW,
+    plot_lng: 0,
+    plot_lat: 0,
+    place: null,
+  });
+  assert.deepEqual(publishUpdate({ published: false, location: "clear" }, EARLIER, null, NOW), {
+    published_at: null,
+    author_name: null,
+    plot_lng: 0,
+    plot_lat: 0,
+    place: null,
+  });
+  // without an explicit clear, the stored spot is kept
+  const keep = publishUpdate({ published: true, location: null }, EARLIER, "Ankit", NOW);
+  assert.ok(!("plot_lng" in keep) && !("place" in keep));
+});

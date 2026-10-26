@@ -23,6 +23,7 @@ const PLUM = "#3d1830";
 const PLUM_SOFT = "#6b4560";
 const LIME = "#e2ef6a";
 const MAGENTA_DEEP = "#b5359a";
+const VIOLET = "#6d28d9"; // showcase listings (not for sale/rent), as on /find
 
 const PHOTO_W = 460;
 
@@ -108,6 +109,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   if (!l) return asJpeg(new ImageResponse(<Fallback />, { ...size }));
 
   const sale = l.type === "sale";
+  // sale lime, rent magenta, showcase violet
+  const pillBg = l.type === "showcase" ? VIOLET : sale ? LIME : MAGENTA_DEEP;
+  const pillFg = sale ? PLUM : "#ffffff";
   const photo = await photoDataUrl(l);
   const city = cityName(l.city);
   const facts = [
@@ -139,8 +143,8 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                 fontWeight: 700,
                 padding: "8px 20px",
                 borderRadius: 999,
-                background: sale ? LIME : MAGENTA_DEEP,
-                color: sale ? PLUM : "#ffffff",
+                background: pillBg,
+                color: pillFg,
               }}
             >
               {dealLabel(l)}
@@ -155,11 +159,11 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                 fontWeight: 700,
                 letterSpacing: -2,
                 padding: "2px 16px",
-                background: sale ? LIME : MAGENTA_DEEP,
-                color: sale ? PLUM : "#ffffff",
+                background: pillBg,
+                color: pillFg,
               }}
             >
-              {formatPrice(l)}
+              {l.type === "showcase" ? "Not for sale/rent" : formatPrice(l)}
             </div>
             <div style={{ display: "flex", fontSize: 54, fontWeight: 700, lineHeight: 1.1, letterSpacing: -1.5 }}>
               {clip(headline(l), photo ? 44 : 60)}

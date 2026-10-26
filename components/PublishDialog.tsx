@@ -135,7 +135,9 @@ export default function PublishDialog({
               place: place.trim().slice(0, MAX_PLACE) || undefined,
             },
           }
-        : { published: true };
+        : // `location: false` removes any stored spot: "without a pin" must
+          // really take the design off the map
+          { published: true, location: false };
     try {
       const res = await fetch(`/api/designs/${encodeURIComponent(design.id)}/publish`, {
         method: "POST",
@@ -224,7 +226,8 @@ export default function PublishDialog({
         </label>
 
         <p className="px-1 text-[12px] font-medium text-plum-soft">
-          Anyone, including people who are not signed in, can see this design and the spot you pick.
+          Anyone, including people who are not signed in, can see this design, the spot you
+          pick and your name as the author (your first name, or your username).
         </p>
 
         {error && <p className="px-1 text-[12px] font-semibold text-coral">{error}</p>}
@@ -238,17 +241,16 @@ export default function PublishDialog({
           >
             {busy ? "Saving…" : movingPin ? "Save pin" : design.publishedAt ? "Add pin" : "Publish"}
           </button>
-          {/* The publish route has no way to clear a stored spot (a missing
-              location keeps it), so this only shows when there is none —
-              otherwise "without a pin" would still put the design on the map. */}
-          {!movingPin && !stored && (
+          {/* Sends `location: false`, which clears a stored spot too. Hidden
+              only for a published design that has no pin (nothing to do). */}
+          {(!design.publishedAt || stored) && (
             <button
               type="button"
               onClick={() => submit(false)}
               disabled={busy}
               className="rounded-full bg-white/70 py-2 text-[12.5px] font-bold text-plum transition-colors hover:bg-white disabled:opacity-50"
             >
-              Publish without map pin
+              {design.publishedAt ? "Remove map pin (gallery only)" : "Publish without map pin"}
             </button>
           )}
           <button
