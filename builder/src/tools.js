@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './sidebar.js';
 import {C} from './catalog.js';
-import {$, chips, escapeMarkup, toast} from './dom.js';
+import {$, VIEW, chips, escapeMarkup, toast} from './dom.js';
 import {commit, footprint, getBlock, newRoom, sel, selBlock, selFurn, setSel, state, ui} from './state.js';
 import {clampFurn, freeT, overlaps, sharedWall} from './geometry.js';
 import {canvas} from './scene.js';
@@ -12,6 +12,7 @@ import {showTemplatePicker} from './templates.js';
 
 /* ============================== chips actions ============================== */
 chips.addEventListener('click', e=>{
+  if(VIEW) return;
   const btn = e.target.closest('button'); if(!btn) return;
   const b = selBlock(); if(!b) return;
   const a = btn.dataset.a;
@@ -119,6 +120,7 @@ function furnCatalogHTML(X){
 function refreshFurnGrid(){ const grid = toolpop.querySelector('.fgrid'); if(grid) grid.innerHTML = furnGridHTML(); }
 
 function openToolPop(tool){
+  if(VIEW) return;
   ui.tool = null;
   document.querySelectorAll('#toolbar button').forEach(b=>b.classList.toggle('on', b.dataset.t===tool));
   let html = '';
@@ -155,6 +157,7 @@ function closeToolPop(){
   document.querySelectorAll('#toolbar button').forEach(b=>b.classList.remove('on'));
 }
 document.getElementById('toolbar').addEventListener('click', e=>{
+  if(VIEW) return;
   const b = e.target.closest('button'); if(!b) return;
   // Templates opens the picker, not a tool popup. Starting a template replaces
   // the current layout, so confirm first when there is work to lose.
@@ -175,6 +178,7 @@ toolpop.addEventListener('input', e=>{
 // piece in the catalog arms ui.tool 'furn-place', and the next tap on a room in
 // the 3D view or the plan drops it there (interact3d.js / plan2d.js).
 function armFurniture(key){
+  if(VIEW) return;
   ui.tool = 'furn-place'; ui.pendingFurn = key;
   toolpop.querySelectorAll('.fitem').forEach(i=>i.classList.toggle('on', i.dataset.addFurn===key));
   // on a phone the catalog covers the stage: get it out of the way of the tap
@@ -184,6 +188,7 @@ function armFurniture(key){
 }
 // Drop the armed piece into room b at room-local (lx, lz). False when it can't fit.
 function placeFurniture(b, lx, lz){
+  if(VIEW) return false;
   const f = {id:++state.seq.furn, key:ui.pendingFurn, lx, lz, rot:0};
   if(!C.furniture[f.key]) return false;
   if(!clampFurn(b, f)){ toast('The room is too small for that'); return false; }
@@ -198,6 +203,7 @@ function syncToolCursor(){
   canvas.style.cursor = ui.tool==='furn-place' ? 'crosshair' : '';
 }
 toolpop.addEventListener('click', e=>{
+  if(VIEW) return;
   if(e.target.closest('[data-close]')){ closeToolPop(); return; }
   const fcat = e.target.closest('[data-fcat]');
   if(fcat){

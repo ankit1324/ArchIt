@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { db, listingToRow, listingForViewer, OWNED_COLUMNS } from "@/lib/db";
+import { db, designAttachCheck, listingToRow, OWNED_COLUMNS, type PropertyRow } from "@/lib/db";
+import { validateListingWrite } from "@/lib/listing-presentation";
 import { parseBBox, parseCursor, parseLimit } from "@/lib/listing-query";
-import { listProperties } from "@/lib/properties";
+import { listProperties, presentListings } from "@/lib/properties";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
 import { safeImageUrl } from "@/lib/url";
@@ -45,23 +46,43 @@ export async function POST(request: Request) {
   const l = await parseJsonBody(request, (v) => validateListing(v, safeImageUrl));
   if (l instanceof Response) return l;
 
+  // a new listing has no stored design, so any designId must be the caller's
+  // own published design (lib/listing-presentation.ts)
+  let newDesign: Awaited<ReturnType<typeof designAttachCheck>> = null;
+  if (typeof l.designId === "string") {
+    try {
+      newDesign = await designAttachCheck(l.designId, userId);
+    } catch (e) {
+      console.error("POST /api/properties design check failed:", e instanceof Error ? e.message : e);
+      return Response.json({ error: "internal error" }, { status: 500 });
+    }
+  }
+  const v = validateListingWrite(l, null, newDesign, null);
+  if (!v.ok) return Response.json({ error: v.error }, { status: v.status });
+
   // featured is a paid boost (₹250 featured_property): never trusted from the
   // body. It starts false and is flipped server-side once a purchase with
   // ref = this listing's id is recorded (lib/purchases.ts applyEntitlement).
-  // New listings wait in the admin queue (/admin) until approved.
+  // New listings (showcase ones included) wait in the admin queue (/admin)
+  // until approved.
   const { data, error } = await db
     .from("properties")
-    .insert({ ...listingToRow(l), user_id: userId, featured: false, status: "pending" })
+    .insert({
+      ...listingToRow({ ...l, price: v.price }),
+      design_id: v.designId,
+      default_view: v.defaultView,
+      user_id: userId,
+      featured: false,
+      status: "pending",
+    })
     .select(OWNED_COLUMNS)
-    .single();
+    .single<PropertyRow>();
   if (error) {
     console.error("POST /api/properties failed:", error.message);
     return Response.json({ error: "internal error" }, { status: 500 });
   }
   // the lister just typed the owner field — echo it back so the UI keeps it
   // without a paid lookup; they own the row they just created
-  return Response.json(
-    { ...listingForViewer(data, userId), owner: l.owner ?? undefined },
-    { status: 201 },
-  );
+  const [listing] = await presentListings([data], userId, "POST /api/properties");
+  return Response.json({ ...listing, owner: l.owner ?? undefined }, { status: 201 });
 }

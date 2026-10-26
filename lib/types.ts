@@ -1,4 +1,7 @@
-export type ListingType = "sale" | "rent";
+export type ListingType = "sale" | "rent" | "showcase";
+
+/** what a listing opens on: its photos or the attached 3D design */
+export type ListingView = "photos" | "3d";
 
 export type PropertyKind =
   | "apartments"
@@ -47,6 +50,14 @@ export interface Listing {
    * not live ('pending' review or 'rejected'). Absent means live.
    */
   status?: "pending" | "rejected";
+  /** attached ArchIt design; visitors only see it while it is published */
+  designId?: string;
+  /** snapshot of the attached design (published only) */
+  designSnapshot?: string;
+  /** what the listing opens on; visitors get "photos" unless the design is published */
+  defaultView?: ListingView;
+  /** lister-only: whether the attached design is currently published */
+  designPublished?: boolean;
 }
 
 export interface Poi {
@@ -106,9 +117,36 @@ export interface Design {
   design: DesignStateV3;
   snapshot?: string;
   meta?: DesignMeta;
+  /** ISO time it was published; absent = private */
+  publishedAt?: string;
+  /** short human label for the picked spot, e.g. "Sector 8, Chandigarh" */
+  place?: string;
 }
 
-export function formatPrice(l: Listing): string {
+/**
+ * What other users see of a published design. Never carries user_id or the
+ * private parts of meta (budget, notes) — see lib/showcase.ts.
+ */
+export interface PublishedDesign {
+  id: string;
+  name: string;
+  /** [lng, lat]; null when no spot was picked */
+  plotCenter: [number, number] | null;
+  plotW: number;
+  plotD: number;
+  place?: string;
+  facing?: DesignMeta["facing"];
+  snapshot?: string;
+  authorName: string;
+  publishedAt: string;
+  /** true when the session user published it (server-computed) */
+  mine: boolean;
+  /** only on the single-design endpoint */
+  design?: DesignStateV3;
+}
+
+export function formatPrice(l: Pick<Listing, "type" | "price">): string {
+  if (l.type === "showcase") return "Showcase";
   const n = `₹${l.price.toLocaleString("en-IN")}`;
   return l.type === "rent" ? `${n}/mo` : n;
 }

@@ -73,6 +73,7 @@ export function listingPublicHref(id: string): string {
 
 /** "₹45,00,000" for sale, "₹25,000/mo" for rent (same format as lib/types formatPrice). */
 export function listingPriceLabel(price: number, type: string): string {
+  if (type === "showcase") return "Showcase";
   const n = `₹${(Number(price) || 0).toLocaleString("en-IN")}`;
   return type === "rent" ? `${n}/mo` : n;
 }

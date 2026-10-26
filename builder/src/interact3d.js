@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {blockGroups, doorPlacement, updateSelection} from './house3d.js';
 import {C} from './catalog.js';
-import {chips, ov, stage, toast} from './dom.js';
+import {VIEW, chips, ov, stage, toast} from './dom.js';
 import {commit, footprint, getBlock, localToWorld, newRoom, redoStack, sel, selBlock, selDoor, selFurn, setDirty, setSel, snapshot, state, ui, undoStack} from './state.js';
 import {clampFurn, nearestWallT, overlaps, sharedWall, snapBlock, worldToLocal} from './geometry.js';
 import {blocksRoot, camera, canvas, controls, renderer, requestRender, requestShadows, selOutline} from './scene.js';
 import {render2D} from './plan2d.js';
-import {renderAll, renderSelection} from './ui.js';
+import {renderAll, renderSelection, resetCam} from './ui.js';
 import {placeFurniture} from './tools.js';
 
 /* -------- hotspots + chips overlay -------- */
@@ -29,6 +29,7 @@ function computeHotspots(){
   });
 }
 function addRoomAt(refId, sx, sz, type='bedroom'){
+  if(VIEW) return;
   const ref = getBlock(refId);
   const [rw, rd] = footprint(ref);
   const spec = C.rooms[type];
@@ -44,6 +45,7 @@ function addRoomAt(refId, sx, sz, type='bedroom'){
 
 function renderHotspots(){
   ov.querySelectorAll('.hs').forEach(e=>e.remove());
+  if(VIEW) return;   // "+ add room" buttons are editing UI
   computeHotspots();
   hotspots.forEach(h=>{
     const el = document.createElement('button');
@@ -126,6 +128,9 @@ canvas.addEventListener('pointerdown', e=>{
   // Walk mode: a click only grabs the mouse for looking (walk.js) — never
   // select, drag or place anything through the first-person camera.
   if(ui.walk){ downPos = null; drag3 = null; return; }
+  // read-only viewer: no selection, drag or placement; OrbitControls still
+  // gets the event (it listens on the canvas itself)
+  if(VIEW){ downPos = null; drag3 = null; return; }
   downPos = [e.clientX, e.clientY];
   drag3 = null;
   if(!state || !sel) return;
@@ -151,7 +156,7 @@ canvas.addEventListener('pointerdown', e=>{
   if(drag3){ controls.enabled = false; canvas.setPointerCapture(e.pointerId); }
 });
 canvas.addEventListener('pointermove', e=>{
-  if(!drag3 || !downPos) return;
+  if(VIEW || !drag3 || !downPos) return;
   const dx = e.clientX-downPos[0], dy = e.clientY-downPos[1];
   if(!drag3.moved && dx*dx+dy*dy < 16) return;
   drag3.moved = true;
@@ -192,6 +197,7 @@ canvas.addEventListener('pointermove', e=>{
   requestShadows();
 });
 canvas.addEventListener('pointerup', e=>{
+  if(VIEW) return;
   if(drag3){
     controls.enabled = true;
     ov.style.visibility = '';
@@ -250,8 +256,14 @@ canvas.addEventListener('pointercancel', ()=>{
 /* -------- resize / loop -------- */
 function resize(){
   const r = stage.getBoundingClientRect();
+  // a hidden or not-yet-laid-out frame (the viewer iframe mounting) is 0x0:
+  // 0/0 would make the aspect, and then the framed camera, NaN — wait for a
+  // real size (the ResizeObserver below calls again)
+  if(!(r.width > 0 && r.height > 0)) return;
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width/r.height; camera.updateProjectionMatrix();
+  // a camera framed while the aspect was unusable is NaN: re-frame it
+  if(!Number.isFinite(camera.position.x)) resetCam();
   _ovlDirty = true; requestRender();
   if(ui.view==='2d') render2D();
 }

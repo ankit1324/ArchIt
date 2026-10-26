@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {PAID_TEMPLATES, TEMPLATES, fetchPaidGeometry, loadTemplateCatalog, markTemplateOwned, showTemplatePicker, tRoom, tRoomSpec} from './templates.js';
 import {C} from './catalog.js';
-import {$, EMBED, toast} from './dom.js';
+import {$, EMBED, VIEW, toast} from './dom.js';
 import {dirty, freshState, linkFloor, sel, setDirty, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
 import {boundsOf, roofComponents, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
 import {blocksRoot, camera, controls, pmrem, renderer, scene, setContext, wallMats} from './scene.js';
@@ -113,6 +113,7 @@ addEventListener('pagehide', e=>{
       // Parent finished checkout for a template. The server is the
       // authority — we just re-read the catalog and open the bought template.
       if(m?.type === 'archit:template-purchased'){
+        if(VIEW) return;
         const key = m.payload && m.payload.key;
         if(!key) return;
         await loadTemplateCatalog();
@@ -143,6 +144,8 @@ addEventListener('pagehide', e=>{
       setContext(p.plot, p.neighbors, p.facing);
       setUndoStack([]); setRedoStack([]); setSel(null); setDirty(false);
       resetCam(); renderAll();
+      // a viewer wants the house, not the editing plan newProject() opened
+      if(VIEW) setView('3d');
     });
     // Parent replies once the design row is written (after the thumbnail
     // upload); only then is the design really saved.
@@ -155,7 +158,7 @@ addEventListener('pagehide', e=>{
       else toast(r.error ? 'Could not save: ' + r.error : 'Could not save — try again');
     });
     document.getElementById('saveMapB').addEventListener('click', async ()=>{
-      if(saving) return;
+      if(VIEW || saving) return;   // read-only viewer: never posts a save
       const all = (state.floors || [{blocks: state.blocks}]).flatMap(f=>f.blocks);
       if(!all.length){ toast('Add at least one room first'); return; }
       saving = true;
@@ -167,7 +170,7 @@ addEventListener('pagehide', e=>{
       parent.postMessage({type:'archit:save', payload:{design:{v:3, state}, snapshot}}, location.origin);
     });
     document.getElementById('closeEmbedB').addEventListener('click', ()=>{
-      parent.postMessage({type:'archit:close', dirty}, location.origin);
+      parent.postMessage({type:'archit:close', dirty: VIEW ? false : dirty}, location.origin);
     });
     parent.postMessage({type:'archit:ready'}, location.origin);
   } else if(await tryHashLoad()){

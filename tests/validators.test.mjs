@@ -333,3 +333,36 @@ test("parseJsonBody: maxBytes option raises the cap", async () => {
   );
   assert.deepEqual(r, { ok: true });
 });
+
+// ---------------------------------------------------------------------------
+// Listings: showcase intent and attached design (multi-user showcase)
+// ---------------------------------------------------------------------------
+
+test("listing: showcase intent is accepted and stored at price 0", () => {
+  const r = validateListing(listing({ type: "showcase", price: 999 }));
+  assert.equal(isError(r), false);
+  assert.equal(r.type, "showcase");
+  assert.equal(r.price, 0);
+});
+
+test("listing: designId is optional, nullable and shape-checked", () => {
+  assert.ok(!("designId" in validateListing(listing())));
+  assert.equal(validateListing(listing({ designId: null })).designId, null);
+  assert.equal(validateListing(listing({ designId: "0b6c-uuid_1" })).designId, "0b6c-uuid_1");
+  assert.ok(isError(validateListing(listing({ designId: 42 }))));
+  assert.ok(isError(validateListing(listing({ designId: "a b" }))));
+  assert.ok(isError(validateListing(listing({ designId: "x".repeat(65) }))));
+  assert.ok(isError(validateListing(listing({ designId: "a\u0000" }))));
+});
+
+test("listing: defaultView must be photos or 3d", () => {
+  assert.equal(validateListing(listing({ defaultView: "3d" })).defaultView, "3d");
+  assert.ok(!("defaultView" in validateListing(listing())));
+  assert.ok(isError(validateListing(listing({ defaultView: "video" }))));
+});
+
+test("listing: client cannot set server-side design fields", () => {
+  const r = validateListing(listing({ designSnapshot: "https://evil.example/x.png", designPublished: true }));
+  assert.ok(!("designSnapshot" in r));
+  assert.ok(!("designPublished" in r));
+});

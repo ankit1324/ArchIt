@@ -11,7 +11,7 @@ export interface EditableListing {
   address: string;
   city: string;
   price: number;
-  type: "sale" | "rent";
+  type: "sale" | "rent" | "showcase";
   kind: string;
   beds: number;
   baths: number;
@@ -148,9 +148,15 @@ export default function ListingEditForm({ id, initial }: { id: string; initial: 
       </label>
       <label className={label}>
         Type
-        <select className={input} value={v.type} onChange={(e) => set("type", e.target.value as "sale" | "rent")}>
+        <select
+          className={input}
+          value={v.type}
+          onChange={(e) => set("type", e.target.value as EditableListing["type"])}
+        >
           <option value="sale">Sale</option>
           <option value="rent">Rent</option>
+          {/* not on the market: saved with price 0 (lib/validators.ts) */}
+          <option value="showcase">Showcase only</option>
         </select>
       </label>
       <label className={label}>

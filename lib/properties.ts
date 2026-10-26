@@ -1,5 +1,13 @@
 import "server-only";
-import { db, listingForViewer, OWNED_COLUMNS, type PropertyRow } from "./db";
+import {
+  attachedDesigns,
+  db,
+  listingForViewer,
+  OWNED_COLUMNS,
+  type AttachedDesign,
+  type PropertyRow,
+} from "./db";
+import { presentListing } from "./listing-presentation";
 import { PAGE_LIMIT, type BBox } from "./listing-query";
 import { onlyVisible } from "./moderation";
 import type { Listing } from "./types";
@@ -40,7 +48,32 @@ export async function listProperties({
   if (error) throw new Error(error.message);
   const rows = data as unknown as PropertyRow[];
   return {
-    listings: rows.map((r) => listingForViewer(r, userId)),
+    listings: await presentListings(rows, userId),
     nextCursor: rows.length === limit ? rows[rows.length - 1].id : null,
   };
+}
+
+/**
+ * listingForViewer plus the attached-design fields (presentListing): visitors
+ * see a listing's design only while it is published; the lister always sees
+ * the attachment and whether it is published. One design query per call.
+ * Best effort: a failed design lookup logs and presents the listings without
+ * their designs rather than failing the whole page.
+ */
+export async function presentListings(
+  rows: PropertyRow[],
+  userId: string | null | undefined,
+  context = "listings",
+): Promise<Listing[]> {
+  let designs = new Map<string, AttachedDesign>();
+  try {
+    designs = await attachedDesigns(rows.map((r) => r.design_id));
+  } catch (e) {
+    console.error(`${context}: attached design lookup failed:`, e instanceof Error ? e.message : e);
+  }
+  return rows.map((r) => {
+    const listing = listingForViewer(r, userId);
+    const design = r.design_id ? designs.get(r.design_id) : undefined;
+    return presentListing(listing, r, design, !!listing.mine);
+  });
 }

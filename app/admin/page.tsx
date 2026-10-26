@@ -207,7 +207,7 @@ export default async function AdminPage() {
                   <div className="font-bold">{p.building_name || p.address}</div>
                   <div className="text-[13px] text-plum-soft">
                     {p.building_name ? `${p.address}, ` : ""}
-                    {p.city} · {p.kind} · {p.type === "sale" ? "Sale" : "Rent"} · ₹
+                    {p.city} · {p.kind} · {p.type === "sale" ? "Sale" : p.type === "showcase" ? "Showcase" : "Rent"} · ₹
                     {Number(p.price).toLocaleString("en-IN")}
                   </div>
                   <div className="mt-1 text-[12px] text-plum-soft">

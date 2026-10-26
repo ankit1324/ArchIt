@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {closeToolPop, syncToolCursor} from './tools.js';
 import {C} from './catalog.js';
-import {$, chips, round1, stage, toast} from './dom.js';
+import {$, VIEW, chips, round1, stage, toast} from './dom.js';
 import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, undo, undoStack} from './state.js';
 import {FLH, boundsOf, clampFurn, designIssues, overlaps} from './geometry.js';
 import {camera, controls, requestRender, requestShadows, selOutline, wallMats} from './scene.js';
@@ -48,9 +48,10 @@ modal.addEventListener('click', e=>{
 
 modal.addEventListener('click', e=>{
   const rst = e.target.closest('[data-reset]');
-  if(rst){ try{ localStorage.removeItem('architHome'); localStorage.removeItem('krausHome'); }catch(e){} newProject(); showTemplatePicker(); }
+  if(rst && !VIEW){ try{ localStorage.removeItem('architHome'); localStorage.removeItem('krausHome'); }catch(e){} newProject(); showTemplatePicker(); }
 });
 $('#resetB').addEventListener('click', ()=>{
+  if(VIEW) return;
   showModal(`
     <h3>Start over?</h3>
     <p class="hint">The current project will be deleted and replaced with a fresh single-room house.</p>
@@ -70,7 +71,10 @@ function resetCam(){
   // +1.2 m for eaves overhang, +2.5 m headroom for a pitched roof
   const R = Math.hypot(bb.w + 1.2, bb.d + 1.2, FLH()*floors.length + 2.5) / 2;
   const vHalf = camera.fov * Math.PI / 360;
-  const half = Math.min(vHalf, Math.atan(Math.tan(vHalf) * camera.aspect));
+  // a 0x0 frame (hidden iframe) leaves aspect 0 or NaN: frame for a square
+  // view rather than writing NaN into the camera
+  const aspect = camera.aspect > 0 && Number.isFinite(camera.aspect) ? camera.aspect : 1;
+  const half = Math.min(vHalf, Math.atan(Math.tan(vHalf) * aspect));
   const offset = new THREE.Vector3(10.5, 6.4, 12.5);   // camera (10.5, 7.5, 12.5) around target y 1.1
   const dist = Math.max(offset.length(), R / Math.sin(half) * 1.1);
   controls.maxDistance = Math.max(40, dist * 1.5);
@@ -169,15 +173,16 @@ $('#wallsDD .dd-menu').addEventListener('click', e=>{
 });
 function renderFloorDD(){
   $('#floorDD .dd-btn').firstChild.textContent = `Floor ${state.floor+1} `;
-  const canDel = state.floors.length > 1;
+  const canDel = !VIEW && state.floors.length > 1;
   $('#floorDD .dd-menu').innerHTML =
     state.floors.map((f,i)=>`<button data-fl="${i}" class="fl-row ${i===state.floor?'on':''}"><span>Floor ${i+1}${f.blocks.length?'':' (empty)'}</span>${canDel?`<span class="fl-del" data-del="${i}" title="Delete floor ${i+1}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0l1 13h8l1-13"/></svg></span>`:''}</button>`).join('')
-    + `<button data-fl="add">+ Add floor</button>`;
+    + (VIEW ? '' : `<button data-fl="add">+ Add floor</button>`);
 }
 $('#floorDD .dd-menu').addEventListener('click', e=>{
   const del = e.target.closest('.fl-del');
   if(del){
     e.stopPropagation();
+    if(VIEW) return;
     const i = +del.dataset.del;
     if(state.floors.length<=1) return;
     $('#floorDD').classList.remove('open');
@@ -193,6 +198,7 @@ $('#floorDD .dd-menu').addEventListener('click', e=>{
   const btn = e.target.closest('button'); if(!btn) return;
   $('#floorDD').classList.remove('open');
   if(btn.dataset.fl==='add'){
+    if(VIEW) return;
     if(state.floors.length>=3){ toast('Up to 3 floors'); return; }
     commit(()=>{
       state.floors.push({blocks:[]});
@@ -240,6 +246,8 @@ document.addEventListener('keydown', e=>{
   // Walk mode owns WASD/arrows (walk.js); editing shortcuts here would nudge or
   // delete whatever was selected before (or clicked while grabbing the mouse).
   if(ui.walk) return;
+  // read-only viewer: every shortcut below edits (undo/redo/delete/nudge)
+  if(VIEW) return;
   if((e.metaKey||e.ctrlKey) && e.key==='z'){ e.preventDefault(); e.shiftKey? redo() : undo(); }
   if((e.metaKey||e.ctrlKey) && e.key==='y'){ e.preventDefault(); redo(); }
   if((e.key==='Delete'||e.key==='Backspace') && sel){

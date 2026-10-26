@@ -108,7 +108,7 @@ export default async function AdminListings({
                       </Link>
                       <div className="text-plum-soft">
                         {l.building_name ? `${l.address}, ` : ""}
-                        {l.city} · {l.kind} · {l.type === "sale" ? "Sale" : "Rent"}
+                        {l.city} · {l.kind} · {l.type === "sale" ? "Sale" : l.type === "showcase" ? "Showcase" : "Rent"}
                         {l.featured ? " · ★ featured" : ""}
                       </div>
                     </td>

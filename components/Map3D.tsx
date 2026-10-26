@@ -8,7 +8,7 @@ import type { StyleSpecification } from "maplibre-gl";
 // ride this lazy (ssr:false) chunk, so only /find pays for them.
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
-import type { Listing, Poi } from "@/lib/types";
+import type { Listing, Poi, PublishedDesign } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { safeImageUrl, sizedImageUrl } from "@/lib/url";
 
@@ -70,6 +70,7 @@ function hashOf(s: string): number {
 const PRISM_COLORS: Record<Listing["type"], string> = {
   rent: "#a06ae8",
   sale: "#ccdb2a",
+  showcase: "#8b5cf6",
 };
 
 const POI_SVGS: Record<Poi["icon"], string> = {
@@ -146,6 +147,8 @@ const LISTING_SOURCE = "listings";
 const LAYER_CLUSTERS = "listing-clusters";
 const LAYER_PINS = "listing-pins";
 const LAYER_POIS = "pois";
+const DESIGN_SOURCE = "designs";
+const LAYER_DESIGNS = "design-pins";
 
 /**
  * whether a listing's pill carries a photo bubble (stable across re-sorts).
@@ -314,6 +317,121 @@ function drawCluster(label: string): ImageData {
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
+// ── Design pins ─────────────────────────────────────────────────────────────
+// Published designs (the showcase) ride their own unclustered GeoJSON source
+// and symbol layer, painted the same way as listing pills: a violet pill with
+// a "3D" badge (or the design's snapshot thumbnail) and its name, no price.
+const DESIGN_PIN = {
+  fill: "#6d28d9", // violet-700: white text is 7.1:1
+  badge: "#ede9fe",
+  badgeText: "#4c1d95",
+  selectedRing: "#e2ef6a",
+};
+const DESIGN_NAME_MAX = 22;
+
+function designLabel(d: PublishedDesign): string {
+  const name = d.name.trim() || "Design";
+  return name.length > DESIGN_NAME_MAX ? `${name.slice(0, DESIGN_NAME_MAX - 1)}\u2026` : name;
+}
+
+/** the snapshot's 64px variant, when one exists (never the full-size original) */
+function designThumbUrl(d: PublishedDesign): string | null {
+  const sized = sizedImageUrl(d.snapshot, 64);
+  return sized && sized !== safeImageUrl(d.snapshot) ? sized : null;
+}
+
+/** image key for a design pill: changes whenever what it draws changes */
+function designPinKey(d: PublishedDesign, selected: boolean): string {
+  const sig = `${designLabel(d)}|${designThumbUrl(d) ?? ""}`;
+  return `dpin|${d.id}|${hashOf(sig).toString(36)}|${selected ? 1 : 0}`;
+}
+
+function designGeoJSON(designs: PublishedDesign[], selectedId: string | null): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: designs
+      .filter((d) => d.plotCenter)
+      .map((d) => ({
+        type: "Feature",
+        properties: {
+          id: d.id,
+          icon: designPinKey(d, d.id === selectedId),
+          rank: d.id === selectedId ? 1 : 0,
+        },
+        geometry: { type: "Point", coordinates: d.plotCenter as [number, number] },
+      })),
+  };
+}
+
+/** Paint one design pill. `thumb` is null until its 64px snapshot has loaded. */
+function drawDesignPin(d: PublishedDesign, selected: boolean, thumb: ThumbSource | null): ImageData {
+  const pr = pixelRatio();
+  const scale = selected ? 1.12 : 1;
+  const label = designLabel(d);
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = pinFont(PIN_FONT_SIZE);
+  const textW = Math.ceil(measure.measureText(label).width);
+  const padL = 5 + THUMB + 6;
+  const pillW = padL + textW + 12;
+  const w = Math.ceil((pillW + PIN_MARGIN * 2) * scale);
+  const h = Math.ceil((PIN_H + PIN_MARGIN * 2) * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(w * pr);
+  // same PIN_LIFT baked-in gap as listing pills (see drawPin)
+  canvas.height = Math.ceil((h + PIN_LIFT) * pr);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(pr * scale, pr * scale);
+  const x = PIN_MARGIN;
+  const y = PIN_MARGIN;
+  const r = PIN_H / 2;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(76, 29, 149, 0.45)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  roundRect(ctx, x, y, pillW, PIN_H, r);
+  ctx.fillStyle = DESIGN_PIN.fill;
+  ctx.fill();
+  ctx.restore();
+
+  if (selected) {
+    roundRect(ctx, x - 1.5, y - 1.5, pillW + 3, PIN_H + 3, r + 1.5);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = DESIGN_PIN.selectedRing;
+    ctx.stroke();
+  }
+
+  const cx = x + 5 + THUMB / 2;
+  const cy = y + PIN_H / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, THUMB / 2, 0, Math.PI * 2);
+  ctx.clip();
+  if (thumb) {
+    const sw = "naturalWidth" in thumb ? thumb.naturalWidth : thumb.width;
+    const sh = "naturalHeight" in thumb ? thumb.naturalHeight : thumb.height;
+    const side = Math.min(sw, sh);
+    ctx.drawImage(thumb, (sw - side) / 2, (sh - side) / 2, side, side, cx - THUMB / 2, cy - THUMB / 2, THUMB, THUMB);
+  } else {
+    ctx.fillStyle = DESIGN_PIN.badge;
+    ctx.fillRect(cx - THUMB / 2, cy - THUMB / 2, THUMB, THUMB);
+    ctx.font = pinFont(9);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = DESIGN_PIN.badgeText;
+    ctx.fillText("3D", cx, cy + 0.5);
+  }
+  ctx.restore();
+
+  ctx.font = pinFont(PIN_FONT_SIZE);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(label, x + padL, y + PIN_H / 2 + 0.5);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
 /** POI bubble (icon tile + white label), rasterised once per POI */
 async function drawPoi(p: Poi): Promise<ImageData> {
   const pr = pixelRatio();
@@ -379,6 +497,10 @@ const FALLBACK_STYLE: StyleSpecification = {
 
 interface Map3DProps {
   listings: Listing[];
+  /** published designs to pin (already filtered by the layer toggle / search) */
+  designs?: PublishedDesign[];
+  selectedDesignId?: string | null;
+  onSelectDesign?: (id: string) => void;
   pois: Poi[];
   mapRef: RefObject<maplibregl.Map | null>;
   selectedId?: string | null;
@@ -390,8 +512,13 @@ interface Map3DProps {
   draftCoords?: [number, number] | null;
 }
 
+const NO_DESIGNS: PublishedDesign[] = [];
+
 export default function Map3D({
   listings,
+  designs = NO_DESIGNS,
+  selectedDesignId = null,
+  onSelectDesign,
   pois,
   mapRef,
   selectedId = null,
@@ -405,7 +532,11 @@ export default function Map3D({
   const draftMarkerRef = useRef<maplibregl.Marker | null>(null);
   // pill images added so far, so ones no feature uses any more can be dropped
   const pinImagesRef = useRef<Set<string>>(new Set());
+  const designImagesRef = useRef<Set<string>>(new Set());
   const listingsRef = useRef(listings);
+  const designsRef = useRef(designs);
+  const selectedDesignIdRef = useRef(selectedDesignId);
+  const onSelectDesignRef = useRef(onSelectDesign);
   const selectedIdRef = useRef(selectedId);
   const onSelectRef = useRef(onSelect);
   const onMapClickRef = useRef(onMapClick);
@@ -415,6 +546,9 @@ export default function Map3D({
   // once and reads these from maplibre callbacks, which always fire post-commit.
   useEffect(() => {
     listingsRef.current = listings;
+    designsRef.current = designs;
+    selectedDesignIdRef.current = selectedDesignId;
+    onSelectDesignRef.current = onSelectDesign;
     selectedIdRef.current = selectedId;
     onSelectRef.current = onSelect;
     onMapClickRef.current = onMapClick;
@@ -486,6 +620,26 @@ export default function Map3D({
         map.addImage(id, drawCluster(id.slice(8)), { pixelRatio: pixelRatio() });
         return;
       }
+      if (id.startsWith("dpin|")) {
+        const [, designId, , dsel] = id.split("|");
+        const d = designsRef.current.find((x) => x.id === designId);
+        if (!d) return;
+        const selected = dsel === "1";
+        map.addImage(id, drawDesignPin(d, selected, null), { pixelRatio: pixelRatio() });
+        designImagesRef.current.add(id);
+        const url = designThumbUrl(d);
+        if (url) {
+          void loadThumb(url).then((img) => {
+            if (!img || !map.hasImage(id)) return;
+            try {
+              map.updateImage(id, drawDesignPin(d, selected, img));
+            } catch {
+              // canvas tainted: keep the "3D" badge
+            }
+          });
+        }
+        return;
+      }
       if (!id.startsWith("pin|")) return;
       const [, listingId, , sel] = id.split("|");
       const l = listingsRef.current.find((x) => x.id === listingId);
@@ -507,7 +661,7 @@ export default function Map3D({
     });
 
     const markerLayers = () =>
-      [LAYER_PINS, LAYER_CLUSTERS].filter((id) => map.getLayer(id));
+      [LAYER_DESIGNS, LAYER_PINS, LAYER_CLUSTERS].filter((id) => map.getLayer(id));
 
     map.on("click", (e) => {
       // while placing a new property every click places the pin: a click that
@@ -531,9 +685,13 @@ export default function Map3D({
         onSelectRef.current?.(hit.properties.id as string);
         return;
       }
+      if (hit?.layer.id === LAYER_DESIGNS) {
+        onSelectDesignRef.current?.(hit.properties.id as string);
+        return;
+      }
       onMapClickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
     });
-    for (const layer of [LAYER_PINS, LAYER_CLUSTERS]) {
+    for (const layer of [LAYER_PINS, LAYER_CLUSTERS, LAYER_DESIGNS]) {
       map.on("mouseenter", layer, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -619,9 +777,35 @@ export default function Map3D({
           "symbol-sort-key": ["coalesce", ["get", "rank"], 0],
         },
       });
+
+      // published designs: never clustered (there are few, and a design pin
+      // must not hide inside a listing count), drawn above the listing pills
+      map.addSource(DESIGN_SOURCE, {
+        type: "geojson",
+        data: designGeoJSON(designsRef.current, selectedDesignIdRef.current),
+      });
+      map.addLayer({
+        id: LAYER_DESIGNS,
+        type: "symbol",
+        source: DESIGN_SOURCE,
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-anchor": "bottom",
+          "icon-allow-overlap": true,
+          "symbol-sort-key": ["coalesce", ["get", "rank"], 0],
+        },
+      });
     });
 
     map.on("load", () => {
+      // a deep-linked design (/find?design=<id>) replaces the intro: fly to it
+      const focus = selectedDesignIdRef.current
+        ? designsRef.current.find((d) => d.id === selectedDesignIdRef.current)
+        : undefined;
+      if (focus?.plotCenter) {
+        map.flyTo({ center: focus.plotCenter, zoom: 16.4, pitch: 58, duration: 2400, essential: false });
+        return;
+      }
       // cinematic settle, mirroring the video intro
       map.flyTo({
         center: CENTER,
@@ -658,6 +842,22 @@ export default function Map3D({
       pinImagesRef.current.delete(id);
     }
   }, [listings, selectedId, mapRef]);
+
+  // react to the design layer / search / selection
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const src = map.getSource(DESIGN_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+    const data = designGeoJSON(designs, selectedDesignId);
+    src.setData(data);
+    const live = new Set(data.features.map((f) => f.properties!.icon as string));
+    for (const id of designImagesRef.current) {
+      if (live.has(id)) continue;
+      if (map.hasImage(id)) map.removeImage(id);
+      designImagesRef.current.delete(id);
+    }
+  }, [designs, selectedDesignId, mapRef]);
 
   useEffect(() => {
     const map = mapRef.current;

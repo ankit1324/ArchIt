@@ -9,9 +9,21 @@ import {
   parsePage,
   sanitizeSearch,
   sumPaise,
+  validateDesignAction,
   validateOrderAction,
   validateUserAction,
 } from "../lib/admin-tools.ts";
+
+test("validateDesignAction accepts only unpublish, with an optional trimmed note", () => {
+  assert.deepEqual(validateDesignAction({ action: "unpublish" }), { action: "unpublish", note: null });
+  assert.deepEqual(validateDesignAction({ action: "unpublish", note: "  spam  " }), {
+    action: "unpublish",
+    note: "spam",
+  });
+  assert.equal(typeof validateDesignAction({ action: "delete" }), "string");
+  assert.equal(typeof validateDesignAction({ action: "publish" }), "string");
+  assert.equal(typeof validateDesignAction(null), "string");
+});
 
 test("parsePage clamps to a positive, bounded integer", () => {
   assert.equal(parsePage(undefined), 1);

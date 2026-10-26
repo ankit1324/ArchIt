@@ -28,7 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const l = await getPublicListing(id);
   if (!l) return { title: "Listing not found", robots: { index: false } };
   const city = cityName(l.city);
-  const title = `${headline(l)} — ${l.type === "sale" ? "For sale" : "For rent"}${
+  const title = `${headline(l)} — ${
+    l.type === "showcase" ? "Showcase" : l.type === "sale" ? "For sale" : "For rent"
+  }${
     city ? ` in ${city}` : ""
   }`;
   const description = summary(l);
@@ -64,15 +66,20 @@ function jsonLd(l: PublicListing) {
     description: summary(l),
     ...(l.createdAt ? { datePosted: l.createdAt } : {}),
     ...(photos.length ? { image: photos } : {}),
-    offers: {
-      "@type": "Offer",
-      price: l.price,
-      priceCurrency: "INR",
-      businessFunction:
-        l.type === "sale"
-          ? "http://purl.org/goodrelations/v1#Sell"
-          : "http://purl.org/goodrelations/v1#LeaseOut",
-    },
+    // a showcase listing is not on the market: no offer to describe
+    ...(l.type === "showcase"
+      ? {}
+      : {
+          offers: {
+            "@type": "Offer",
+            price: l.price,
+            priceCurrency: "INR",
+            businessFunction:
+              l.type === "sale"
+                ? "http://purl.org/goodrelations/v1#Sell"
+                : "http://purl.org/goodrelations/v1#LeaseOut",
+          },
+        }),
     about: {
       "@type": l.kind === "apartments" ? "Apartment" : l.kind === "house" ? "House" : "Place",
       name: `${kindLabel(l)} · ${headline(l)}`,

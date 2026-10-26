@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_FILTERS, countFilters, findListings } from "../lib/find.ts";
+import { DEFAULT_FILTERS, countFilters, findListings, matchesDesignQuery } from "../lib/find.ts";
 
 const listings = [
   { id: "large", buildingName: "Garden House", address: "Sector 8", city: "Chandigarh", type: "sale", kind: "house", price: 25000000, areaM: 400, rooms: 6, floors: 2 },
@@ -33,4 +33,31 @@ test("sorts results without mutating the loaded listings", () => {
 test("reset returns all listings after a restrictive search", () => {
   assert.deepEqual(find({ type: "sale" }, "Mohali"), []);
   assert.equal(find().length, listings.length);
+});
+
+const withShowcase = [
+  ...listings,
+  { id: "show", buildingName: "Lake Villa", address: "Sector 2", city: "Panchkula", type: "showcase", kind: "house", price: 0, areaM: 300, rooms: 4, floors: 2 },
+];
+const findAll = (patch = {}, query = "", sort = "recommended") => findListings(withShowcase, { ...DEFAULT_FILTERS, ...patch }, query, sort).map((l) => l.id);
+
+test("showcase type filter returns only showcase listings", () => {
+  assert.deepEqual(findAll({ type: "showcase" }), ["show"]);
+  assert.deepEqual(findAll({ type: "sale" }), ["large"]);
+});
+test("showcase listings pass the price filter despite their 0 price", () => {
+  assert.deepEqual(findAll({ price: [1000, 50000] }), ["featured", "small", "show"]);
+});
+test("price sorts put showcase listings last", () => {
+  assert.deepEqual(findAll({}, "", "price-asc"), ["small", "featured", "large", "show"]);
+  assert.deepEqual(findAll({}, "", "price-desc"), ["large", "featured", "small", "show"]);
+});
+test("design search matches name and place regardless of case", () => {
+  const design = { id: "d1", name: "Courtyard Home", place: "Sector 8, Chandigarh", plotCenter: [76.7, 30.7], plotW: 20, plotD: 30, authorName: "Asha", publishedAt: "2026-10-17T00:00:00Z", mine: false };
+  assert.equal(matchesDesignQuery(design, ""), true);
+  assert.equal(matchesDesignQuery(design, "courtyard"), true);
+  assert.equal(matchesDesignQuery(design, " CHANDIGARH home "), true);
+  assert.equal(matchesDesignQuery(design, "asha"), true);
+  assert.equal(matchesDesignQuery(design, "mohali"), false);
+  assert.equal(matchesDesignQuery({ ...design, place: undefined }, "sector"), false);
 });
