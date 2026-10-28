@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db, designUpdateRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
 import { designEditNeedsReview } from "@/lib/moderation";
+import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
 import { removeUnreferencedUploads } from "@/lib/storage";
 import { safeImageUrl } from "@/lib/url";
@@ -16,6 +17,10 @@ export async function PUT(
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  // shared bucket across POST/PUT/DELETE: each write uploads up to ~1 MB
+  if (!(await checkRateLimit(ipKey(request, "designs-write", userId), 30, 60_000))) {
+    return rateLimitedResponse();
+  }
   const locked = await builderUnlockError(userId);
   if (locked) return locked;
   const { id } = await params;
@@ -70,11 +75,15 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  // shared bucket across POST/PUT/DELETE: each write uploads up to ~1 MB
+  if (!(await checkRateLimit(ipKey(request, "designs-write", userId), 30, 60_000))) {
+    return rateLimitedResponse();
+  }
   const locked = await builderUnlockError(userId);
   if (locked) return locked;
   const { id } = await params;

@@ -56,6 +56,15 @@ export function validateContact(body: unknown): ContactResult | string {
     return { spam: true };
   }
 
+  // Postgres text cannot store U+0000: the insert would fail with a 500, so
+  // refuse it here with a message instead.
+  for (const field of ["name", "email", "message"] as const) {
+    const v = b[field];
+    if (typeof v === "string" && v.includes("\u0000")) {
+      return `The ${field} contains an invalid character.`;
+    }
+  }
+
   const name = typeof b.name === "string" ? b.name.trim().replace(/\s+/g, " ") : "";
   if (!name) return "Please enter your name.";
   if (name.length > MAX_CONTACT_NAME) return `Name must be at most ${MAX_CONTACT_NAME} characters.`;

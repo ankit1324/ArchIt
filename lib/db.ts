@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { chunk } from "./chunk";
 import type { ListingStatus } from "./moderation";
 import type {
   Design,
@@ -225,7 +226,9 @@ export type AttachedDesign = { published: boolean; snapshot: string | null };
 
 /**
  * Publish state + snapshot of the designs attached to listings, keyed by id —
- * one query for a whole page (see presentListing). Throws on a DB error.
+ * one query per 100 ids for a whole page (see presentListing): every id goes
+ * in the request URL, so a single `.in()` over a 1,000-row page could exceed
+ * URL-length limits. Throws on a DB error.
  */
 export async function attachedDesigns(
   ids: (string | null | undefined)[],
@@ -233,13 +236,16 @@ export async function attachedDesigns(
   const unique = [...new Set(ids.filter((id): id is string => !!id))];
   const out = new Map<string, AttachedDesign>();
   if (!unique.length) return out;
-  const { data, error } = await db
-    .from("designs")
-    .select("id, published_at, snapshot")
-    .in("id", unique);
-  if (error) throw new Error(error.message);
-  for (const d of data as Pick<DesignRow, "id" | "published_at" | "snapshot">[]) {
-    out.set(d.id, { published: !!d.published_at, snapshot: d.snapshot });
+  const results = await Promise.all(
+    chunk(unique, 100).map((group) =>
+      db.from("designs").select("id, published_at, snapshot").in("id", group),
+    ),
+  );
+  for (const { data, error } of results) {
+    if (error) throw new Error(error.message);
+    for (const d of data as Pick<DesignRow, "id" | "published_at" | "snapshot">[]) {
+      out.set(d.id, { published: !!d.published_at, snapshot: d.snapshot });
+    }
   }
   return out;
 }

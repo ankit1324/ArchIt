@@ -74,7 +74,7 @@ export interface CreateOrderDeps {
   paywallEnabled: boolean;
   /** The `properties` row for a property ref (featured_property / contact_owner). */
   lookupProperty(id: string): PromiseLike<{
-    data: { user_id: string | null; owner: string | null } | null;
+    data: { user_id: string | null; owner: string | null; status: string | null } | null;
     error: DbError | null;
   }>;
   /** TEMPLATE_KEYS.has(key) && isPaidTemplate(key). */
@@ -145,7 +145,11 @@ export function createOrderHandler(deps: CreateOrderDeps) {
         return { status: 500, body: { error: "internal error" } };
       }
       if (data) {
-        property = { userId: data.user_id, hasOwner: Boolean(data.owner?.trim()) };
+        property = {
+          userId: data.user_id,
+          hasOwner: Boolean(data.owner?.trim()),
+          status: data.status,
+        };
       }
     }
 
@@ -188,9 +192,14 @@ export function createOrderHandler(deps: CreateOrderDeps) {
       return { status: 502, body: { error: "order creation failed" } };
     }
 
-    // The reconciler's work list (app/api/cron/reconcile). Not fatal: the
-    // checkout still works without it, the payment just can't be swept up if
-    // both verify-payment and the webhook later miss it.
+    // The order row is what recordPurchase checks a paid payment against, and
+    // the reconciler's work list. Without it the payment could never be
+    // recorded, so the checkout URL is withheld and the session left to expire
+    // unpaid at the gateway.
+    const failed = (detail: string): OrderResult => {
+      console.error(`create-order: order ${orderId} not logged, checkout withheld:`, detail);
+      return { status: 503, body: { error: "order creation failed" } };
+    };
     try {
       const { error: logError } = await deps.logOrder({
         order_id: orderId,
@@ -200,14 +209,9 @@ export function createOrderHandler(deps: CreateOrderDeps) {
         ref: ref || null,
         amount,
       });
-      if (logError) {
-        console.error(`create-order: order ${orderId} not logged for reconciliation:`, logError.message);
-      }
+      if (logError) return failed(logError.message);
     } catch (e) {
-      console.error(
-        `create-order: order ${orderId} not logged for reconciliation:`,
-        e instanceof Error ? e.message : e,
-      );
+      return failed(e instanceof Error ? e.message : String(e));
     }
 
     return {

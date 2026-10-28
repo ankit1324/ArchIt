@@ -12,8 +12,22 @@ import type { PurchaseFailure } from "./payment-validation.ts";
 export const RECONCILE_GRACE_MS = 15 * 60_000;
 /** Checkout sessions expire long before this; older open orders are abandoned. */
 export const RECONCILE_WINDOW_MS = 30 * 24 * 60 * 60_000;
-/** Gateway round-trips per run, so one run stays well inside the function timeout. */
+/** Orders per scan; the sweep keeps scanning until a batch comes back short. */
 export const RECONCILE_BATCH = 40;
+/**
+ * Wall-clock point after which the sweep starts no new order, inside the
+ * route's 60s maxDuration. One order can take ~20s at worst (two 8s gateway
+ * timeouts, the 3s alert webhook, DB calls), so the last one must start by
+ * 30s to leave room for itself and the featured repair. Vercel Hobby crons run
+ * once a day, so throughput has to come from looping within one run, not a
+ * tighter schedule.
+ */
+export const RECONCILE_BUDGET_MS = 30_000;
+/**
+ * An order still open this long after creation means the sweep is not keeping
+ * up (or keeps failing on it): page before it ages out of the 30-day window.
+ */
+export const RECONCILE_BACKLOG_AGE_MS = 24 * 60 * 60_000;
 /** Property ids per `.in()` lookup, so the PostgREST URL stays short. */
 export const FEATURED_CHUNK = 100;
 
@@ -37,14 +51,20 @@ type DbError = { message: string };
 export interface ReconcileDeps {
   now(): number;
   /**
-   * Open orders created in (newerThan, olderThan), least recently checked
-   * first, at most `limit`.
+   * Open orders created in (newerThan, olderThan), never checked or last
+   * checked before `checkedBefore` (the run's start, so orders this run has
+   * already marked drop out), least recently checked first, at most `limit`.
    */
   listOpenOrders(q: {
     olderThan: string;
     newerThan: string;
     limit: number;
+    checkedBefore: string;
   }): PromiseLike<{ data: OpenOrder[] | null; error: DbError | null }>;
+  /** The oldest open order created after `newerThan`, or null when there is none. */
+  oldestOpenOrder(q: {
+    newerThan: string;
+  }): PromiseLike<{ data: { created_at: string } | null; error: DbError | null }>;
   /** How many ledger rows hold this payment id. */
   countRecorded(paymentId: string): PromiseLike<{ count: number | null; error: DbError | null }>;
   /** The gateway's view of the payment (merchant key). Throws when unreachable. */
@@ -79,6 +99,8 @@ export interface ReconcileSummary {
   stillPending: number;
   errors: number;
   featuredRepaired: number;
+  /** True when the sweep ran out of time or an open order is past the backlog age. */
+  backlog: boolean;
 }
 
 export type ReconcileResult =
@@ -86,103 +108,173 @@ export type ReconcileResult =
   | { ok: false; error: string; summary: ReconcileSummary };
 
 export function createReconciler(deps: ReconcileDeps) {
-  /** Step 1: every checkout create-order opened that is still open past the grace period. */
-  async function sweepOrders(summary: ReconcileSummary): Promise<boolean> {
-    const now = deps.now();
-    const { data: orders, error } = await deps.listOpenOrders({
-      olderThan: new Date(now - RECONCILE_GRACE_MS).toISOString(),
-      newerThan: new Date(now - RECONCILE_WINDOW_MS).toISOString(),
-      limit: RECONCILE_BATCH,
-    });
-    if (error) {
-      await deps.report("reconcile_failed", `payment_orders scan failed: ${error.message}`);
-      return false;
-    }
-
-    for (const order of orders ?? []) {
-      summary.checked++;
-      const ctx = { orderId: order.order_id, paymentId: order.payment_id };
-      const mark = async (status: OrderStatus) => {
-        const { error: markError } = await deps.markOrder(order.order_id, {
-          status,
-          attempts: order.attempts + 1,
-          checked_at: new Date(deps.now()).toISOString(),
-        });
-        if (markError) {
-          console.error(`reconcile: could not mark order ${order.order_id} ${status}:`, markError.message);
-        }
-      };
-
-      try {
-        const recorded = await deps.countRecorded(order.payment_id);
-        // A failed ledger read is not "unrecorded": leave the order open
-        // rather than re-recording (and falsely paging) a settled payment.
-        if (recorded.error) throw new Error(`ledger lookup failed: ${recorded.error.message}`);
-        if (recorded.count) {
-          summary.alreadyRecorded++;
-          await mark("recorded");
-          continue;
-        }
-
-        const payment = await deps.fetchPaymentStatus(order.payment_id);
-        const terminal = TERMINAL_ORDER_STATUS[payment.status];
-        if (terminal) {
-          summary.closed++;
-          await mark(terminal);
-          continue;
-        }
-        if (payment.status !== "SUCCESS") {
-          summary.stillPending++;
-          await mark("open");
-          continue;
-        }
-
-        // Paid at the gateway, missing from our ledger.
-        const failure = await deps.recordPurchase(order.payment_id);
-        if (!failure) {
-          summary.repaired++;
-          await mark("recorded");
-          await deps.report(
-            "reconcile_repaired",
-            `Payment ${order.payment_id} (order ${order.order_id}) was paid but unrecorded — recorded by reconciler`,
-            ctx,
-          );
-        } else if (failure.status === 409) {
-          // recordPurchase already paged the DUPLICATE CHARGE
-          summary.refundDue++;
-          await mark("refund_due");
-        } else if (failure.status === 400) {
-          // Paid, but the payment can never be recorded as-is (wrong amount or
-          // order, unusable metadata). Retrying won't change that — close it as
-          // owed back and page once, instead of paging every run for 30 days.
-          summary.refundDue++;
-          await mark("refund_due");
-          await deps.report(
-            "reconcile_failed",
-            `Paid order ${order.order_id} cannot be recorded (${failure.error}) — needs a refund or manual grant`,
-            { ...ctx, ...failure },
-          );
-        } else {
-          // 5xx (our DB, metadata/merchant key) — transient or config: retry next run
-          summary.errors++;
-          await mark("open");
-          await deps.report(
-            "reconcile_failed",
-            `Paid order ${order.order_id} could not be recorded: ${failure.status} ${failure.error}`,
-            { ...ctx, ...failure },
-          );
-        }
-      } catch (e) {
-        // gateway down or timing out: leave it open for the next run
-        summary.errors++;
-        console.error(
-          `reconcile: order ${order.order_id} lookup failed:`,
-          e instanceof Error ? e.message : e,
-        );
-        await mark("open");
+  /** One order: ledger, then gateway, then record or close. Never throws. */
+  async function checkOrder(order: OpenOrder, summary: ReconcileSummary): Promise<void> {
+    summary.checked++;
+    const ctx = { orderId: order.order_id, paymentId: order.payment_id };
+    const mark = async (status: OrderStatus) => {
+      const { error: markError } = await deps.markOrder(order.order_id, {
+        status,
+        attempts: order.attempts + 1,
+        checked_at: new Date(deps.now()).toISOString(),
+      });
+      if (markError) {
+        console.error(`reconcile: could not mark order ${order.order_id} ${status}:`, markError.message);
       }
+    };
+
+    try {
+      const recorded = await deps.countRecorded(order.payment_id);
+      // A failed ledger read is not "unrecorded": leave the order open
+      // rather than re-recording (and falsely paging) a settled payment.
+      if (recorded.error) throw new Error(`ledger lookup failed: ${recorded.error.message}`);
+      if (recorded.count) {
+        summary.alreadyRecorded++;
+        await mark("recorded");
+        return;
+      }
+
+      const payment = await deps.fetchPaymentStatus(order.payment_id);
+      const terminal = TERMINAL_ORDER_STATUS[payment.status];
+      if (terminal) {
+        summary.closed++;
+        await mark(terminal);
+        return;
+      }
+      if (payment.status !== "SUCCESS") {
+        summary.stillPending++;
+        await mark("open");
+        return;
+      }
+
+      // Paid at the gateway, missing from our ledger.
+      const failure = await deps.recordPurchase(order.payment_id);
+      if (!failure) {
+        summary.repaired++;
+        await mark("recorded");
+        await deps.report(
+          "reconcile_repaired",
+          `Payment ${order.payment_id} (order ${order.order_id}) was paid but unrecorded — recorded by reconciler`,
+          ctx,
+        );
+      } else if (failure.status === 409) {
+        // recordPurchase already paged the DUPLICATE CHARGE
+        summary.refundDue++;
+        await mark("refund_due");
+      } else if (failure.status === 400) {
+        // Paid, but the payment can never be recorded as-is (wrong amount or
+        // order, unusable metadata). Retrying won't change that — close it as
+        // owed back and page once, instead of paging every run for 30 days.
+        summary.refundDue++;
+        await mark("refund_due");
+        await deps.report(
+          "reconcile_failed",
+          `Paid order ${order.order_id} cannot be recorded (${failure.error}) — needs a refund or manual grant`,
+          { ...ctx, ...failure },
+        );
+      } else {
+        // 5xx (our DB, metadata/merchant key) — transient or config: retry next run
+        summary.errors++;
+        await mark("open");
+        await deps.report(
+          "reconcile_failed",
+          `Paid order ${order.order_id} could not be recorded: ${failure.status} ${failure.error}`,
+          { ...ctx, ...failure },
+        );
+      }
+    } catch (e) {
+      // gateway down or timing out: leave it open for the next run
+      summary.errors++;
+      console.error(
+        `reconcile: order ${order.order_id} lookup failed:`,
+        e instanceof Error ? e.message : e,
+      );
+      await mark("open");
     }
+}
+
+  /**
+   * Step 1: every checkout create-order opened that is still open past the
+   * grace period. Scans batch after batch until one comes back short or the
+   * time budget is spent, so a backlog drains in one daily run instead of 40
+   * orders a day. Returns false when a scan failed (already paged).
+   */
+  async function sweepOrders(summary: ReconcileSummary): Promise<boolean> {
+    const start = deps.now();
+    // fixed for the whole run so every batch reads the same slice
+    const query = {
+      olderThan: new Date(start - RECONCILE_GRACE_MS).toISOString(),
+      newerThan: new Date(start - RECONCILE_WINDOW_MS).toISOString(),
+      limit: RECONCILE_BATCH,
+      checkedBefore: new Date(start).toISOString(),
+    };
+    const outOfTime = () => deps.now() - start >= RECONCILE_BUDGET_MS;
+    // belt and braces for checkedBefore: a failed markOrder leaves checked_at
+    // unchanged, and the order must still not be re-read in this run
+    const seen = new Set<string>();
+
+    let budgetSpent = false;
+    for (;;) {
+      if (outOfTime()) {
+        budgetSpent = true;
+        break;
+      }
+      const { data, error } = await deps.listOpenOrders(query);
+      if (error) {
+        await deps.report("reconcile_failed", `payment_orders scan failed: ${error.message}`);
+        return false;
+      }
+      const batch = data ?? [];
+      const fresh = batch.filter((o) => !seen.has(o.order_id));
+      for (const order of fresh) {
+        if (outOfTime()) {
+          budgetSpent = true;
+          break;
+        }
+        seen.add(order.order_id);
+        await checkOrder(order, summary);
+      }
+      if (budgetSpent || batch.length < RECONCILE_BATCH || fresh.length === 0) break;
+    }
+
+    await checkBacklog(summary, budgetSpent, query.newerThan);
     return true;
+  }
+
+  /**
+   * Page when the sweep is falling behind: it ran out of time with orders left,
+   * or an order has stayed open past RECONCILE_BACKLOG_AGE_MS. Either way the
+   * 30-day window would otherwise let paid orders age out unnoticed.
+   */
+  async function checkBacklog(
+    summary: ReconcileSummary,
+    budgetSpent: boolean,
+    newerThan: string,
+  ): Promise<void> {
+    if (budgetSpent) {
+      summary.backlog = true;
+      await deps.report(
+        "reconcile_backlog",
+        `Reconcile hit its ${RECONCILE_BUDGET_MS / 1000}s time budget after ${summary.checked} order(s) with more still open`,
+        { checked: summary.checked },
+      );
+      return;
+    }
+    const { data, error } = await deps.oldestOpenOrder({ newerThan });
+    if (error) {
+      await deps.report("reconcile_failed", `oldest open order lookup failed: ${error.message}`);
+      return;
+    }
+    if (!data) return;
+    const age = deps.now() - Date.parse(data.created_at);
+    if (age > RECONCILE_BACKLOG_AGE_MS) {
+      summary.backlog = true;
+      await deps.report(
+        "reconcile_backlog",
+        `An order has been open since ${data.created_at} (over ${RECONCILE_BACKLOG_AGE_MS / 3_600_000}h) — reconcile is not closing it`,
+        { oldestOpenAt: data.created_at, checked: summary.checked },
+      );
+    }
   }
 
   /** Step 2: featured_property purchases whose listing never got its flag. */
@@ -249,6 +341,7 @@ export function createReconciler(deps: ReconcileDeps) {
       stillPending: 0,
       errors: 0,
       featuredRepaired: 0,
+      backlog: false,
     };
     if (!(await sweepOrders(summary))) return { ok: false, error: "scan failed", summary };
     await repairFeatured(summary);

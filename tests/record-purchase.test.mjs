@@ -17,15 +17,56 @@ function payment(overrides = {}) {
   };
 }
 
+/**
+ * The payment_orders row create-order wrote for `payment()`. Derived from the
+ * payment by default so a test that changes the payment keeps a matching row.
+ */
+function orderFor(p) {
+  const meta = p.metadata ?? {};
+  return {
+    order_id: p.orderId,
+    user_id: meta.userId ?? "user_a",
+    purpose: meta.purpose ?? "builder_unlock",
+    ref: meta.ref || null,
+    amount: Number(p.amountPaise),
+  };
+}
+
 /** A recorder wired to in-memory fakes; `calls` records every side effect. */
-function harness({ payments = [payment()], insertError = null, grantError = null } = {}) {
-  const calls = { fetch: 0, inserts: [], grants: [], reports: [], sleeps: 0 };
+function harness({
+  payments = [payment()],
+  insertError = null,
+  grantError = null,
+  order = undefined,
+  orderError = null,
+  recorded = 0,
+  recordedError = null,
+} = {}) {
+  const calls = {
+    fetch: 0,
+    inserts: [],
+    grants: [],
+    reports: [],
+    sleeps: 0,
+    orderLookups: [],
+    ledgerLookups: [],
+  };
   const recorder = createPurchaseRecorder({
     async fetchPayment(id) {
       assert.equal(id, PAYMENT_ID);
       const p = payments[Math.min(calls.fetch, payments.length - 1)];
       calls.fetch += 1;
       return p;
+    },
+    async loadOrder(id) {
+      calls.orderLookups.push(id);
+      if (orderError) return { data: null, error: orderError };
+      return { data: order === undefined ? orderFor(payments.at(-1)) : order, error: null };
+    },
+    async countRecorded(id) {
+      calls.ledgerLookups.push(id);
+      if (recordedError) return { count: null, error: recordedError };
+      return { count: recorded, error: null };
     },
     async insertPurchase(row) {
       calls.inserts.push(row);
@@ -224,6 +265,8 @@ test("onRecorded fires once per new payment, not on a same-payment retry", async
   const make = (insertError) =>
     createPurchaseRecorder({
       fetchPayment: async () => payment(),
+      loadOrder: async () => ({ data: orderFor(payment()), error: null }),
+      countRecorded: async () => ({ count: 0, error: null }),
       insertPurchase: async () => ({ error: insertError }),
       grantFeatured: async () => ({ error: null }),
       report() {},
@@ -243,6 +286,8 @@ test("onRecorded fires once per new payment, not on a same-payment retry", async
 test("a throwing onRecorded hook never fails the purchase", async () => {
   const recorder = createPurchaseRecorder({
     fetchPayment: async () => payment(),
+    loadOrder: async () => ({ data: orderFor(payment()), error: null }),
+    countRecorded: async () => ({ count: 0, error: null }),
     insertPurchase: async () => ({ error: null }),
     grantFeatured: async () => ({ error: null }),
     report() {},
@@ -252,4 +297,89 @@ test("a throwing onRecorded hook never fails the purchase", async () => {
     sleep: async () => {},
   });
   assert.equal(await recorder.recordPurchase(PAYMENT_ID, "user_a"), null);
+});
+
+// --- the payment_orders row ties a paid payment to the order we opened ------
+
+test("refuses a payment with no payment_orders row", async () => {
+  const { recordPurchase, calls } = harness({ order: null });
+  assert.deepEqual(await recordPurchase(PAYMENT_ID, "user_a"), {
+    error: "no order for payment",
+    status: 400,
+  });
+  assert.deepEqual(calls.orderLookups, [PAYMENT_ID]);
+  assert.equal(calls.inserts.length, 0);
+  assert.equal(calls.grants.length, 0);
+  assert.deepEqual(
+    calls.reports.map((r) => r.kind),
+    ["payment_order_missing"],
+  );
+  assert.equal(calls.reports[0].context.paymentId, PAYMENT_ID);
+});
+
+test("an order-less payment already in the ledger is still an idempotent no-op", async () => {
+  // recorded before payment_orders existed (20261022120000): a re-verify or a
+  // redelivered webhook used to be a silent success and must stay one
+  const { recordPurchase, calls } = harness({ order: null, recorded: 1 });
+  assert.equal(await recordPurchase(PAYMENT_ID, "user_a"), null);
+  assert.deepEqual(calls.ledgerLookups, [PAYMENT_ID]);
+  assert.equal(calls.inserts.length, 0);
+  assert.equal(calls.grants.length, 0);
+  assert.equal(calls.reports.length, 0);
+});
+
+test("answers 503 when the ledger check for an order-less payment fails", async () => {
+  const { recordPurchase, calls } = harness({
+    order: null,
+    recordedError: { message: "fetch failed" },
+  });
+  assert.deepEqual(await recordPurchase(PAYMENT_ID, "user_a"), {
+    error: "purchase service unavailable",
+    status: 503,
+  });
+  assert.equal(calls.inserts.length, 0);
+  assert.equal(calls.reports.length, 0);
+});
+
+test("refuses when the order row disagrees with the payment", async () => {
+  const good = orderFor(payment());
+  const cases = {
+    order_id: { ...good, order_id: "builder_unlock_other_999" },
+    user_id: { ...good, user_id: "user_b" },
+    purpose: { ...good, purpose: "template_unlock" },
+    ref: { ...good, ref: "prop_1" },
+    amount: { ...good, amount: 100 },
+  };
+  for (const [field, order] of Object.entries(cases)) {
+    const { recordPurchase, calls } = harness({ order });
+    assert.deepEqual(
+      await recordPurchase(PAYMENT_ID, null, { poll: false }),
+      { error: "payment does not match order", status: 400 },
+      field,
+    );
+    assert.equal(calls.inserts.length, 0, field);
+    assert.deepEqual(
+      calls.reports.map((r) => r.kind),
+      ["payment_order_mismatch"],
+      field,
+    );
+    assert.equal(calls.reports[0].context.field, field);
+  }
+});
+
+test("answers 503 when the order lookup fails", async () => {
+  const { recordPurchase, calls } = harness({ orderError: { message: "TypeError: fetch failed" } });
+  assert.deepEqual(await recordPurchase(PAYMENT_ID, "user_a"), {
+    error: "purchase service unavailable",
+    status: 503,
+  });
+  assert.equal(calls.inserts.length, 0);
+  assert.equal(calls.reports.length, 0, "transient: the webhook retries, no page");
+});
+
+test("the ledger row carries the order id from payment_orders", async () => {
+  const { recordPurchase, calls } = harness();
+  assert.equal(await recordPurchase(PAYMENT_ID, "user_a"), null);
+  assert.equal(calls.inserts[0].order_id, ORDER_ID);
+  assert.deepEqual(calls.orderLookups, [PAYMENT_ID]);
 });

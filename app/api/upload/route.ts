@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
 import sharp from "@/lib/sharp";
 import { db } from "@/lib/db";
+import { sanitizeImage } from "@/lib/image-sanitize";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { readBodyCapped } from "@/lib/request";
 import {
@@ -63,8 +64,7 @@ export async function POST(request: Request) {
   // Both used to be stored anyway: the failed thumbnail just fell back to the
   // original, which every viewer's browser then fetched. Parse the header
   // before anything is stored — it must be a real image within the pixel
-  // budget. Header only, so a truncated-but-valid photo still goes through as
-  // before (without thumbnails).
+  // budget. Header only; the full decode happens in sanitizeImage below.
   let meta: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
   try {
     meta = await sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
@@ -79,16 +79,27 @@ export async function POST(request: Request) {
     return Response.json({ error: "image too large (max 40 megapixels)" }, { status: 413 });
   }
 
+  // The bucket is public: the stored original must not carry the uploader's
+  // EXIF (GPS, device serial). Re-encoding needs a full decode, so a photo
+  // that only has a valid header is refused here rather than stored raw.
+  let clean: Buffer;
+  try {
+    clean = await sanitizeImage(buf, mime);
+  } catch (e) {
+    console.warn("Photo sanitize failed:", (e as Error).message);
+    return Response.json({ error: "unreadable image" }, { status: 415 });
+  }
+
   // Resized webp variants for markers (64px) and cards/panels (480px). Only
   // when every variant is stored does the original get the `-t` name that
   // tells readers they exist (lib/url.ts thumbnailUrl); otherwise it is saved
   // under a plain name and readers fall back to the original.
   const id = crypto.randomUUID();
-  const thumbed = await storeThumbnails(`${id}-t`, buf);
+  const thumbed = await storeThumbnails(`${id}-t`, clean);
   const name = `${thumbed ? `${id}-t` : id}${ext}`;
   const { error } = await db.storage
     .from("photos")
-    .upload(name, buf, { contentType: mime });
+    .upload(name, clean, { contentType: mime });
   if (error) {
     console.error("Photo upload failed:", error.message);
     if (thumbed) await db.storage.from("photos").remove(thumbObjectNames(name));
@@ -106,7 +117,7 @@ async function storeThumbnails(base: string, buf: Buffer): Promise<boolean> {
     const variants = await Promise.all(
       THUMB_WIDTHS.map((w) =>
         sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS })
-          .rotate() // honour EXIF orientation before it is stripped
+          .rotate() // no-op on the sanitized buffer (already upright); kept as a guard
           .resize(w === 64 ? { width: 64, height: 64, fit: "cover" } : { width: w, withoutEnlargement: true })
           .webp({ quality: w === 64 ? 70 : 76 })
           .toBuffer(),

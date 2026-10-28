@@ -22,7 +22,7 @@ class FakeGatewayError extends Error {
 /** A handler wired to in-memory fakes; `calls` records every side effect. */
 function harness({
   paywallEnabled = true,
-  property = { user_id: OTHER, owner: "+91 98765 43210" },
+  property = { user_id: OTHER, owner: "+91 98765 43210", status: "live" },
   propertyError = null,
   owned = { ok: true, granted: false },
   payment = { paymentId: "pay_1", orderId: "ord_1", checkoutUrl: "https://pay.test/checkout/pay_1" },
@@ -136,7 +136,7 @@ test("template_unlock: only paid template keys", async () => {
 });
 
 test("featured_property: only the lister's own listing", async () => {
-  const mine = harness({ property: { user_id: USER, owner: null } });
+  const mine = harness({ property: { user_id: USER, owner: null, status: "live" } });
   assert.equal((await mine.createOrder(USER, { purpose: "featured_property", ref: "p1" })).status, 200);
 
   for (const property of [{ user_id: OTHER, owner: null }, null, { user_id: null, owner: null }]) {
@@ -154,9 +154,11 @@ test("featured_property: only the lister's own listing", async () => {
 test("contact_owner: someone else's listing with an owner contact", async () => {
   const cases = [
     [null, "property not found"],
-    [{ user_id: USER, owner: "x" }, "you already own this listing"],
-    [{ user_id: OTHER, owner: "   " }, "listing has no owner contact to unlock"],
-    [{ user_id: OTHER, owner: null }, "listing has no owner contact to unlock"],
+    [{ user_id: USER, owner: "x", status: "live" }, "you already own this listing"],
+    [{ user_id: OTHER, owner: "   ", status: "live" }, "listing has no owner contact to unlock"],
+    [{ user_id: OTHER, owner: null, status: "live" }, "listing has no owner contact to unlock"],
+    [{ user_id: OTHER, owner: "+91 98765 43210", status: "pending" }, "listing is not live"],
+    [{ user_id: OTHER, owner: "+91 98765 43210", status: "rejected" }, "listing is not live"],
   ];
   for (const [property, error] of cases) {
     const h = harness({ property });
@@ -193,12 +195,21 @@ test("a failed ledger check is a 500, never a session", async () => {
   assert.equal(h.calls.payments.length, 0);
 });
 
-test("payment_orders logging failure is non-fatal (error result or throw)", async () => {
+test("featured_property on a listing in review is still sold", async () => {
+  for (const status of ["pending", "rejected"]) {
+    const h = harness({ property: { user_id: USER, owner: null, status } });
+    assert.equal((await h.createOrder(USER, { purpose: "featured_property", ref: "p1" })).status, 200, status);
+  }
+});
+
+test("a failed order log aborts the checkout", async () => {
+  // recordPurchase refuses a payment without its payment_orders row, so a
+  // checkout handed out without one would take money we then cannot record
   for (const logResult of [{ error: { message: "insert failed" } }, new Error("network")]) {
     const h = harness({ logResult });
     const res = await h.createOrder(USER, { purpose: "builder_unlock", ref: "" });
-    assert.equal(res.status, 200);
-    assert.equal(res.body.checkoutUrl, "https://pay.test/checkout/pay_1");
+    assert.deepEqual(res, { status: 503, body: { error: "order creation failed" } });
+    assert.equal(res.body.checkoutUrl, undefined);
     assert.equal(h.calls.logs.length, 1);
   }
 });

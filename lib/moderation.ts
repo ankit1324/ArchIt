@@ -136,6 +136,8 @@ export function validateReport(v: unknown): ReportInput | string {
   let details: string | null = null;
   if (b.details !== undefined && b.details !== null) {
     if (typeof b.details !== "string") return "details must be a string";
+    // Postgres text cannot store U+0000; the insert would 500.
+    if (b.details.includes("\u0000")) return "details contain an invalid character";
     details = b.details.trim() || null;
     if (details && details.length > MAX_REPORT_DETAILS) {
       return `details must be at most ${MAX_REPORT_DETAILS} characters`;

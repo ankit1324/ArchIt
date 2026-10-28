@@ -221,3 +221,9 @@ test("designEditNeedsReview: snapshot, geometry or name changes re-queue attache
   // unknown previous state: fail towards review
   assert.equal(designEditNeedsReview(null, row), true);
 });
+
+test("report rejects NUL in details", () => {
+  const r = validateReport({ propertyId: ID, reason: "fraud", details: "price\u0000is wrong" });
+  assert.equal(typeof r, "string");
+  assert.match(r, /details/);
+});

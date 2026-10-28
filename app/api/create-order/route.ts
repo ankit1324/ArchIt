@@ -19,9 +19,9 @@ const createOrder = createOrderHandler({
   lookupProperty: (id) =>
     db
       .from("properties")
-      .select("user_id, owner")
+      .select("user_id, owner, status")
       .eq("id", id)
-      .maybeSingle<{ user_id: string | null; owner: string | null }>(),
+      .maybeSingle<{ user_id: string | null; owner: string | null; status: string | null }>(),
   isPaidTemplateKey: (key) => TEMPLATE_KEYS.has(key) && isPaidTemplate(key),
   hasPurchase,
   createPayment,

@@ -2,7 +2,7 @@ import "server-only";
 import { reportIncident } from "./alert";
 import { db } from "./db";
 import { afterResponse, notifyPurchaseRecorded } from "./notify";
-import { createPurchaseRecorder } from "./record-purchase";
+import { createPurchaseRecorder, type PaymentOrder } from "./record-purchase";
 import { retryTransientDb } from "./retry";
 import { fetchPayment } from "./youpi";
 
@@ -25,6 +25,21 @@ export type {
  */
 export const { recordPurchase, applyEntitlement } = createPurchaseRecorder({
   fetchPayment,
+  loadOrder: (paymentId) =>
+    retryTransientDb(() =>
+      db
+        .from("payment_orders")
+        .select("order_id, user_id, purpose, ref, amount")
+        .eq("payment_id", paymentId)
+        .maybeSingle<PaymentOrder>(),
+    ),
+  countRecorded: (paymentId) =>
+    retryTransientDb(() =>
+      db
+        .from("purchases")
+        .select("*", { count: "exact", head: true })
+        .eq("payment_id", paymentId),
+    ),
   insertPurchase: (row) => retryTransientDb(() => db.from("purchases").insert(row)),
   grantFeatured: (propertyId, userId) =>
     db.from("properties").update({ featured: true }).eq("id", propertyId).eq("user_id", userId),

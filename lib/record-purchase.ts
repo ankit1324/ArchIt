@@ -40,10 +40,40 @@ type DbError = { code?: string; message: string; details?: string | null };
 export type IncidentKind =
   | "duplicate_charge"
   | "entitlement_failed"
-  | "payment_metadata_missing";
+  | "payment_metadata_missing"
+  | "payment_order_missing"
+  | "payment_order_mismatch";
+
+/** The payment_orders row create-order wrote when it opened the checkout. */
+export interface PaymentOrder {
+  order_id: string;
+  user_id: string;
+  purpose: string;
+  ref: string | null;
+  /** Paise, as ordered. */
+  amount: number;
+}
 
 export interface RecordPurchaseDeps {
   fetchPayment(paymentId: string): Promise<GatewayPayment>;
+  /**
+   * The payment_orders row for this payment id (null when there is none).
+   * This is our own record of what was sold, written before the checkout URL
+   * reached the browser, so it is independent of anything the gateway echoes.
+   */
+  loadOrder(paymentId: string): PromiseLike<{
+    data: PaymentOrder | null;
+    error: { message: string } | null;
+  }>;
+  /**
+   * Ledger rows already holding this payment_id. Consulted only when the order
+   * row is missing, so a payment recorded before payment_orders existed stays
+   * an idempotent no-op on a re-verify or a redelivered webhook.
+   */
+  countRecorded(paymentId: string): PromiseLike<{
+    count: number | null;
+    error: { message: string } | null;
+  }>;
   insertPurchase(row: LedgerRow): PromiseLike<{ error: DbError | null }>;
   /** Flip properties.featured for (propertyId, owner). Must be idempotent. */
   grantFeatured(
@@ -81,6 +111,20 @@ export const SETTLE_ATTEMPTS = 3;
 function metaString(meta: Record<string, unknown> | undefined, key: string): string {
   const v = meta?.[key];
   return typeof v === "string" ? v : "";
+}
+
+/** The first field on which the order row and the paid payment disagree, else null. */
+function orderDisagreement(
+  order: PaymentOrder,
+  paid: Omit<PaymentOrder, "ref"> & { ref: string | null },
+): keyof PaymentOrder | null {
+  if (order.order_id !== paid.order_id) return "order_id";
+  if (order.user_id !== paid.user_id) return "user_id";
+  if (order.purpose !== paid.purpose) return "purpose";
+  // create-order stores an absent ref as null; metadata carries it as ""
+  if ((order.ref || null) !== paid.ref) return "ref";
+  if (Number(order.amount) !== paid.amount) return "amount";
+  return null;
 }
 
 export function createPurchaseRecorder(deps: RecordPurchaseDeps) {
@@ -160,7 +204,6 @@ export function createPurchaseRecorder(deps: RecordPurchaseDeps) {
     options: RecordOptions = {},
   ): Promise<PurchaseFailure | null> {
     const payment = await fetchSettledPayment(paymentId, options.poll ?? true);
-    const orderId = payment.orderId;
     const meta = payment.metadata;
     if (!meta) {
       // Public view only: the merchant key was rejected or unset. Without
@@ -168,7 +211,7 @@ export function createPurchaseRecorder(deps: RecordPurchaseDeps) {
       await deps.report(
         "payment_metadata_missing",
         `Payment ${paymentId} returned no metadata — check YOUPI_WEBHOOK_SECRET`,
-        { paymentId, orderId },
+        { paymentId, orderId: payment.orderId },
       );
       return { error: "payment metadata unavailable", status: 502 };
     }
@@ -193,7 +236,49 @@ export function createPurchaseRecorder(deps: RecordPurchaseDeps) {
       return { error: "order belongs to another user", status: 403 };
     }
 
+    // Tie the payment to the order we opened. Metadata and orderId both come
+    // back from the gateway; only payment_orders is ours, so every field the
+    // ledger row will carry must agree with it.
+    const { data: order, error: orderError } = await deps.loadOrder(paymentId);
+    if (orderError) {
+      console.error(`payment_orders lookup failed for ${paymentId}:`, orderError.message);
+      return { error: "purchase service unavailable", status: 503 };
+    }
+    if (!order) {
+      // Already in the ledger: recorded before payment_orders existed, so a
+      // re-verify or a redelivered webhook is the same money arriving twice.
+      const recorded = await deps.countRecorded(paymentId);
+      if (recorded.error) {
+        console.error(`purchases lookup failed for ${paymentId}:`, recorded.error.message);
+        return { error: "purchase service unavailable", status: 503 };
+      }
+      if (recorded.count) return null;
+      await deps.report(
+        "payment_order_missing",
+        `Payment ${paymentId} has no payment_orders row — not opened by create-order; not recorded`,
+        { paymentId, gatewayOrderId: payment.orderId, userId, purpose, ref },
+      );
+      return { error: "no order for payment", status: 400 };
+    }
+    const disagreement = orderDisagreement(order, {
+      order_id: payment.orderId,
+      user_id: userId,
+      purpose,
+      ref,
+      amount: Number(payment.amountPaise),
+    });
+    if (disagreement) {
+      await deps.report(
+        "payment_order_mismatch",
+        `Payment ${paymentId} disagrees with its order ${order.order_id} on ${disagreement} — not recorded`,
+        { paymentId, orderId: order.order_id, field: disagreement },
+      );
+      return { error: "payment does not match order", status: 400 };
+    }
+    const orderId = order.order_id;
+
     // Confirm the money actually landed, for the right amount, on this order.
+    // orderId is ours (payment_orders), so this compares two independent values.
     const mismatch = checkPayment(payment, {
       orderId,
       purpose,

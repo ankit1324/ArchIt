@@ -65,12 +65,12 @@ test("template_unlock consults the injected catalog check with the ref", () => {
 // --- featured_property -----------------------------------------------------
 
 test("featured_property accepts the caller's own listing", () => {
-  const c = ctx({ property: { userId: ME, hasOwner: false } });
+  const c = ctx({ property: { userId: ME, hasOwner: false, status: "live" } });
   assert.deepEqual(validatePurchaseRef("featured_property", "prop_1", c), ok);
 });
 
 test("featured_property rejects a missing ref", () => {
-  const c = ctx({ property: { userId: ME, hasOwner: true } });
+  const c = ctx({ property: { userId: ME, hasOwner: true, status: "live" } });
   fails(validatePurchaseRef("featured_property", "", c));
   fails(validatePurchaseRef("featured_property", undefined, c));
 });
@@ -82,29 +82,29 @@ test("featured_property rejects a listing that does not exist", () => {
 test("featured_property rejects someone else's listing", () => {
   // applyEntitlement scopes the boost to the payer; paying for another
   // user's row would succeed at the gateway and then flip nothing.
-  const c = ctx({ property: { userId: OTHER, hasOwner: true } });
+  const c = ctx({ property: { userId: OTHER, hasOwner: true, status: "live" } });
   fails(validatePurchaseRef("featured_property", "prop_2", c));
 });
 
 test("featured_property rejects a legacy listing with no lister", () => {
-  const c = ctx({ property: { userId: null, hasOwner: true } });
+  const c = ctx({ property: { userId: null, hasOwner: true, status: "live" } });
   fails(validatePurchaseRef("featured_property", "prop_3", c));
 });
 
 // --- contact_owner ---------------------------------------------------------
 
 test("contact_owner accepts another user's listing with an owner contact", () => {
-  const c = ctx({ property: { userId: OTHER, hasOwner: true } });
+  const c = ctx({ property: { userId: OTHER, hasOwner: true, status: "live" } });
   assert.deepEqual(validatePurchaseRef("contact_owner", "prop_2", c), ok);
 });
 
 test("contact_owner accepts a legacy listing with no lister but an owner", () => {
-  const c = ctx({ property: { userId: null, hasOwner: true } });
+  const c = ctx({ property: { userId: null, hasOwner: true, status: "live" } });
   assert.deepEqual(validatePurchaseRef("contact_owner", "prop_3", c), ok);
 });
 
 test("contact_owner rejects a missing ref", () => {
-  const c = ctx({ property: { userId: OTHER, hasOwner: true } });
+  const c = ctx({ property: { userId: OTHER, hasOwner: true, status: "live" } });
   fails(validatePurchaseRef("contact_owner", "", c));
   fails(validatePurchaseRef("contact_owner", undefined, c));
 });
@@ -115,14 +115,35 @@ test("contact_owner rejects a listing that does not exist", () => {
 
 test("contact_owner rejects the caller's own listing", () => {
   // the lister already sees their own contact for free
-  const c = ctx({ property: { userId: ME, hasOwner: true } });
+  const c = ctx({ property: { userId: ME, hasOwner: true, status: "live" } });
   fails(validatePurchaseRef("contact_owner", "prop_1", c));
 });
 
 test("contact_owner rejects a listing with nothing to unlock", () => {
   // ₹50 for an empty field is a refund waiting to happen
-  const c = ctx({ property: { userId: OTHER, hasOwner: false } });
+  const c = ctx({ property: { userId: OTHER, hasOwner: false, status: "live" } });
   fails(validatePurchaseRef("contact_owner", "prop_2", c));
+});
+
+test("contact_owner requires a live listing", () => {
+  // contact details of a pending or rejected listing are not shown to anyone
+  // but the lister, so the unlock would take ₹50 for nothing
+  for (const status of ["pending", "rejected", null]) {
+    const c = ctx({ property: { userId: OTHER, hasOwner: true, status } });
+    assert.deepEqual(
+      validatePurchaseRef("contact_owner", "prop_2", c),
+      { ok: false, error: "listing is not live" },
+      String(status),
+    );
+  }
+});
+
+test("featured_property does not depend on the listing status", () => {
+  // a lister may boost a listing still in review; behaviour unchanged
+  for (const status of ["live", "pending", "rejected"]) {
+    const c = ctx({ property: { userId: ME, hasOwner: false, status } });
+    assert.deepEqual(validatePurchaseRef("featured_property", "prop_1", c), ok, status);
+  }
 });
 
 // --- helpers ---------------------------------------------------------------
@@ -132,7 +153,7 @@ test("every failure carries a human-readable error", () => {
     ["builder_unlock", "x", ctx()],
     ["template_unlock", "", ctx()],
     ["featured_property", "p", ctx({ property: null })],
-    ["contact_owner", "p", ctx({ property: { userId: ME, hasOwner: true } })],
+    ["contact_owner", "p", ctx({ property: { userId: ME, hasOwner: true, status: "live" } })],
   ];
   for (const [purpose, ref, c] of cases) {
     const r = validatePurchaseRef(purpose, ref, c);

@@ -104,3 +104,15 @@ test("replyHref builds a mailto with a subject", () => {
   // A crafted address can't smuggle extra mailto params.
   assert.ok(!replyHref("a@b.co?bcc=x@y.co", "other").includes("?bcc="));
 });
+
+test("contact rejects NUL in name, email and message", () => {
+  // Postgres text cannot hold U+0000: let through, it 500s at insert time.
+  for (const [field, value] of [
+    ["name", "Asha\u0000Rao"],
+    ["email", "asha\u0000@example.com"],
+    ["message", `${good.message}\u0000`],
+  ]) {
+    const out = validateContact({ ...good, [field]: value });
+    assert.equal(typeof out, "string", field);
+  }
+});
