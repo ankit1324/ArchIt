@@ -2,11 +2,18 @@ import "server-only";
 import type { AuditTarget } from "./admin-tools";
 import { db } from "./db";
 
+/**
+ * What admin_audit_log.target_type accepts (its CHECK constraint): the
+ * admin-tools targets plus 'design', added by
+ * 20261028120100_audit_design_target_and_order_purpose.sql.
+ */
+export type AuditTargetType = AuditTarget | "design";
+
 export interface AuditEntry {
   id: number;
   admin_id: string;
   action: string;
-  target_type: AuditTarget;
+  target_type: AuditTargetType;
   target_id: string;
   note: string | null;
   details: Record<string, unknown> | null;
@@ -21,7 +28,7 @@ export interface AuditEntry {
 export async function logAdminAction(entry: {
   adminId: string;
   action: string;
-  targetType: AuditTarget;
+  targetType: AuditTargetType;
   targetId: string;
   note?: string | null;
   details?: Record<string, unknown>;
@@ -42,9 +49,17 @@ export async function logAdminAction(entry: {
   }
 }
 
-/** Latest entries, optionally for one record. */
+/** A Clerk user id, safe to interpolate into a PostgREST filter string. */
+const PLAIN_ID = /^[A-Za-z0-9_]{1,64}$/;
+
+/**
+ * Latest entries, optionally for one record. A user's history also lists the
+ * actions taken on their designs (target 'design', author in
+ * details.authorId), which were logged against the user before 'design'
+ * became a target type.
+ */
 export async function auditHistory(
-  target?: { type: AuditTarget; id: string },
+  target?: { type: AuditTargetType; id: string },
   limit = 200,
 ): Promise<{ entries: AuditEntry[]; error: string | null }> {
   let q = db
@@ -52,7 +67,14 @@ export async function auditHistory(
     .select("id, admin_id, action, target_type, target_id, note, details, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (target) q = q.eq("target_type", target.type).eq("target_id", target.id);
+  if (target?.type === "user" && PLAIN_ID.test(target.id)) {
+    q = q.or(
+      `and(target_type.eq.user,target_id.eq.${target.id}),` +
+        `and(target_type.eq.design,details->>authorId.eq.${target.id})`,
+    );
+  } else if (target) {
+    q = q.eq("target_type", target.type).eq("target_id", target.id);
+  }
   const { data, error } = await q.overrideTypes<AuditEntry[], { merge: false }>();
   return { entries: data ?? [], error: error?.message ?? null };
 }

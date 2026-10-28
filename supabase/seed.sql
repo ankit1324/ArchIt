@@ -1,0 +1,2 @@
+-- No seed data. config.toml enables [db.seed] with sql_paths = ["./seed.sql"],
+-- so `supabase db reset` expects this file to exist; it is intentionally empty.
