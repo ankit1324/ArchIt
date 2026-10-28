@@ -18,19 +18,23 @@ export default function ShowcaseViewer({ designId, name }: { designId: string; n
 
   if (state.status !== "ready") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 bg-paper-soft px-6 text-center">
         {state.status === "loading" ? (
-          <p className="font-medium text-plum-soft" role="status">
-            Loading the 3D view…
-          </p>
+          <div role="status" className="flex flex-col items-center gap-4 text-ink-soft">
+            <span
+              aria-hidden
+              className="size-7 animate-spin rounded-full border-2 border-line border-t-accent motion-reduce:animate-none"
+            />
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Loading the 3D view…</span>
+          </div>
         ) : (
           <>
-            <p className="font-bold text-plum" role="alert">
+            <p className="max-w-md font-display text-[22px] font-normal text-ink" role="alert">
               {state.message}
             </p>
             <Link
               href="/showcase"
-              className="rounded-full border border-plum/20 px-4 py-2 text-sm font-bold text-plum hover:bg-plum/5"
+              className="inline-flex min-h-11 items-center rounded-[5px] border border-line-strong px-5 py-3 text-[13px] font-semibold text-ink transition-colors hover:border-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               Back to the showcase
             </Link>

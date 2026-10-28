@@ -12,22 +12,26 @@ const TABS = [
 /**
  * Bottom tab bar for phones, where Navbar hides its links (below `md`).
  * Pads by the home-indicator inset (needs viewport-fit=cover, app/layout).
+ * A hairline instead of a shadow, like the landing's bands; the current tab
+ * gets an accent rule along its top edge.
  */
 export default function MobileTabBar({ active }: { active: string }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-white/70 bg-cream/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_#3d183014] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
       <ul className="mx-auto flex max-w-md justify-around px-2">
         {TABS.map(({ label, href, Icon }) => {
           const current = href === active;
-          const cls = `flex min-w-16 flex-col items-center gap-1 px-3 pb-2 pt-2.5 text-[11px] font-bold ${
-            current ? "text-plum" : "text-plum-soft"
+          const cls = `relative flex min-h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-[5px] px-3 pb-2 pt-2.5 text-[11px] font-bold tracking-[0.04em] transition-colors focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-accent ${
+            current
+              ? "text-accent before:absolute before:inset-x-3 before:top-0 before:h-0.5 before:bg-accent"
+              : "text-ink-soft hover:text-ink"
           }`;
           const body = (
             <>
-              <Icon width={22} height={22} aria-hidden />
+              <Icon width={22} height={22} aria-hidden="true" />
               {label}
             </>
           );

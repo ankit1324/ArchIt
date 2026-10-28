@@ -35,10 +35,13 @@ export function priceLabel(l: PublicListing): string {
   return l.type === "showcase" ? "Not for sale/rent" : formatPrice(l);
 }
 
-/** Pill colours by deal, as on the /find cards: sale lime, rent magenta, showcase violet. */
+/**
+ * Chip colours by deal, as on the /find cards: sale highlight, rent accent,
+ * showcase violet (the map prism colour, kept so the two read as one key).
+ */
 export function dealTone(l: PublicListing): string {
   if (l.type === "showcase") return "bg-violet-700 text-white";
-  return l.type === "sale" ? "bg-lime text-plum" : "bg-magenta-deep text-white";
+  return l.type === "sale" ? "bg-highlight text-ink" : "bg-accent-deep text-paper";
 }
 
 export function dealLabel(l: PublicListing): string {

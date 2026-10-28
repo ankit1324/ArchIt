@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -13,6 +14,44 @@ export const metadata: Metadata = {
   description: "How ArchIt collects, uses, and protects your data.",
 };
 
+// Shared shape of the three legal pages: a sticky index of the policies beside
+// a ~68ch reading column. Restyle only; the policy wording below is unchanged.
+const EYEBROW =
+  "flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
+const LINK =
+  "rounded-[2px] text-accent underline underline-offset-4 hover:text-accent-deep focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const LEGAL_DOCS: Array<{ href: string; label: string }> = [
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/terms", label: "Terms & Conditions" },
+  { href: "/refunds", label: "Refunds & Cancellation" },
+  { href: "/contact", label: "Contact" },
+];
+
+function LegalNav({ current }: { current: string }) {
+  return (
+    <nav aria-label="Legal documents" className="hidden self-start lg:sticky lg:top-8 lg:block">
+      <p className={EYEBROW}>Policies</p>
+      <ul className="mt-4 border-t border-line text-[14px]">
+        {LEGAL_DOCS.map((d) => (
+          <li key={d.href} className="border-b border-line">
+            <Link
+              href={d.href}
+              prefetch={false}
+              aria-current={d.href === current ? "page" : undefined}
+              className="group flex min-h-11 items-center justify-between gap-3 py-2 text-ink-soft transition-colors hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+            >
+              {d.label}
+              <span aria-hidden="true" className="text-accent opacity-0 transition-opacity group-hover:opacity-100 group-aria-[current=page]:opacity-100">
+                &rarr;
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 // Every business detail comes from lib/business.ts. Until a value is filled
 // in there, the line that needs it is omitted or reworded neutrally, so the
 // page never shows a raw "[PLACEHOLDER]".
@@ -25,7 +64,7 @@ function SupportEmail() {
   return (
     <a
       href={`mailto:${BUSINESS.supportEmail}`}
-      className="font-semibold text-plum underline hover:text-plum"
+      className={`font-semibold ${LINK}`}
     >
       {BUSINESS.supportEmail}
     </a>
@@ -34,7 +73,7 @@ function SupportEmail() {
 
 function ContactPage() {
   return (
-    <a href="/contact" className="underline hover:text-plum">
+    <a href="/contact" className={LINK}>
       Contact page
     </a>
   );
@@ -42,20 +81,27 @@ function ContactPage() {
 
 export default function PrivacyPage() {
   return (
-    <div className="h-full overflow-y-auto bg-cream text-plum">
+    <div className="flex min-h-full flex-col bg-paper text-ink">
       <Navbar />
-      <main className="mx-auto max-w-3xl px-6 py-14">
-        <h1 className="text-3xl font-extrabold tracking-wide text-plum">
+      <main id="main-content" className="mx-auto w-full max-w-[1400px] px-[clamp(20px,5.5vw,84px)] pb-20 md:pb-28">
+        <header className="border-b border-line pt-12 pb-10 md:pt-20 md:pb-14">
+          <p className={EYEBROW}>
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> Legal
+          </p>
+        <h1 className="mt-5 max-w-[16ch] font-display text-[clamp(40px,5.6vw,72px)] leading-[1.05] font-normal tracking-[-0.035em] text-ink">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-plum-soft">
+        <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft tabular-nums">
           Last updated: {BUSINESS.lastUpdated}
         </p>
+        </header>
 
-        <div className="mt-8 space-y-8 text-[15px] leading-relaxed text-plum-soft">
+        <div className="grid gap-10 pt-10 md:pt-14 lg:grid-cols-[200px_minmax(0,68ch)] lg:gap-[clamp(48px,7vw,112px)]">
+          <LegalNav current="/privacy" />
+        <article className="max-w-[68ch] space-y-8 text-[15px] leading-[1.8] text-ink-soft md:text-[16px] [&>p:first-child]:text-[17px] [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-ink [&>section]:border-t [&>section]:border-line [&>section]:pt-8">
           <p>
             This Privacy Policy explains how{" "}
-            <strong className="text-plum">{legalEntityName}</strong>{" "}
+            <strong className="font-semibold text-ink">{legalEntityName}</strong>{" "}
             (&ldquo;ArchIt&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or
             &ldquo;our&rdquo;), operating the website and application at this
             domain, collects, uses, discloses, and safeguards information
@@ -68,29 +114,29 @@ export default function PrivacyPage() {
           </p>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               1. Information We Collect
             </h2>
-            <ul className="mt-3 list-disc space-y-2 pl-5">
+            <ul className="mt-4 list-disc space-y-2.5 pl-5 marker:text-accent">
               <li>
-                <strong className="text-plum">Account data</strong> — name,
+                <strong className="font-semibold text-ink">Account data</strong> — name,
                 email address, and profile details you provide when you sign
                 up or sign in, processed for us by our authentication
                 provider, Clerk.
               </li>
               <li>
-                <strong className="text-plum">Listing &amp; design data</strong>{" "}
+                <strong className="font-semibold text-ink">Listing &amp; design data</strong>{" "}
                 — property listings, photos, location pins, house designs,
                 and other content you create or upload within the Services.
               </li>
               <li>
-                <strong className="text-plum">Contact information</strong> —
+                <strong className="font-semibold text-ink">Contact information</strong> —
                 phone numbers or email addresses you add to a listing so that
                 interested buyers/renters can reach you after unlocking
                 contact details.
               </li>
               <li>
-                <strong className="text-plum">Payment data</strong> —
+                <strong className="font-semibold text-ink">Payment data</strong> —
                 transaction identifiers, order IDs, UPI transaction
                 references (UTR), and payment status relating to purchases
                 you make. We do not collect or store your card, UPI PIN, or
@@ -98,13 +144,13 @@ export default function PrivacyPage() {
                 UPI app.
               </li>
               <li>
-                <strong className="text-plum">Usage &amp; device data</strong>{" "}
+                <strong className="font-semibold text-ink">Usage &amp; device data</strong>{" "}
                 — IP address, browser type, device identifiers, pages
                 viewed, and map interactions, collected automatically to
                 operate and improve the Services.
               </li>
               <li>
-                <strong className="text-plum">Cookies &amp; similar
+                <strong className="font-semibold text-ink">Cookies &amp; similar
                 technologies</strong> — used for session management,
                 authentication, and basic analytics.
               </li>
@@ -112,11 +158,11 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               2. How We Use Your Information
             </h2>
             <p className="mt-3">We use the information we collect to:</p>
-            <ul className="mt-3 list-disc space-y-2 pl-5">
+            <ul className="mt-4 list-disc space-y-2.5 pl-5 marker:text-accent">
               <li>Provide, operate, and maintain the Services;</li>
               <li>
                 Process UPI payments for contact unlocks, featured-listing
@@ -142,16 +188,16 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               3. Sharing &amp; Disclosure
             </h2>
             <p className="mt-3">
               We do not sell your personal information. We share information
               only with:
             </p>
-            <ul className="mt-3 list-disc space-y-2 pl-5">
+            <ul className="mt-4 list-disc space-y-2.5 pl-5 marker:text-accent">
               <li>
-                <strong className="text-plum">Service providers</strong> —
+                <strong className="font-semibold text-ink">Service providers</strong> —
                 Clerk (authentication), our self-hosted UPI payment gateway
                 (payment processing), Supabase (database and file storage),
                 and hosting/CDN
@@ -159,12 +205,12 @@ export default function PrivacyPage() {
                 obligations;
               </li>
               <li>
-                <strong className="text-plum">Other users</strong> — listing
+                <strong className="font-semibold text-ink">Other users</strong> — listing
                 details you mark public, and your contact details with users
                 who pay to unlock them;
               </li>
               <li>
-                <strong className="text-plum">Legal authorities</strong> —
+                <strong className="font-semibold text-ink">Legal authorities</strong> —
                 where required to comply with a legal obligation, court
                 order, or valid government request.
               </li>
@@ -172,7 +218,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               4. Data Retention
             </h2>
             <p className="mt-3">
@@ -187,7 +233,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">5. Data Security</h2>
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">5. Data Security</h2>
             <p className="mt-3">
               We implement reasonable technical and organizational measures
               — including encryption in transit, access controls, and
@@ -198,7 +244,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               6. Children&rsquo;s Privacy
             </h2>
             <p className="mt-3">
@@ -211,7 +257,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               7. Your Rights &amp; Choices
             </h2>
             <p className="mt-3">
@@ -234,7 +280,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               8. Grievance Officer
             </h2>
             <p className="mt-3">
@@ -243,7 +289,7 @@ export default function PrivacyPage() {
               Officer are provided below:
             </p>
             <p className="mt-3">
-              <strong className="text-plum">
+              <strong className="font-semibold text-ink">
                 {grievanceOfficer ?? "Grievance Officer"}
               </strong>
               {registeredName && (
@@ -278,7 +324,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               9. Changes to This Policy
             </h2>
             <p className="mt-3">
@@ -291,7 +337,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">10. Contact Us</h2>
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">10. Contact Us</h2>
             <p className="mt-3">
               For questions about this Privacy Policy,{" "}
               {hasSupportEmail ? (
@@ -306,6 +352,7 @@ export default function PrivacyPage() {
               .
             </p>
           </section>
+        </article>
         </div>
       </main>
       <Footer />

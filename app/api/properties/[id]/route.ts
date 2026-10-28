@@ -103,7 +103,7 @@ export async function PUT(
   // photos dropped in this edit are cleaned up after the write; the reviewed
   // fields decide whether the edit sends the listing back into review.
   // design_id / default_view are read too: an edit that omits them keeps them.
-  const { data: previous } = await db
+  const { data: previous, error: previousError } = await db
     .from("properties")
     .select("photo, photos, status, building_name, owner, address, city, design_id, default_view")
     .eq("id", id)
@@ -123,6 +123,12 @@ export async function PUT(
         status: string | null;
       }
     >();
+  // A failed read is not "no row": treating it as one would detach the design,
+  // reset default_view and re-queue review on a transient DB error.
+  if (previousError) {
+    console.error(`PUT /api/properties/${id} previous-row read failed:`, previousError.message);
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
   // no row for this lister: the scoped update below answers 404
   const storedDesignId = previous?.design_id ?? null;
 

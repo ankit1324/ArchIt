@@ -125,7 +125,7 @@ function setContext(plot, neighbors, facing){
     if(off){
       const c = document.createElement('canvas'); c.width = c.height = 128;
       const g = c.getContext('2d');
-      g.fillStyle = '#e5476f'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#ad4a31'; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = '700 64px system-ui'; g.fillText(facing, 64, 46);
       g.font = '600 26px system-ui'; g.fillText('facing', 64, 98);
       const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false}));
@@ -140,12 +140,12 @@ function setContext(plot, neighbors, facing){
         new THREE.Vector3(-hw, .012, -hd), new THREE.Vector3(hw, .012, -hd),
         new THREE.Vector3(hw, .012, hd), new THREE.Vector3(-hw, .012, hd),
       ]),
-      new THREE.LineBasicMaterial({color:'#e5476f'})
+      new THREE.LineBasicMaterial({color:'#ad4a31'})
     );
     contextRoot.add(outline);
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(plot.w, plot.d),
-      new THREE.MeshStandardMaterial({color:'#f8e9ee', roughness:1})
+      new THREE.MeshStandardMaterial({color:'#eee5d9', roughness:1})
     );
     plane.rotation.x = -Math.PI/2; plane.position.y = .006;
     contextRoot.add(plane);
@@ -173,8 +173,8 @@ function setContext(plot, neighbors, facing){
 // reused across rebuilds, so this is a Set, not a per-rebuild list.
 const wallMats = new Set();
 let selOutline = null;
-const selLineMat = new THREE.LineBasicMaterial({color:'#e5476f'});
-const selHandleMat = new THREE.MeshBasicMaterial({color:'#e5476f'});
+const selLineMat = new THREE.LineBasicMaterial({color:'#ad4a31'});
+const selHandleMat = new THREE.MeshBasicMaterial({color:'#ad4a31'});
 
 function beam(sx,sy,sz, x,y,z, mat){
   const m = new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz), mat);

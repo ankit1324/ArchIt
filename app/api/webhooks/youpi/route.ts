@@ -1,5 +1,6 @@
 import { recordPurchase } from "@/lib/purchases";
 import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
+import { readBodyCapped } from "@/lib/request";
 import { verifyWebhookSignature, type YoupiWebhookEvent } from "@/lib/youpi";
 
 /**
@@ -10,6 +11,18 @@ import { verifyWebhookSignature, type YoupiWebhookEvent } from "@/lib/youpi";
  * their API) stays non-2xx to trigger a retry.
  */
 const NON_RETRYABLE = new Set([202, 400, 402, 409]);
+
+/**
+ * A gateway event is a few hundred bytes. Anything past this is not ours,
+ * and is refused before it is buffered in full or hashed.
+ */
+const MAX_WEBHOOK_BYTES = 64 * 1024;
+
+/**
+ * Strict UTF-8, BOM kept: decoding is then lossless, so the string handed to
+ * verifyWebhookSignature re-encodes to exactly the bytes the gateway signed.
+ */
+const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 /**
  * YouPI-PG merchant webhook. Configure the gateway's merchant webhook URL to
@@ -36,7 +49,24 @@ export async function POST(request: Request) {
     return Response.json({ error: "webhook not configured" }, { status: 500 });
   }
 
-  const body = await request.text();
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_WEBHOOK_BYTES) {
+    return Response.json({ error: "body too large" }, { status: 413 });
+  }
+  let raw: Uint8Array | null;
+  try {
+    raw = await readBodyCapped(request, MAX_WEBHOOK_BYTES);
+  } catch {
+    return Response.json({ error: "invalid body" }, { status: 400 });
+  }
+  if (!raw) return Response.json({ error: "body too large" }, { status: 413 });
+  let body: string;
+  try {
+    body = utf8.decode(raw);
+  } catch {
+    // not UTF-8, so not a gateway event; a lossy decode would also break the HMAC
+    return Response.json({ error: "invalid body" }, { status: 400 });
+  }
   if (!verifyWebhookSignature(body, signature, secret)) {
     return Response.json({ error: "invalid signature" }, { status: 400 });
   }

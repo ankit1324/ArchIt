@@ -75,7 +75,8 @@ export default function PinPickerMap({
       markerRef.current.setLngLat(coords);
       return;
     }
-    const marker = new maplibregl.Marker({ color: "#3d1830", draggable: true })
+    // planner accent (paper/ink markers would vanish into the positron basemap)
+    const marker = new maplibregl.Marker({ color: "#ad4a31", draggable: true })
       .setLngLat(coords)
       .addTo(map);
     marker.on("dragend", () => {
@@ -181,16 +182,16 @@ export default function PinPickerMap({
   }, [flyTo]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl bg-white/60">
+    <div className="relative h-full w-full overflow-hidden rounded-md border border-line bg-paper-soft">
       {/* maplibre forces position:relative on its container, so size it with
           h/w-full inside the positioned wrapper (as Map3D does) */}
       <div ref={containerRef} className="h-full w-full" />
       {failed && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-cream/95 p-4 text-center">
-          <p className="text-[12.5px] font-semibold text-plum">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/95 p-4 text-center">
+          <p className="font-display text-[17px] font-medium tracking-[-0.01em] text-ink">
             The map didn’t load.
           </p>
-          <p className="text-[11.5px] font-medium text-plum-soft">
+          <p className="max-w-[34ch] text-[14px] leading-relaxed text-ink-soft">
             Search for a place above to drop the pin there, or publish without a
             map pin.
           </p>
@@ -200,7 +201,7 @@ export default function PinPickerMap({
               setFailed(false);
               setAttempt((a) => a + 1);
             }}
-            className="rounded-full bg-white/80 px-3 py-1 text-[11.5px] font-bold text-plum hover:bg-white"
+            className="mt-1 min-h-11 rounded-[5px] border border-line-strong bg-paper px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Try again
           </button>

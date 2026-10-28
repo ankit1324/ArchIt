@@ -6,7 +6,26 @@ import { ADMIN_PAGE_SIZE, listingSearchFilter, parseListingFilters } from "@/lib
 import { db } from "@/lib/db";
 import { LISTING_STATUSES } from "@/lib/moderation";
 import AdminAction from "../AdminAction";
-import { Badge, cell, Empty, head, LoadError, Pager, UserLink, when } from "../ui";
+import {
+  Badge,
+  button,
+  cell,
+  Empty,
+  eyebrow,
+  focus,
+  head,
+  input,
+  link,
+  LoadError,
+  num,
+  PageHeader,
+  Pager,
+  row,
+  table,
+  tableWrap,
+  UserLink,
+  when,
+} from "../ui";
 
 export const metadata = { title: "Listings" };
 
@@ -60,39 +79,45 @@ export default async function AdminListings({
   return (
     <>
       <LoadError errors={[error?.message]} />
-      <form className="mt-8 flex flex-wrap items-center gap-2" action="/admin/listings">
+      <PageHeader title="Listings" />
+      <form className="mt-8 flex flex-wrap items-center gap-2" action="/admin/listings" role="search">
         <input
           type="search"
           name="q"
           defaultValue={filters.q}
+          aria-label="Search listings"
           placeholder="Search name, address, city or id"
-          className="min-w-0 flex-1 rounded-full border border-plum/15 bg-white px-4 py-2 text-[14px]"
+          className={`${input} min-w-0 flex-1 basis-60`}
         />
         {filters.status !== "all" && <input type="hidden" name="status" value={filters.status} />}
-        <button className="rounded-full bg-plum px-4 py-2 text-[13px] font-bold text-cream">Search</button>
+        <button className={`${button} border border-line-strong text-ink hover:border-ink`}>Search</button>
       </form>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <nav aria-label="Filter by status" className="mt-4 flex flex-wrap items-center gap-2">
+        <span className={`mr-1 ${eyebrow}`}>Status</span>
         {STATUS_FILTERS.map((s) => (
           <Link
             key={s}
             href={filterHref(s)}
-            className={`rounded-full px-3 py-1 text-[12px] font-bold ${
-              filters.status === s ? "bg-plum text-cream" : "bg-white/70 text-plum"
+            aria-current={filters.status === s ? "page" : undefined}
+            className={`inline-flex min-h-8 items-center rounded-full border px-3 text-[12px] font-semibold capitalize transition-colors ${focus} ${
+              filters.status === s
+                ? "border-ink bg-ink text-paper"
+                : "border-line-strong text-ink hover:border-ink"
             }`}
           >
             {s}
           </Link>
         ))}
-      </div>
+      </nav>
 
-      <div className="mt-4">
+      <div className="mt-6">
         {rows.length ? (
-          <div className="overflow-x-auto rounded-2xl bg-white/70">
-            <table className="w-full text-[13px]">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
                 <tr>
                   <th className={head}>Listing</th>
-                  <th className={head}>Price</th>
+                  <th className={`${head} text-right`}>Price</th>
                   <th className={head}>Status</th>
                   <th className={head}>Lister</th>
                   <th className={head}>Created</th>
@@ -101,23 +126,23 @@ export default async function AdminListings({
               </thead>
               <tbody>
                 {rows.map((l) => (
-                  <tr key={l.id} className="border-t border-plum/10">
+                  <tr key={l.id} className={row}>
                     <td className={cell}>
-                      <Link href={`/admin/listings/${l.id}`} className="font-bold underline">
+                      <Link href={`/admin/listings/${l.id}`} className={`${link} font-semibold`}>
                         {l.building_name || l.address}
                       </Link>
-                      <div className="text-plum-soft">
+                      <div className="text-ink-soft">
                         {l.building_name ? `${l.address}, ` : ""}
                         {l.city} · {l.kind} · {l.type === "sale" ? "Sale" : l.type === "showcase" ? "Showcase" : "Rent"}
                         {l.featured ? " · ★ featured" : ""}
                       </div>
                     </td>
-                    <td className={cell}>
+                    <td className={`${cell} ${num}`}>
                       {l.type === "showcase" ? "—" : `₹${Number(l.price).toLocaleString("en-IN")}`}
                     </td>
                     <td className={cell}><Badge label={l.status} /></td>
                     <td className={cell}><UserLink id={l.user_id} /></td>
-                    <td className={cell}>{when(l.created_at)}</td>
+                    <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(l.created_at)}</td>
                     <td className={cell}>
                       <AdminAction
                         endpoint={`/api/admin/listings/${l.id}`}

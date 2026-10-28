@@ -5,7 +5,7 @@ import { isAdmin } from "@/lib/admin";
 import { ADMIN_PAGE_SIZE, parsePage } from "@/lib/admin-tools";
 import { db } from "@/lib/db";
 import AdminAction from "../AdminAction";
-import { cell, Empty, head, LoadError, Pager, UserLink, when } from "../ui";
+import { cell, Empty, head, link, LoadError, PageHeader, Pager, row, table, tableWrap, UserLink, when } from "../ui";
 
 export const metadata = { title: "Designs" };
 
@@ -48,14 +48,16 @@ export default async function AdminDesigns({
   return (
     <>
       <LoadError errors={[error?.message]} />
-      <p className="mt-8 text-[14px] text-plum-soft">
-        Published designs are public in the showcase and on the map. Unpublishing makes one
-        private again; its author keeps it and can publish it again.
-      </p>
-      <div className="mt-4">
+      <PageHeader title="Published designs">
+        <p className="mt-3 max-w-2xl text-[14px] leading-[1.7] text-ink-soft">
+          Published designs are public in the showcase and on the map. Unpublishing makes one
+          private again; its author keeps it and can publish it again.
+        </p>
+      </PageHeader>
+      <div className="mt-8">
         {rows.length ? (
-          <div className="overflow-x-auto rounded-2xl bg-white/70">
-            <table className="w-full text-[13px]">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
                 <tr>
                   <th className={head}>Design</th>
@@ -66,12 +68,12 @@ export default async function AdminDesigns({
               </thead>
               <tbody>
                 {rows.map((d) => (
-                  <tr key={d.id} className="border-t border-plum/10">
+                  <tr key={d.id} className={row}>
                     <td className={cell}>
-                      <Link href={`/showcase/${encodeURIComponent(d.id)}`} className="font-bold underline">
+                      <Link href={`/showcase/${encodeURIComponent(d.id)}`} className={`${link} font-semibold`}>
                         {d.name}
                       </Link>
-                      <div className="text-plum-soft">
+                      <div className="text-ink-soft">
                         {d.place || (d.plot_lng || d.plot_lat ? "pinned on the map" : "gallery only")}
                       </div>
                     </td>
@@ -79,7 +81,7 @@ export default async function AdminDesigns({
                       <div>{d.author_name || "—"}</div>
                       <UserLink id={d.user_id} />
                     </td>
-                    <td className={cell}>{when(d.published_at)}</td>
+                    <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(d.published_at)}</td>
                     <td className={cell}>
                       <AdminAction
                         endpoint={`/api/admin/designs/${encodeURIComponent(d.id)}`}

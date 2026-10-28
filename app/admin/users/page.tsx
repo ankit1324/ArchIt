@@ -4,7 +4,23 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { isAdmin, isAdminUser } from "@/lib/admin";
 import { ADMIN_PAGE_SIZE, parsePage, sanitizeSearch } from "@/lib/admin-tools";
 import { db } from "@/lib/db";
-import { Badge, cell, Empty, head, LoadError, Pager, when } from "../ui";
+import {
+  Badge,
+  button,
+  cell,
+  Empty,
+  head,
+  input,
+  link,
+  LoadError,
+  num,
+  PageHeader,
+  Pager,
+  row,
+  table,
+  tableWrap,
+  when,
+} from "../ui";
 
 export const metadata = { title: "Users" };
 
@@ -53,53 +69,58 @@ export default async function AdminUsers({
   return (
     <>
       <LoadError errors={[clerkError, listings.error?.message, purchases.error?.message]} />
-      <form className="mt-8 flex flex-wrap items-center gap-2" action="/admin/users">
+      <PageHeader title="Users">
+        {users && (
+          <p className="mt-3 text-[14px] tabular-nums text-ink-soft">
+            {users.totalCount.toLocaleString("en-IN")} users
+          </p>
+        )}
+      </PageHeader>
+      <form className="mt-8 flex flex-wrap items-center gap-2" action="/admin/users" role="search">
         <input
           type="search"
           name="q"
           defaultValue={q}
+          aria-label="Search users"
           placeholder="Search email, name or user id"
-          className="min-w-0 flex-1 rounded-full border border-plum/15 bg-white px-4 py-2 text-[14px]"
+          className={`${input} min-w-0 flex-1 basis-60`}
         />
-        <button className="rounded-full bg-plum px-4 py-2 text-[13px] font-bold text-cream">Search</button>
+        <button className={`${button} border border-line-strong text-ink hover:border-ink`}>Search</button>
       </form>
-      {users && (
-        <p className="mt-2 text-[13px] text-plum-soft">{users.totalCount.toLocaleString("en-IN")} users</p>
-      )}
 
-      <div className="mt-4">
+      <div className="mt-6">
         {list.length ? (
-          <div className="overflow-x-auto rounded-2xl bg-white/70">
-            <table className="w-full text-[13px]">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
                 <tr>
                   <th className={head}>User</th>
                   <th className={head}>Joined</th>
                   <th className={head}>Last sign-in</th>
-                  <th className={head}>Listings</th>
-                  <th className={head}>Purchases</th>
+                  <th className={`${head} text-right`}>Listings</th>
+                  <th className={`${head} text-right`}>Purchases</th>
                 </tr>
               </thead>
               <tbody>
                 {list.map((u) => {
                   const name = [u.firstName, u.lastName].filter(Boolean).join(" ");
                   return (
-                    <tr key={u.id} className="border-t border-plum/10">
+                    <tr key={u.id} className={row}>
                       <td className={cell}>
-                        <Link href={`/admin/users/${u.id}`} className="font-bold underline">
+                        <Link href={`/admin/users/${u.id}`} className={`${link} break-all font-semibold`}>
                           {/* `||`: with no email, name is "" (not null) and must fall through to the id */}
                           {u.primaryEmailAddress?.emailAddress || name || u.id}
                         </Link>{" "}
                         {isAdminUser(u) && <Badge label="admin" />} {u.banned && <Badge label="banned" />}
-                        <div className="text-plum-soft">
+                        <div className="text-ink-soft">
                           {name && `${name} · `}
                           <code>{u.id}</code>
                         </div>
                       </td>
-                      <td className={cell}>{when(u.createdAt)}</td>
-                      <td className={cell}>{when(u.lastSignInAt)}</td>
-                      <td className={cell}>{listingCounts.get(u.id) ?? 0}</td>
-                      <td className={cell}>{purchaseCounts.get(u.id) ?? 0}</td>
+                      <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(u.createdAt)}</td>
+                      <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(u.lastSignInAt)}</td>
+                      <td className={`${cell} ${num}`}>{listingCounts.get(u.id) ?? 0}</td>
+                      <td className={`${cell} ${num}`}>{purchaseCounts.get(u.id) ?? 0}</td>
                     </tr>
                   );
                 })}

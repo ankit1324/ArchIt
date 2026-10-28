@@ -30,14 +30,15 @@ interface Toast {
   kind: "info" | "error";
 }
 
+// Planner palette (app/globals.css). Canvas fills need literal colours.
 const COLORS = [
-  "#f0483e", // coral
-  "#e2ef6a", // lime
-  "#ccdb2a", // lime deep
-  "#e857c2", // magenta
-  "#b18cf0", // lavender
-  "#3d1830", // plum
-  "#fffdf7",
+  "#ad4a31", // accent
+  "#8e3b27", // accent-deep
+  "#dde3b6", // highlight
+  "#b9c47f", // highlight-deep
+  "#d9a28c", // clay
+  "#b8c6c4", // mist
+  "#293c31", // forest
 ];
 
 interface Particle {
@@ -196,10 +197,8 @@ export default function CelebrationLayer() {
             <div
               key={t.id}
               role={t.kind === "error" ? "alert" : "status"}
-              className={`toast-chip pointer-events-auto flex max-w-[460px] items-start gap-3 rounded-2xl border px-4 py-3 text-[13px] font-semibold shadow-[0_18px_50px_-12px_rgba(61,24,48,.35)] ${
-                t.kind === "error"
-                  ? "border-coral/40 bg-[#fff3f2] text-plum"
-                  : "border-white/60 bg-white/95 text-plum"
+              className={`toast-chip pointer-events-auto flex max-w-[460px] items-start gap-3 rounded-md border border-line bg-paper py-3 pr-3 pl-4 text-[14px] font-medium text-ink shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] ${
+                t.kind === "error" ? "border-l-[3px] border-l-accent" : ""
               }`}
             >
               <span className="flex-1">{t.message}</span>
@@ -207,7 +206,7 @@ export default function CelebrationLayer() {
                 type="button"
                 onClick={() => dismiss(t.id)}
                 aria-label="Dismiss"
-                className="shrink-0 rounded-full px-1.5 leading-none text-plum-soft hover:text-plum"
+                className="-my-1 grid size-6 shrink-0 place-items-center rounded-full text-[12px] leading-none text-ink-soft hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 ✕
               </button>
@@ -217,9 +216,9 @@ export default function CelebrationLayer() {
       )}
       {message && (
         <div className="absolute inset-x-0 top-[26%] flex justify-center">
-          <div className="hurray-chip flex items-center gap-2.5 rounded-full border border-white/60 bg-white/80 px-6 py-3 shadow-[0_18px_50px_-12px_rgba(61,24,48,.35)] backdrop-blur-md">
+          <div className="hurray-chip flex items-center gap-2.5 rounded-full border border-line bg-paper/90 px-6 py-3 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] backdrop-blur-md">
             <span className="hurray-emoji text-[22px]">🎉</span>
-            <span className="text-[15px] font-extrabold tracking-tight text-plum">
+            <span className="font-display text-[19px] font-medium tracking-[-0.02em] text-ink">
               {message}
             </span>
           </div>

@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, designToRow, rowToDesign } from "@/lib/db";
 import { builderUnlockError } from "@/lib/entitlements";
+import { checkRateLimit, ipKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request";
 import { safeImageUrl } from "@/lib/url";
 import { MAX_DESIGN_BYTES, validateDesign } from "@/lib/validators";
@@ -28,6 +29,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+  // shared bucket across POST/PUT/DELETE: each write uploads up to ~1 MB
+  if (!(await checkRateLimit(ipKey(request, "designs-write", userId), 30, 60_000))) {
+    return rateLimitedResponse();
+  }
   const locked = await builderUnlockError(userId);
   if (locked) return locked;
   // designs carry the full block list; allow the 1 MB design cap plus envelope

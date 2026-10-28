@@ -592,10 +592,10 @@ export default function FindClient({
   };
 
   return (
-    <div className="flex h-full flex-col bg-cream pt-[env(safe-area-inset-top)]">
-      <Navbar />
+    <div className="app-shell flex h-full flex-col bg-paper pt-[env(safe-area-inset-top)] text-ink">
+      <Navbar variant="app" />
 
-      <main className={`${styles.canvas} relative mx-[max(0.5rem,env(safe-area-inset-left))] mb-[max(0.5rem,env(safe-area-inset-bottom))] min-h-0 flex-1 overflow-hidden rounded-[22px] bg-cream-soft sm:mx-3 sm:mb-[max(0.75rem,env(safe-area-inset-bottom))]`}>
+      <main className={`${styles.canvas} relative mx-[max(0.5rem,env(safe-area-inset-left))] mt-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-paper-soft sm:mx-3 sm:mt-3 sm:mb-[max(0.75rem,env(safe-area-inset-bottom))]`}>
         <Map3D
           listings={mapListings}
           designs={deferredDesigns}
@@ -614,7 +614,7 @@ export default function FindClient({
         {/* overlay chrome */}
         <div className="pointer-events-none absolute inset-0 z-10 p-3.5">
           <div id="find-filters" onKeyDown={(event) => { if (event.key === "Escape") setFiltersOpen(false); }} className={`${styles.filters} ${filtersOpen ? styles.filtersOpen : ""}`}>
-            <div className={styles.filterHeading}><div><span className={styles.eyebrow}>MAKE IT YOURS</span><h1>Find a property</h1></div><button onClick={() => setFiltersOpen(false)} className={styles.closeFilters} aria-label="Close filters">✕</button></div>
+            <div className={styles.filterHeading}><div><span className={styles.eyebrow}>Make it yours</span><h1>Find a property</h1></div><button type="button" onClick={() => setFiltersOpen(false)} className={styles.closeFilters} aria-label="Close filters"><span aria-hidden="true">✕</span></button></div>
             <FilterSidebar
               filters={filters}
               onChange={setFilters}
@@ -626,26 +626,28 @@ export default function FindClient({
 
           <div className={styles.toolbar}>
             <SearchBar value={query} onChange={setQuery} onSearch={searchPlace} onShowResults={showResults} resultCount={filtered.length} />
-            <button className={styles.filterToggle} aria-expanded={filtersOpen} aria-controls="find-filters" onClick={() => setFiltersOpen(!filtersOpen)}>Filters{activeFilters ? ` (${activeFilters})` : ""}</button>
+            <button type="button" className={styles.filterToggle} aria-expanded={filtersOpen} aria-controls="find-filters" onClick={() => setFiltersOpen(!filtersOpen)}>Filters{activeFilters ? ` (${activeFilters})` : ""}</button>
             <button
+              type="button"
               onClick={() => {
                 setFiltersOpen(false);
                 if (addStage === "idle") setAddStage("picking");
                 else cancelAdd();
               }}
-              className={`glass rounded-full px-4 py-2.5 text-[13px] font-bold transition-colors ${
+              className={`inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-[13px] font-semibold shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] transition-colors ${
                 addStage === "idle"
-                  ? "text-plum hover:bg-white/70"
-                  : "bg-plum/90! text-cream"
+                  ? "bg-accent text-paper hover:bg-accent-deep"
+                  : "border border-line-strong bg-paper text-ink hover:border-ink"
               }`}
             >
-              {addStage === "idle" ? "+ Add property" : "Cancel"}
+              {addStage === "idle" ? <><span aria-hidden="true">+</span> Add property</> : "Cancel"}
             </button>
 
           </div>
 
           {addStage === "picking" && (
-            <div className={`${styles.pickHint} glass rounded-full px-5 py-2.5 text-[13px] font-semibold text-plum`}>
+            <div role="status" className={`${styles.pickHint} mx-auto w-fit max-w-full rounded-full border border-line bg-paper/95 px-5 py-2.5 text-[14px] font-semibold text-ink shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)]`}>
+              <span aria-hidden="true" className="mr-2 inline-block size-1.5 -translate-y-px rounded-full bg-accent align-middle" />
               Click a spot on the map to place the property
             </div>
           )}
@@ -670,7 +672,7 @@ export default function FindClient({
                   <span className={styles.areaLong}>Search as I move</span>
                   <span className={styles.areaShort}>Map area</span>
                 </label>
-                <button onClick={showResults} disabled={!filtered.length}>Show on map ↗</button>
+                <button type="button" onClick={showResults} disabled={!filtered.length}>Show on map <span aria-hidden="true">↗</span></button>
                 <select aria-label="Sort properties" value={sort} onChange={(e) => setSort(e.target.value as ListingSort)}>
                   <option value="recommended">Featured first</option>
                   <option value="price-asc">Price: low to high</option>

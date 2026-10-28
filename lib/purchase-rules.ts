@@ -16,6 +16,8 @@ export interface PurchaseRefProperty {
   userId: string | null;
   /** Whether the listing has a non-empty owner contact to unlock. */
   hasOwner: boolean;
+  /** properties.status: 'live' | 'pending' | 'rejected'. */
+  status: string | null;
 }
 
 export interface PurchaseRefContext {
@@ -67,6 +69,11 @@ export function validatePurchaseRef(
       }
       if (!ctx.property.hasOwner) {
         return { ok: false, error: "listing has no owner contact to unlock" };
+      }
+      // Only live listings are public (lib/moderation.ts); a pending or
+      // rejected one may never be shown, so its contact must not be sold.
+      if (ctx.property.status !== "live") {
+        return { ok: false, error: "listing is not live" };
       }
       return { ok: true };
 

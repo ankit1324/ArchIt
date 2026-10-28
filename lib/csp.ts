@@ -86,8 +86,10 @@ export function buildCsp({ isDev, nonce }: CspOptions): string {
     `script-src-elem ${scriptSrc}`,
     // Tailwind and maplibre-gl both inject <style> tags at runtime, so styles
     // stay on 'unsafe-inline' (out of scope for the script XSS hardening).
-    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-    `font-src 'self' data: https://fonts.gstatic.com`,
+    // Every font is self-hosted (next/font/local, public/builder/fonts), so no
+    // font CDN is allowed.
+    `style-src 'self' 'unsafe-inline'`,
+    `font-src 'self' data:`,
     // blob:/data: cover maplibre's canvas + WebGL textures and builder screenshots.
     `img-src 'self' data: blob: https://images.unsplash.com ${SUPABASE} ${TILES.join(" ")} https://img.clerk.com`,
     `media-src 'self' blob:`,
@@ -118,8 +120,9 @@ export function buildBuilderCsp({ isDev }: { isDev: boolean }): string {
     `script-src 'self'`,
     // the stylesheet is inline in builder.html; the walk overlay and plan set
     // style attributes at runtime
-    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-    `font-src 'self' https://fonts.gstatic.com`,
+    `style-src 'self' 'unsafe-inline'`,
+    // Manrope is self-hosted in public/builder/fonts/, so no font CDN
+    `font-src 'self'`,
     // furniture thumbnails, exports and the design sheet are data:/blob: URLs
     `img-src 'self' data: blob:`,
     `connect-src 'self'`,

@@ -106,25 +106,28 @@ function jsonLd(l: PublicListing) {
   };
 }
 
+const FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const EYEBROW = "text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/60 px-4 py-3">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-plum-soft">{label}</dt>
-      <dd className="mt-0.5 text-[15px] font-bold text-plum">{value}</dd>
+    <div className="border-t border-line pt-3">
+      <dt className={EYEBROW}>{label}</dt>
+      <dd className="mt-1 text-[15px] font-semibold tabular-nums text-ink">{value}</dd>
     </div>
   );
 }
 
-/** Compact card for the "More in <city>" grid. */
+/** Compact card for the "More in <city>" grid, in the landing's starter-card style. */
 function MoreCard({ l }: { l: PublicListing }) {
   const photo = photosOf(l)[0];
   return (
     <li>
       <Link
         href={`/property/${encodeURIComponent(l.id)}`}
-        className="group block overflow-hidden rounded-3xl bg-white/60 transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum"
+        className={`group block h-full overflow-hidden rounded-md border border-line bg-paper-soft transition-colors hover:border-line-strong ${FOCUS}`}
       >
-        <div className="relative aspect-[4/3] bg-gradient-to-br from-plum-soft to-plum">
+        <div className="relative aspect-[4/3] border-b border-line bg-[#e7ece4]">
           {photo && (
             <Image
               src={photo}
@@ -140,9 +143,9 @@ function MoreCard({ l }: { l: PublicListing }) {
             {dealLabel(l)}
           </span>
         </div>
-        <div className="px-3 py-2.5">
-          <p className="text-[15px] font-extrabold">{priceLabel(l)}</p>
-          <p className="truncate text-[13px] font-semibold text-plum-soft group-hover:text-plum">
+        <div className="px-3 py-3">
+          <p className="text-[15px] font-semibold tabular-nums">{priceLabel(l)}</p>
+          <p className="mt-0.5 truncate text-[14px] text-ink-soft group-hover:text-ink">
             {headline(l)}
           </p>
         </div>
@@ -172,81 +175,87 @@ export default async function PropertyPage({ params }: Props) {
   const ld = JSON.stringify(jsonLd(l)).replace(/</g, "\\u003c");
 
   return (
-    <div className="h-full overflow-y-auto bg-cream text-plum">
+    <div className="flex min-h-full flex-col bg-paper text-ink">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld }} />
       <Navbar />
-      <main className="mx-auto max-w-4xl px-4 pb-10 pt-8 sm:px-6">
-        <nav aria-label="Breadcrumb" className="text-[13px] font-semibold text-plum-soft">
-          <Link href="/" className="hover:text-plum">ArchIt</Link>
-          <span aria-hidden> / </span>
+      <main className="mx-auto w-full max-w-5xl px-6 pb-16 pt-8 sm:px-8 sm:pt-10">
+        <nav aria-label="Breadcrumb" className={EYEBROW}>
+          <Link href="/" className={`inline-flex min-h-6 items-center hover:text-accent ${FOCUS}`}>ArchIt</Link>
+          <span aria-hidden className="mx-2 text-line-strong">/</span>
           <span>{city || "Listings"}</span>
         </nav>
 
-        <header className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <header className="mt-5 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end sm:gap-10">
           <div className="min-w-0">
-            <h1 className="break-words text-[28px] font-extrabold leading-tight sm:text-[36px]">{headline(l)}</h1>
-            <p className="mt-1 text-[15px] font-medium text-plum-soft">
+            <p className={`flex items-center gap-2 ${EYEBROW}`}>
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-accent" />
+              {kindLabel(l)}
+            </p>
+            <h1 className="mt-3 break-words font-display text-[34px] font-normal leading-[1.1] tracking-[-0.03em] sm:text-[48px]">
+              {headline(l)}
+            </h1>
+            <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
               {l.buildingName ? `${l.address}, ` : ""}
               {l.city}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2 py-1 text-[20px] font-extrabold ${dealTone(l)}`}
-            >
+          <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-2">
+            <span className="font-display text-[28px] font-normal tabular-nums leading-none tracking-[-0.02em] sm:text-[32px]">
               {priceLabel(l)}
             </span>
-            <span
-              className={`rounded-full px-3 py-1 text-[12px] font-bold ${dealTone(l)}`}
-            >
+            <span className={`rounded-full px-3 py-1 text-[12px] font-bold ${dealTone(l)}`}>
               {dealLabel(l)}
             </span>
           </div>
         </header>
 
         {/* Above the fold on phones: the two things a shared-link visitor does. */}
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="mt-7 flex flex-wrap items-center gap-2 border-t border-line pt-6">
           <Link
             href={mapHref}
             prefetch={false}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-plum px-5 py-2 text-[14px] font-bold text-cream transition-opacity hover:opacity-90 sm:w-auto"
+            className={`inline-flex min-h-11 w-full items-center justify-center gap-6 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep sm:mr-2 sm:w-auto ${FOCUS}`}
           >
-            View on the 3D map →
+            View on the 3D map <span aria-hidden>↗</span>
           </Link>
           <ShareButtons url={shareUrl} title={shareLine(l)} />
         </div>
 
         {photos.length > 0 ? (
-          <div className="mt-6 grid gap-2 sm:grid-cols-[2fr_1fr]">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl sm:row-span-2">
+          <div className="mt-8 grid gap-2 sm:grid-cols-[2fr_1fr]">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-line bg-paper-soft sm:row-span-2">
               <Image
                 src={photos[0]}
                 alt={`${headline(l)}, ${l.city}`}
                 fill
                 priority
-                sizes="(min-width: 896px) 560px, 100vw"
+                sizes="(min-width: 1024px) 640px, 100vw"
                 className="object-cover"
               />
             </div>
             {photos.slice(1, 3).map((src, i) => (
-              <div key={src} className="relative hidden aspect-[4/3] overflow-hidden rounded-3xl sm:block">
+              <div key={src} className="relative hidden aspect-[4/3] overflow-hidden rounded-md border border-line bg-paper-soft sm:block">
                 <Image
                   src={src}
                   alt={`${headline(l)} — photo ${i + 2}`}
                   fill
-                  sizes="280px"
+                  sizes="320px"
                   className="object-cover"
                 />
               </div>
             ))}
           </div>
         ) : (
-          <div className="mt-6 aspect-[16/7] rounded-3xl bg-gradient-to-br from-plum-soft to-plum" aria-hidden />
+          // No photos: a drafting-grid plate holds the space instead of a blank box.
+          <div
+            className="mt-8 aspect-[16/7] rounded-md border border-line bg-paper-soft bg-[linear-gradient(var(--color-line)_1px,transparent_1px),linear-gradient(90deg,var(--color-line)_1px,transparent_1px)] bg-[size:22px_22px]"
+            aria-hidden
+          />
         )}
 
-        <section aria-labelledby="facts-title" className="mt-8">
-          <h2 id="facts-title" className="text-lg font-bold">Details</h2>
-          <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <section aria-labelledby="facts-title" className="mt-12">
+          <h2 id="facts-title" className="font-display text-[26px] font-normal tracking-[-0.02em]">Details</h2>
+          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
             <Fact label="Type" value={kindLabel(l)} />
             {/* A plot or shop has no beds/baths: skip rows that would read "0". */}
             {dwelling && l.beds > 0 && <Fact label="Beds" value={String(l.beds)} />}
@@ -259,10 +268,12 @@ export default async function PropertyPage({ params }: Props) {
           </dl>
         </section>
 
-        <section className="mt-8 rounded-3xl bg-plum p-6 text-cream sm:flex sm:items-center sm:justify-between sm:gap-6">
+        <section className="mt-12 rounded-md bg-forest px-6 py-8 text-paper sm:flex sm:items-center sm:justify-between sm:gap-8 sm:px-10">
           <div>
-            <h2 className="text-lg font-bold">Interested in this {kindLabel(l).toLowerCase()}?</h2>
-            <p className="mt-1 text-[14px] text-cream/85">
+            <h2 className="font-display text-[26px] font-normal tracking-[-0.02em]">
+              Interested in this {kindLabel(l).toLowerCase()}?
+            </h2>
+            <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-paper/85">
               {PAYWALL_ENABLED ? (
                 <>
                   See it in 3D on the map and unlock the owner&apos;s contact for {feeLabel("contact_owner")}.
@@ -276,16 +287,16 @@ export default async function PropertyPage({ params }: Props) {
           <Link
             href={mapHref}
             prefetch={false}
-            className="mt-4 inline-block shrink-0 rounded-full bg-cream px-6 py-3 text-[14px] font-bold text-plum transition-opacity hover:opacity-90 sm:mt-0"
+            className="mt-5 inline-flex min-h-11 shrink-0 items-center gap-6 rounded-[5px] bg-paper px-5 py-3 text-[13px] font-semibold text-ink transition-colors hover:bg-paper-soft focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-paper sm:mt-0"
           >
-            Open on the 3D map →
+            Open on the 3D map <span aria-hidden>↗</span>
           </Link>
         </section>
 
         {more.length > 0 && (
-          <section aria-labelledby="more-title" className="mt-10">
-            <h2 id="more-title" className="text-lg font-bold">More in {city}</h2>
-            <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <section aria-labelledby="more-title" className="mt-12">
+            <h2 id="more-title" className="font-display text-[26px] font-normal tracking-[-0.02em]">More in {city}</h2>
+            <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {more.map((m) => (
                 <MoreCard key={m.id} l={m} />
               ))}
@@ -293,10 +304,12 @@ export default async function PropertyPage({ params }: Props) {
           </section>
         )}
 
-        <section className="mt-10 flex flex-col items-start gap-3 rounded-3xl bg-lime p-6 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mt-12 flex flex-col items-start gap-5 rounded-md border border-line bg-[#e7ece4] p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
           <div>
-            <h2 className="text-lg font-bold">Have a property{city ? ` in ${city}` : ""}?</h2>
-            <p className="mt-1 text-[14px] text-plum-soft">
+            <h2 className="font-display text-[22px] font-normal tracking-[-0.02em]">
+              Have a property{city ? ` in ${city}` : ""}?
+            </h2>
+            <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
               List it free on ArchIt and let buyers explore it on the 3D map.
             </p>
           </div>
@@ -304,9 +317,9 @@ export default async function PropertyPage({ params }: Props) {
           <Link
             href="/find"
             prefetch={false}
-            className="inline-block shrink-0 rounded-full bg-plum px-6 py-3 text-[14px] font-bold text-cream transition-opacity hover:opacity-90"
+            className={`inline-flex min-h-11 shrink-0 items-center gap-6 rounded-[5px] border border-line-strong px-5 py-3 text-[13px] font-semibold text-ink transition-colors hover:border-ink ${FOCUS}`}
           >
-            List your property free →
+            List your property free <span aria-hidden>↗</span>
           </Link>
         </section>
       </main>

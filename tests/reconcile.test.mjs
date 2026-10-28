@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   createReconciler,
   FEATURED_CHUNK,
+  RECONCILE_BACKLOG_AGE_MS,
   RECONCILE_BATCH,
+  RECONCILE_BUDGET_MS,
   RECONCILE_GRACE_MS,
   RECONCILE_WINDOW_MS,
 } from "../lib/reconcile.ts";
@@ -22,6 +24,13 @@ function order(id, attempts = 0) {
  */
 function harness({
   orders = [],
+  // (query, scanIndex) → the batch; defaults to `orders` on every scan
+  scan = null,
+  // a mutable clock; gatewayDelayMs is added on every gateway read
+  clock = { t: NOW },
+  gatewayDelayMs = 0,
+  oldestOpen = null,
+  oldestError = null,
   scanError = null,
   gateway = {},
   recorded = new Set(),
@@ -32,12 +41,27 @@ function harness({
   properties = [],
   grantOk = true,
 } = {}) {
-  const calls = { scans: [], marks: [], reports: [], records: [], fetches: [], grants: [], lookups: [] };
+  const calls = {
+    scans: [],
+    marks: [],
+    reports: [],
+    records: [],
+    fetches: [],
+    grants: [],
+    lookups: [],
+    oldest: [],
+  };
   const { reconcile } = createReconciler({
-    now: () => NOW,
+    now: () => clock.t,
     async listOpenOrders(q) {
       calls.scans.push(q);
-      return { data: scanError ? null : orders, error: scanError };
+      if (scanError) return { data: null, error: scanError };
+      return { data: scan ? scan(q, calls.scans.length - 1) : orders, error: null };
+    },
+    async oldestOpenOrder(q) {
+      calls.oldest.push(q);
+      if (oldestError) return { data: null, error: oldestError };
+      return { data: oldestOpen ? { created_at: oldestOpen } : null, error: null };
     },
     async countRecorded(paymentId) {
       if (countError) return { count: null, error: countError };
@@ -45,6 +69,7 @@ function harness({
     },
     async fetchPaymentStatus(paymentId) {
       calls.fetches.push(paymentId);
+      clock.t += gatewayDelayMs;
       const s = gateway[paymentId];
       if (s instanceof Error) throw s;
       return { status: s ?? "ACTIVE" };
@@ -86,8 +111,83 @@ test("scans open orders past the grace period, inside the window, in one batch",
       olderThan: new Date(NOW - RECONCILE_GRACE_MS).toISOString(),
       newerThan: new Date(NOW - RECONCILE_WINDOW_MS).toISOString(),
       limit: RECONCILE_BATCH,
+      checkedBefore: new Date(NOW).toISOString(),
     },
   ]);
+});
+
+const batchOf = (scanIndex, n) =>
+  Array.from({ length: n }, (_, i) => order(`${scanIndex}_${i}`));
+
+test("keeps sweeping batches until the backlog is empty", async () => {
+  const sizes = [RECONCILE_BATCH, RECONCILE_BATCH, 5];
+  const { reconcile, calls } = harness({ scan: (_q, i) => batchOf(i, sizes[i] ?? 0) });
+  const res = await reconcile();
+  assert.equal(res.ok, true);
+  assert.equal(calls.scans.length, 3, "a short batch ends the sweep");
+  assert.equal(res.summary.checked, RECONCILE_BATCH * 2 + 5);
+  assert.equal(res.summary.backlog, false);
+  // every scan uses the cutoffs fixed at the start of the run
+  assert.equal(new Set(calls.scans.map((q) => JSON.stringify(q))).size, 1);
+  assert.deepEqual(
+    calls.reports.filter((r) => r.kind === "reconcile_backlog"),
+    [],
+  );
+});
+
+test("never checks an order twice in one run", async () => {
+  // the same full batch keeps coming back (e.g. markOrder failing to bump checked_at)
+  const same = batchOf(0, RECONCILE_BATCH);
+  const { reconcile, calls } = harness({ scan: () => same });
+  const { summary } = await reconcile();
+  assert.equal(summary.checked, RECONCILE_BATCH);
+  assert.equal(calls.fetches.length, RECONCILE_BATCH);
+  assert.equal(calls.scans.length, 2);
+});
+
+test("stops at the time budget and reports reconcile_backlog", async () => {
+  const clock = { t: NOW };
+  const { reconcile, calls } = harness({
+    clock,
+    gatewayDelayMs: 1000,
+    // an endless backlog of full batches
+    scan: (_q, i) => batchOf(i, RECONCILE_BATCH),
+  });
+  const res = await reconcile();
+  assert.equal(res.ok, true);
+  assert.equal(res.summary.checked, RECONCILE_BUDGET_MS / 1000);
+  assert.equal(res.summary.backlog, true);
+  assert.ok(clock.t - NOW <= RECONCILE_BUDGET_MS, "no gateway read starts past the budget");
+  const backlog = calls.reports.filter((r) => r.kind === "reconcile_backlog");
+  assert.equal(backlog.length, 1);
+  assert.match(backlog[0].message, /time budget/);
+});
+
+test("reports reconcile_backlog when an open order older than 24h remains", async () => {
+  const stale = new Date(NOW - RECONCILE_BACKLOG_AGE_MS - 60_000).toISOString();
+  const { reconcile, calls } = harness({ orders: [order(1)], oldestOpen: stale });
+  const res = await reconcile();
+  assert.equal(res.ok, true);
+  assert.equal(res.summary.backlog, true);
+  assert.deepEqual(calls.oldest, [{ newerThan: new Date(NOW - RECONCILE_WINDOW_MS).toISOString() }]);
+  const backlog = calls.reports.filter((r) => r.kind === "reconcile_backlog");
+  assert.equal(backlog.length, 1);
+  assert.equal(backlog[0].context.oldestOpenAt, stale);
+});
+
+test("an open order younger than 24h is not a backlog", async () => {
+  const fresh = new Date(NOW - RECONCILE_BACKLOG_AGE_MS + 60_000).toISOString();
+  const { reconcile, calls } = harness({ oldestOpen: fresh });
+  const { summary } = await reconcile();
+  assert.equal(summary.backlog, false);
+  assert.deepEqual(calls.reports, []);
+});
+
+test("a failed backlog lookup does not fail the run", async () => {
+  const { reconcile, calls } = harness({ oldestError: { message: "db down" } });
+  const res = await reconcile();
+  assert.equal(res.ok, true);
+  assert.equal(calls.reports[0].kind, "reconcile_failed");
 });
 
 test("a failed scan is paged and stops the run", async () => {

@@ -8,7 +8,25 @@ import { purposeLabel, rupees } from "@/lib/email-templates";
 import { REPORT_REASONS, isReportReason } from "@/lib/moderation";
 import { safeImageUrl } from "@/lib/url";
 import AdminAction from "./AdminAction";
-import { cell, Empty, head, LoadError, Section, UserLink, when } from "./ui";
+import {
+  Badge,
+  card,
+  cell,
+  Empty,
+  eyebrow,
+  focus,
+  head,
+  link,
+  LoadError,
+  num,
+  PageHeader,
+  row,
+  Section,
+  table,
+  tableWrap,
+  UserLink,
+  when,
+} from "./ui";
 
 interface PendingRow {
   id: string;
@@ -68,14 +86,16 @@ async function count(q: PromiseLike<{ count: number | null; error: unknown }>) {
 function Stat({ label, value, hint, href }: { label: string; value: string; hint?: string; href?: string }) {
   const body = (
     <>
-      <div className="text-[12px] font-bold uppercase tracking-wide text-plum-soft">{label}</div>
-      <div className="mt-1 text-2xl font-extrabold">{value}</div>
-      {hint && <div className="mt-0.5 text-[12px] text-plum-soft">{hint}</div>}
+      <div className={eyebrow}>{label}</div>
+      <div className="mt-2 font-display text-[30px] font-normal leading-none tracking-[-0.02em] tabular-nums">
+        {value}
+      </div>
+      {hint && <div className="mt-2 text-[13px] tabular-nums text-ink-soft">{hint}</div>}
     </>
   );
-  const cls = "block rounded-2xl bg-white/70 p-4";
+  const cls = "block h-full bg-paper p-4";
   return href ? (
-    <Link href={href} className={`${cls} transition-colors hover:bg-white`}>
+    <Link href={href} className={`${cls} transition-colors hover:bg-paper-soft ${focus} focus-visible:-outline-offset-3`}>
       {body}
     </Link>
   ) : (
@@ -178,198 +198,206 @@ export default async function AdminPage() {
 
   return (
     <>
-        <LoadError errors={failed.map((r) => r.error?.message)} />
+      <LoadError errors={failed.map((r) => r.error?.message)} />
+      <PageHeader title="Overview" />
 
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Live listings" value={fmt(live)} href="/admin/listings?status=live" />
-          <Stat
-            label="Awaiting review"
-            value={fmt(pendingCount)}
-            hint={pendingCount ? `oldest ${ageLabel(oldestPending.data?.created_at ?? null)}` : undefined}
-            href="/admin/listings?status=pending"
-          />
-          <Stat label="Hidden / rejected" value={fmt(rejected)} href="/admin/listings?status=rejected" />
-          <Stat label="New this week" value={fmt(newThisWeek)} href="/admin/listings" />
-          <Stat label="Users" value={fmt(userCount)} href="/admin/users" />
-          <Stat
-            label="Revenue"
-            value={rupees(sumPaise(paid))}
-            hint={`${paid.length} purchases · ${rupees(sumPaise(paid30))} last 30 days`}
-          />
-        </div>
+      {/* hairline grid: the 1px gap over a line-coloured backdrop draws the rules */}
+      <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Live listings" value={fmt(live)} href="/admin/listings?status=live" />
+        <Stat
+          label="Awaiting review"
+          value={fmt(pendingCount)}
+          hint={pendingCount ? `oldest ${ageLabel(oldestPending.data?.created_at ?? null)}` : undefined}
+          href="/admin/listings?status=pending"
+        />
+        <Stat label="Hidden / rejected" value={fmt(rejected)} href="/admin/listings?status=rejected" />
+        <Stat label="New this week" value={fmt(newThisWeek)} href="/admin/listings" />
+        <Stat label="Users" value={fmt(userCount)} href="/admin/users" />
+        <Stat
+          label="Revenue"
+          value={rupees(sumPaise(paid))}
+          hint={`${paid.length} purchases · ${rupees(sumPaise(paid30))} last 30 days`}
+        />
+      </div>
 
-        {/* the true total: the list below stops at 100 */}
-        <Section title="Listings awaiting review" count={pendingCount ?? pending.data?.length ?? 0}>
-          {pending.data?.length ? (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {pending.data.map((p) => (
-                <li key={p.id} className="rounded-2xl bg-white/70 p-4">
-                  <div className="font-bold">{p.building_name || p.address}</div>
-                  <div className="text-[13px] text-plum-soft">
-                    {p.building_name ? `${p.address}, ` : ""}
-                    {p.city} · {p.kind} · {p.type === "sale" ? "Sale" : p.type === "showcase" ? "Showcase" : "Rent"}
-                    {p.type === "showcase" ? "" : ` · ₹${Number(p.price).toLocaleString("en-IN")}`}
-                  </div>
-                  <div className="mt-1 text-[12px] text-plum-soft">
-                    Submitted {when(p.created_at)} by <UserLink id={p.user_id} />
-                  </div>
-                  {safeImageUrl(p.photo) && (
-                    <a
-                      href={safeImageUrl(p.photo)!}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-1 inline-block text-[12px] underline"
-                    >
-                      View photo
-                    </a>
+      {/* the true total: the list below stops at 100 */}
+      <Section title="Listings awaiting review" count={pendingCount ?? pending.data?.length ?? 0}>
+        {pending.data?.length ? (
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {pending.data.map((p) => (
+              <li key={p.id} className={card}>
+                <div className="text-[15px] font-semibold">{p.building_name || p.address}</div>
+                <div className="mt-0.5 text-[13px] text-ink-soft">
+                  {p.building_name ? `${p.address}, ` : ""}
+                  {p.city} · {p.kind} · {p.type === "sale" ? "Sale" : p.type === "showcase" ? "Showcase" : "Rent"}
+                  {p.type === "showcase" ? (
+                    ""
+                  ) : (
+                    <span className="tabular-nums"> · ₹{Number(p.price).toLocaleString("en-IN")}</span>
                   )}
-                  <div className="mt-3">
-                    <AdminAction
-                      endpoint={`/api/admin/listings/${p.id}`}
-                      actions={[
-                        { action: "approve", label: "Approve", tone: "primary" },
-                        { action: "reject", label: "Reject", tone: "danger", askNote: true },
-                      ]}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty>Nothing waiting. New listings land here before they go live.</Empty>
-          )}
-        </Section>
+                </div>
+                <div className="mt-1 text-[13px] text-ink-soft">
+                  Submitted <span className="tabular-nums">{when(p.created_at)}</span> by <UserLink id={p.user_id} />
+                </div>
+                {safeImageUrl(p.photo) && (
+                  <a
+                    href={safeImageUrl(p.photo)!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${link} mt-1 text-[13px] font-semibold`}
+                  >
+                    View photo <span aria-hidden="true" className="ml-1">↗</span>
+                  </a>
+                )}
+                <div className="mt-3 border-t border-line pt-3">
+                  <AdminAction
+                    endpoint={`/api/admin/listings/${p.id}`}
+                    actions={[
+                      { action: "approve", label: "Approve", tone: "primary" },
+                      { action: "reject", label: "Reject", tone: "danger", askNote: true },
+                    ]}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>Nothing waiting. New listings land here before they go live.</Empty>
+        )}
+      </Section>
 
-        <Section title="Open reports" count={reports.data?.length ?? 0}>
-          {reports.data?.length ? (
-            <ul className="grid gap-3">
-              {reports.data.map((r) => (
-                <li key={r.id} className="rounded-2xl bg-white/70 p-4">
-                  <div className="font-bold">
-                    {r.properties?.building_name || r.properties?.address || r.property_id}
-                    {r.properties && r.properties.status !== "live" && (
-                      <span className="ml-2 rounded-full bg-plum/10 px-2 py-0.5 text-[11px]">
-                        {r.properties.status}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[13px]">
-                    <strong>{isReportReason(r.reason) ? REPORT_REASONS[r.reason] : r.reason}</strong>
-                    {r.details ? ` — ${r.details}` : ""}
-                  </div>
-                  <div className="mt-1 text-[12px] text-plum-soft">
-                    {when(r.created_at)} by <UserLink id={r.reporter_id} /> · listing{" "}
-                    <Link href={`/admin/listings/${r.property_id}`} className="font-mono text-[12px] underline">
-                      {r.property_id}
-                    </Link>
-                  </div>
-                  <div className="mt-3">
-                    <AdminAction
-                      endpoint={`/api/admin/reports/${r.id}`}
-                      actions={[
-                        { action: "dismiss", label: "Dismiss", tone: "neutral" },
-                        { action: "takedown", label: "Take down listing", tone: "danger", askNote: true },
-                      ]}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty>No open reports.</Empty>
-          )}
-        </Section>
+      <Section title="Open reports" count={reports.data?.length ?? 0}>
+        {reports.data?.length ? (
+          <ul className="grid gap-3">
+            {reports.data.map((r) => (
+              <li key={r.id} className={card}>
+                <div className="text-[15px] font-semibold">
+                  {r.properties?.building_name || r.properties?.address || r.property_id}
+                  {r.properties && r.properties.status !== "live" && (
+                    <span className="ml-2">
+                      <Badge label={r.properties.status} />
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-[14px]">
+                  <strong className="font-semibold">
+                    {isReportReason(r.reason) ? REPORT_REASONS[r.reason] : r.reason}
+                  </strong>
+                  {r.details ? ` — ${r.details}` : ""}
+                </div>
+                <div className="mt-1 text-[13px] text-ink-soft">
+                  <span className="tabular-nums">{when(r.created_at)}</span> by <UserLink id={r.reporter_id} /> · listing{" "}
+                  <Link href={`/admin/listings/${r.property_id}`} className={`${link} font-mono text-[12px]`}>
+                    {r.property_id}
+                  </Link>
+                </div>
+                <div className="mt-3 border-t border-line pt-3">
+                  <AdminAction
+                    endpoint={`/api/admin/reports/${r.id}`}
+                    actions={[
+                      { action: "dismiss", label: "Dismiss", tone: "neutral" },
+                      { action: "takedown", label: "Take down listing", tone: "danger", askNote: true },
+                    ]}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>No open reports.</Empty>
+        )}
+      </Section>
 
-        <Section title="Refunds due" count={refunds.data?.length ?? 0}>
-          <p className="mb-3 text-[13px] text-plum-soft">
-            Payments the gateway settled for something the user already owned (the reconciler
-            marks these <code>refund_due</code>). Refund them from the YouPI-PG admin, then mark
-            them refunded here.
-          </p>
-          {refunds.data?.length ? (
-            <div className="overflow-x-auto rounded-2xl bg-white/70">
-              <table className="w-full text-[13px]">
-                <thead>
-                  <tr>
-                    <th className={head}>Created</th>
-                    <th className={head}>Purpose</th>
-                    <th className={head}>Amount</th>
-                    <th className={head}>User</th>
-                    <th className={head}>Payment</th>
-                    <th className={head}>Order</th>
-                    <th className={head} />
+      <Section title="Refunds due" count={refunds.data?.length ?? 0}>
+        <p className="mb-4 max-w-3xl text-[14px] leading-[1.7] text-ink-soft">
+          Payments the gateway settled for something the user already owned (the reconciler
+          marks these <code>refund_due</code>). Refund them from the YouPI-PG admin, then mark
+          them refunded here.
+        </p>
+        {refunds.data?.length ? (
+          <div className={tableWrap}>
+            <table className={table}>
+              <thead>
+                <tr>
+                  <th className={head}>Created</th>
+                  <th className={head}>Purpose</th>
+                  <th className={`${head} text-right`}>Amount</th>
+                  <th className={head}>User</th>
+                  <th className={head}>Payment</th>
+                  <th className={head}>Order</th>
+                  <th className={head}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {refunds.data.map((o) => (
+                  <tr key={o.order_id} className={row}>
+                    <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(o.created_at)}</td>
+                    <td className={cell}>
+                      {purposeLabel(o.purpose)}
+                      {o.ref ? <div className="text-ink-soft">{o.ref}</div> : null}
+                    </td>
+                    <td className={`${cell} ${num}`}>{rupees(o.amount)}</td>
+                    <td className={cell}><UserLink id={o.user_id} /></td>
+                    <td className={cell}><code className="text-[12px]">{o.payment_id}</code></td>
+                    <td className={cell}><code className="text-[12px]">{o.order_id}</code></td>
+                    <td className={cell}>
+                      <AdminAction
+                        endpoint={`/api/admin/orders/${encodeURIComponent(o.order_id)}`}
+                        actions={[
+                          {
+                            action: "refunded",
+                            label: "Mark refunded",
+                            tone: "primary",
+                            confirm: `Mark ${rupees(o.amount)} to ${o.user_id} as refunded? Only do this after the money has been sent back in YouPI.`,
+                            askNote: true,
+                            notePrompt: "Refund reference (UTR or gateway refund id), optional",
+                          },
+                        ]}
+                      />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {refunds.data.map((o) => (
-                    <tr key={o.order_id} className="border-t border-plum/10">
-                      <td className={cell}>{when(o.created_at)}</td>
-                      <td className={cell}>
-                        {purposeLabel(o.purpose)}
-                        {o.ref ? <div className="text-plum-soft">{o.ref}</div> : null}
-                      </td>
-                      <td className={cell}>{rupees(o.amount)}</td>
-                      <td className={cell}><UserLink id={o.user_id} /></td>
-                      <td className={cell}><code>{o.payment_id}</code></td>
-                      <td className={cell}><code>{o.order_id}</code></td>
-                      <td className={cell}>
-                        <AdminAction
-                          endpoint={`/api/admin/orders/${encodeURIComponent(o.order_id)}`}
-                          actions={[
-                            {
-                              action: "refunded",
-                              label: "Mark refunded",
-                              tone: "primary",
-                              confirm: `Mark ${rupees(o.amount)} to ${o.user_id} as refunded? Only do this after the money has been sent back in YouPI.`,
-                              askNote: true,
-                              notePrompt: "Refund reference (UTR or gateway refund id), optional",
-                            },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty>No refunds owed.</Empty>
-          )}
-        </Section>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty>No refunds owed.</Empty>
+        )}
+      </Section>
 
-        <Section title="Recent purchases" count={purchases.data?.length ?? 0}>
-          {purchases.data?.length ? (
-            <div className="overflow-x-auto rounded-2xl bg-white/70">
-              <table className="w-full text-[13px]">
-                <thead>
-                  <tr>
-                    <th className={head}>When</th>
-                    <th className={head}>Purpose</th>
-                    <th className={head}>Amount</th>
-                    <th className={head}>User</th>
-                    <th className={head}>Payment</th>
+      <Section title="Recent purchases" count={purchases.data?.length ?? 0}>
+        {purchases.data?.length ? (
+          <div className={tableWrap}>
+            <table className={table}>
+              <thead>
+                <tr>
+                  <th className={head}>When</th>
+                  <th className={head}>Purpose</th>
+                  <th className={`${head} text-right`}>Amount</th>
+                  <th className={head}>User</th>
+                  <th className={head}>Payment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchases.data.map((p) => (
+                  <tr key={p.id} className={row}>
+                    <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(p.created_at)}</td>
+                    <td className={cell}>
+                      {purposeLabel(p.purpose)}
+                      {p.ref ? <div className="text-ink-soft">{p.ref}</div> : null}
+                    </td>
+                    <td className={`${cell} ${num}`}>{p.amount == null ? "—" : rupees(p.amount)}</td>
+                    <td className={cell}><UserLink id={p.user_id} /></td>
+                    <td className={cell}><code className="text-[12px]">{p.payment_id}</code></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {purchases.data.map((p) => (
-                    <tr key={p.id} className="border-t border-plum/10">
-                      <td className={cell}>{when(p.created_at)}</td>
-                      <td className={cell}>
-                        {purposeLabel(p.purpose)}
-                        {p.ref ? <div className="text-plum-soft">{p.ref}</div> : null}
-                      </td>
-                      <td className={cell}>{p.amount == null ? "—" : rupees(p.amount)}</td>
-                      <td className={cell}><UserLink id={p.user_id} /></td>
-                      <td className={cell}><code>{p.payment_id}</code></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty>No purchases yet.</Empty>
-          )}
-        </Section>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty>No purchases yet.</Empty>
+        )}
+      </Section>
     </>
   );
 }

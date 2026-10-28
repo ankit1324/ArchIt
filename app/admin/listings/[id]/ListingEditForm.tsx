@@ -39,8 +39,9 @@ const NUMBER_FIELDS: ReadonlyArray<readonly [NumberField, string, boolean]> = [
   ["lat", "Latitude", false],
 ];
 
-const input = "w-full rounded-xl border border-plum/15 bg-white px-3 py-2 text-[14px]";
-const label = "flex flex-col gap-1 text-[12px] font-bold uppercase tracking-wide text-plum-soft";
+const FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const input = `w-full rounded-[5px] border border-line-strong bg-paper px-3 py-2.5 text-[14px] font-normal normal-case tracking-normal text-ink tabular-nums ${FOCUS}`;
+const label = "flex flex-col gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
 
 /**
  * Admin edit of a listing's details. Sends the full listing to
@@ -125,7 +126,7 @@ export default function ListingEditForm({ id, initial }: { id: string; initial: 
   };
 
   return (
-    <form onSubmit={save} className="grid gap-3 rounded-2xl bg-white/70 p-4 sm:grid-cols-2">
+    <form onSubmit={save} className="grid gap-4 rounded-md border border-line bg-paper-soft p-4 sm:grid-cols-2 sm:p-6">
       <label className={label}>
         Building name
         <input className={input} value={v.buildingName} onChange={(e) => set("buildingName", e.target.value)} />
@@ -167,7 +168,7 @@ export default function ListingEditForm({ id, initial }: { id: string; initial: 
           ))}
         </select>
       </label>
-      <div className="grid grid-cols-3 gap-3 sm:col-span-2 sm:grid-cols-6">
+      <div className="grid grid-cols-3 gap-4 sm:col-span-2 sm:grid-cols-6">
         <label className={label}>Beds<input {...num("beds")} min={0} /></label>
         <label className={label}>Baths<input {...num("baths")} min={0} /></label>
         <label className={label}>Sqft<input {...num("sqft")} min={0} /></label>
@@ -180,33 +181,43 @@ export default function ListingEditForm({ id, initial }: { id: string; initial: 
       {initial.photos.length > 0 && (
         <fieldset className="sm:col-span-2">
           <legend className={label}>Photos (untick to remove)</legend>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {initial.photos.map((p) => (
-              <label key={p} className="flex flex-col items-center gap-1 text-[12px]">
+          <div className="mt-3 flex flex-wrap gap-3">
+            {initial.photos.map((p, i) => (
+              // The visible "Keep photo N" text is the checkbox's accessible
+              // name: the preview's alt is empty, so on its own the label gave
+              // screen readers an unnamed checkbox.
+              <label
+                key={p}
+                className="group flex cursor-pointer flex-col gap-2 rounded-md border border-line bg-paper p-2 text-[13px] font-semibold text-ink has-[input:not(:checked)]:border-dashed has-[input:not(:checked)]:border-line-strong"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element -- admin preview of an already-allowlisted URL */}
-                <img src={p} alt="" className="h-20 w-28 rounded-lg object-cover" />
-                <input
-                  type="checkbox"
-                  checked={v.photos.includes(p)}
-                  onChange={(e) =>
-                    set("photos", e.target.checked ? initial.photos.filter((x) => x === p || v.photos.includes(x)) : v.photos.filter((x) => x !== p))
-                  }
-                />
+                <img src={p} alt="" className="h-20 w-28 rounded-[3px] object-cover transition-opacity group-has-[input:not(:checked)]:opacity-40" />
+                <span className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className={`size-4 accent-accent ${FOCUS}`}
+                    checked={v.photos.includes(p)}
+                    onChange={(e) =>
+                      set("photos", e.target.checked ? initial.photos.filter((x) => x === p || v.photos.includes(x)) : v.photos.filter((x) => x !== p))
+                    }
+                  />
+                  Keep photo {i + 1}
+                </span>
               </label>
             ))}
           </div>
         </fieldset>
       )}
-      <div className="flex items-center gap-3 sm:col-span-2">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4 sm:col-span-2">
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-plum px-5 py-2 text-[13px] font-bold text-cream disabled:opacity-50"
+          className={`inline-flex min-h-11 items-center rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep disabled:opacity-50 ${FOCUS}`}
         >
           {saving ? "Saving…" : "Save changes"}
         </button>
         {message && (
-          <span role="status" className={`text-[13px] font-semibold ${message.ok ? "text-emerald-800" : "text-coral"}`}>
+          <span role="status" className={`text-[14px] font-semibold ${message.ok ? "text-ink" : "text-accent"}`}>
             {message.text}
           </span>
         )}

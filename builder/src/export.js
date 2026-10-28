@@ -62,7 +62,7 @@ function planShot(){
   const w = bb.w*S + pad*2, h = bb.d*S + pad*2;
   // replace full-viewport background rects with ones covering the cropped viewBox
   xml = xml.replace(/<rect width="100%" height="100%"[^>]*\/>/g, '');
-  xml = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f7f9fc"/>
+  xml = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f8f7f2"/>
     <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#g1)"/>` + xml;
   return {xml, x, y, w, h};
 }
@@ -70,8 +70,8 @@ function planSVGDoc(p, sizeAttrs){
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${p.x} ${p.y} ${p.w} ${p.h}" ${sizeAttrs}>
     <style>text{font-family:'Manrope',system-ui,sans-serif}
     .dimchip{font-size:10px;font-weight:800;fill:#fff}
-    .blk-num{font-size:26px;font-weight:800;fill:#c3cbd8}
-    .blk-name{font-size:13px;font-weight:700;fill:#8b96ab}</style>${p.xml}</svg>`;
+    .blk-num{font-size:26px;font-weight:800;fill:#c6cbbf}
+    .blk-name{font-size:13px;font-weight:700;fill:#5d665b}</style>${p.xml}</svg>`;
 }
 function save3D(){
   const a = document.createElement('a');
@@ -128,23 +128,23 @@ function designSheet(){
       </table></div></div>`;
   });
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>ArchIt — Design Sheet</title><style>
-    body{font-family:'Manrope',system-ui,sans-serif;color:#2c3b58;margin:0;background:#eef1f6}
+    body{font-family:'Manrope',system-ui,sans-serif;color:#29372c;margin:0;background:#eeeee5}
     .wrap{max-width:1000px;margin:0 auto;padding:28px}
     h1{font-size:26px;margin:0 0 4px} h2{font-size:17px;margin:26px 0 10px} h3{font-size:15px;margin:0 0 8px}
-    .meta{color:#8b96ab;font-size:13px;margin-bottom:18px}
-    .card{background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(44,59,88,.08);overflow:hidden}
+    .meta{color:#5d665b;font-size:13px;margin-bottom:18px}
+    .card{background:#f8f7f2;border-radius:6px;box-shadow:0 4px 14px rgba(41,55,44,.08);overflow:hidden}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .grid img,.card>img{width:100%;display:block}
-    .cap{font-size:12px;font-weight:700;color:#8b96ab;padding:8px 12px}
+    .cap{font-size:12px;font-weight:700;color:#5d665b;padding:8px 12px}
     .summary table,.room table{border-collapse:collapse;width:100%;font-size:13px}
-    .summary td,.room td{padding:5px 10px;border-bottom:1px solid #eef1f6;vertical-align:top}
-    .summary td:first-child,.room td:first-child{color:#8b96ab;font-weight:700;width:110px;white-space:nowrap}
+    .summary td,.room td{padding:5px 10px;border-bottom:1px solid #e4e6dc;vertical-align:top}
+    .summary td:first-child,.room td:first-child{color:#5d665b;font-weight:700;width:110px;white-space:nowrap}
     .summary{padding:14px}
     .rooms{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .room .rb{padding:12px 14px}
     .plan{padding:10px}
-    .printbtn{position:fixed;right:18px;top:18px;background:#1d5bb4;color:#fff;border:0;border-radius:999px;padding:10px 20px;font-weight:800;font-size:14px;cursor:pointer}
-    @media print{.printbtn{display:none}body{background:#fff}.card{box-shadow:none;border:1px solid #dde3ec}.rooms{grid-template-columns:1fr 1fr}.room{break-inside:avoid}}
+    .printbtn{position:fixed;right:18px;top:18px;background:#ad4a31;color:#f8f7f2;border:0;border-radius:5px;padding:10px 20px;font-weight:800;font-size:14px;cursor:pointer}
+    @media print{.printbtn{display:none}body{background:#fff}.card{box-shadow:none;border:1px solid #d8dcd2}.rooms{grid-template-columns:1fr 1fr}.room{break-inside:avoid}}
   </style></head><body>
   <button class="printbtn">Print / PDF</button>
   <div class="wrap">
@@ -203,10 +203,10 @@ $('#shotB').addEventListener('click', ()=>{
     <h3>Save &amp; export</h3>
     <p class="hint">Save images, a full design sheet, or the project file to continue later on any device.</p>
     <button class="mbtn" data-export="sheet">Design sheet — all previews</button>
-    <button class="mbtn" data-export="3d" style="background:#1d5bb4">Save 3D image</button>
-    <button class="mbtn" data-export="2d" style="background:#1d5bb4">Save 2D plan</button>
-    <button class="mbtn" data-export="savep" style="background:#2c3b58">Save project (.json)</button>
-    <button class="mbtn" data-export="share" style="background:#3aa06b">Copy share link</button>
+    <button class="mbtn" data-export="3d" style="background:#ad4a31">Save 3D image</button>
+    <button class="mbtn" data-export="2d" style="background:#293c31">Save 2D plan</button>
+    <button class="mbtn" data-export="savep" style="background:#29372c">Save project (.json)</button>
+    <button class="mbtn" data-export="share" style="background:#547548">Copy share link</button>
     <button class="mbtn ghost" data-export="openp">Open project…</button>
     <button class="mbtn ghost" data-close>Cancel</button>`);
 });

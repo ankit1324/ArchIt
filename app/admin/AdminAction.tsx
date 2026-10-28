@@ -19,10 +19,12 @@ interface ActionSpec {
   redirectTo?: string;
 }
 
+// Filled accent for the go-ahead, outlined accent for destructive steps, a
+// plain outline for the rest. Accent on paper and paper on accent are 5.1:1.
 const TONES: Record<ActionSpec["tone"], string> = {
-  primary: "bg-plum text-cream",
-  danger: "bg-coral text-white",
-  neutral: "bg-plum/10 text-plum",
+  primary: "border-accent bg-accent text-paper hover:border-accent-deep hover:bg-accent-deep",
+  danger: "border-accent/70 text-accent-deep hover:border-accent hover:bg-accent/10",
+  neutral: "border-line-strong text-ink hover:border-ink",
 };
 
 /**
@@ -89,13 +91,13 @@ export default function AdminAction({
           type="button"
           onClick={() => run(spec)}
           disabled={busy !== null || refreshing}
-          className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-50 ${TONES[spec.tone]}`}
+          className={`inline-flex min-h-11 items-center justify-center rounded-[5px] border px-4 text-[13px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 ${TONES[spec.tone]}`}
         >
           {busy === spec.action ? "Working…" : spec.label}
         </button>
       ))}
       {error && (
-        <span role="alert" className="text-[12px] font-semibold text-coral">
+        <span role="alert" className="text-[13px] font-semibold text-accent">
           {error}
         </span>
       )}

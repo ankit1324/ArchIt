@@ -1,0 +1,33 @@
+/* Signed-in dashboard (components/SuiteDashboard.tsx). Only what Tailwind
+   utilities can't express: the hero's drafting grid and the page's one staged
+   reveal. */
+
+/* The landing's floor-plan grid (MarketingLanding HomeDrawing), drawn faintly
+   in paper over the forest band so the hero reads as the same drawing board. */
+.grid {
+  background-image:
+    linear-gradient(to right, rgb(248 247 242 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(248 247 242 / 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+}
+
+/* One staged reveal per page (Design Language): the product tiles rise in
+   order on first paint. Nothing moves under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

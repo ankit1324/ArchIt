@@ -4,12 +4,27 @@
    pins, clusters and POIs are canvas-drawn symbol layers (Map3D.tsx), not DOM,
    so they have no css here. */
 
-/* soften maplibre chrome */
+/* attribution: a paper chip in the planner palette, legible over imagery */
 .maplibregl-ctrl-attrib {
-  background: rgb(245 241 234 / 0.6) !important;
-  border-radius: 8px 0 0 0;
+  background: rgb(248 247 242 / 0.82) !important;
+  color: var(--color-ink);
+  border-radius: 5px 0 0 0;
   font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-ink);
+}
+.maplibregl-ctrl-attrib-button:focus-visible,
+.maplibregl-ctrl-attrib a:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
 }
 .maplibregl-canvas {
   outline: none;
+}
+/* the canvas takes arrow-key panning: show where keyboard focus is, inset so
+   the rounded map frame does not clip it */
+.maplibregl-canvas:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
 }

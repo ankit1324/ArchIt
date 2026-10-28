@@ -10,8 +10,33 @@ each. Some history predating the branch ruleset came in as merge commits.
 
 ## [Unreleased]
 
+### Added
+
+- **Explicit Postgres grants** for every table and `rate_limit_hit()`
+  (`20261028120000`), ahead of Supabase ending automatic grants on new `public`
+  tables on 2026-10-30. `tests/migrations.test.mjs` fails any future table
+  without RLS or its `service_role` grant, and any grant or policy for
+  `anon`/`authenticated`.
+- `npm run check:templates` runs the paid-template geometry checks, now also
+  in CI. Tests for cron auth, entitlements, the YouPI client and upload
+  cleanup (seams in `lib/entitlements-core.ts`, `lib/youpi-client.ts`,
+  `lib/storage-cleanup.ts`).
+- Loading and error states for the signed-in app, admin, showcase and
+  property pages, and a mobile menu in the shared header.
+
 ### Changed
 
+- **One visual language across the suite.** Every page now uses the landing
+  page's palette (paper, forest ink, terracotta), Fraunces display type over
+  Manrope, and its logo. Tokens live in `app/globals.css`; the older token
+  names remain as aliases. The 3D builder's chrome follows, with its font
+  self-hosted (no Google Fonts left, so the CSP no longer allows them).
+- Content pages scroll the document instead of an inner container; `/find`
+  and the designer lock it with `.app-shell`.
+- The reconciler sweeps batches until its 30s budget runs out instead of 40
+  orders a day, and pages `reconcile_backlog` when open orders pile up.
+- `.nvmrc` pins Node 22.23.2; ESLint skips `.claude/` worktrees and the
+  generated MapLibre worker (lint went from 5 minutes to 4 seconds).
 - **Payments moved from Razorpay to a self-hosted
   [YouPI-PG](https://github.com/youpi-pg/YouPI-PG) UPI gateway.** The browser
   embeds the gateway's `youpi.js` iframe checkout; `/api/create-order` opens a
@@ -27,12 +52,35 @@ each. Some history predating the branch ruleset came in as merge commits.
 
 ### Fixed
 
+- A payment is only recorded when it matches the `payment_orders` row
+  create-order wrote (order id, user, purpose, ref, amount). The old order
+  check compared the gateway's order id with itself. create-order no longer
+  opens a checkout it could not log.
+- Owner-contact unlocks can no longer be bought for listings that aren't live.
+- "Try again" on the error pages crashed: Next 16.4 passes `retry`, not
+  `unstable_retry`.
+- Editing a listing during a database blip no longer detaches its design or
+  resets its view; the edit fails with a 500 instead.
+- NUL characters in contact messages and reports return 400, not 500.
+- Admin: photo checkboxes in the listing editor have accessible names; design
+  unpublishes are audited against the design and still appear in the author's
+  history.
 - "Contact owner" button never appeared for buyers — it was gated on the very
   field the server strips before payment. The detail route now returns a
   `hasOwner` flag instead.
 - Dashboard badge said "Paid" while the FAQ said free; it now shows the fee.
 - Terms omitted the ₹99 template unlock and linked to a `/refunds` page that
   did not exist. Both fixed; refunds policy added to the footer and sitemap.
+
+### Security
+
+- Uploaded originals are re-encoded without EXIF, so photo GPS and device
+  data no longer reach the public bucket.
+- The YouPI webhook rejects bodies over 64 KiB before computing the HMAC.
+- Rate-limit keys use the platform's client IP (`x-vercel-forwarded-for`,
+  `x-real-ip`, then the last `X-Forwarded-For` hop) instead of the
+  client-controlled first hop. Design writes are rate-limited, and the daily
+  keepalive prunes `rate_limits` rows older than 24 hours.
 
 ## [0.1.0] - 2026-08-13
 

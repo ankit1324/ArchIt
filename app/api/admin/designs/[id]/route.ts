@@ -10,10 +10,6 @@ import { isDesignId } from "@/lib/showcase";
  * of any listing that attached it). Same effect as the author's own
  * "Unpublish": the design itself stays in the author's /designer list, and
  * they may publish it again.
- *
- * Audit: admin_audit_log.target_type only allows listing/report/user/order,
- * so this is recorded against the author (target_type 'user') with the
- * design in `details` until a migration adds 'design' to that CHECK.
  */
 export async function POST(
   request: Request,
@@ -56,10 +52,10 @@ export async function POST(
   await logAdminAction({
     adminId,
     action: "unpublish_design",
-    targetType: "user",
-    targetId: data.user_id,
+    targetType: "design",
+    targetId: data.id,
     note: decision.note,
-    details: { designId: data.id, name: data.name },
+    details: { authorId: data.user_id, name: data.name },
   });
   return Response.json({ id: data.id, published: false });
 }

@@ -15,7 +15,8 @@ const TABS = [
 export default function AdminNav() {
   const path = usePathname();
   return (
-    <nav aria-label="Admin sections" className="mt-4 flex flex-wrap gap-2">
+    // scrolls sideways on narrow screens instead of wrapping into a second row
+    <nav aria-label="Admin sections" className="no-scrollbar -mb-px mt-2 flex gap-6 overflow-x-auto">
       {TABS.map((t) => {
         // whole-segment match, so /admin/log doesn't also light up for /admin/logins
         const active =
@@ -25,8 +26,8 @@ export default function AdminNav() {
             key={t.href}
             href={t.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors ${
-              active ? "bg-plum text-cream" : "bg-white/70 text-plum hover:bg-white"
+            className={`inline-flex min-h-11 flex-none items-center border-b-2 text-[13px] font-semibold transition-colors focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-accent ${
+              active ? "border-accent text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink"
             }`}
           >
             {t.label}

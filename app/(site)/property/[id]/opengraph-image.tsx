@@ -6,7 +6,7 @@ import { thumbnailUrl } from "@/lib/url";
 import { dealLabel, headline, isDwelling, kindLabel, photosOf } from "./format";
 
 // Per-listing link preview (WhatsApp, X, Slack…): price, deal, title and city
-// on the site's cream/plum/lime palette, with the listing's first photo when
+// on the site's planner palette, with the listing's first photo when
 // there is one. Anything that isn't a live listing — unknown id, pending,
 // rejected, a DB error — gets the generic ArchIt card instead of an error, so
 // a preview never breaks and never reveals a non-public listing.
@@ -18,11 +18,13 @@ export const contentType = "image/jpeg";
 // taken down shows up in the next preview fetch rather than a cached card.
 export const dynamic = "force-dynamic";
 
-const CREAM = "#f5f1ea";
-const PLUM = "#3d1830";
-const PLUM_SOFT = "#6b4560";
-const LIME = "#e2ef6a";
-const MAGENTA_DEEP = "#b5359a";
+// Planner palette (app/globals.css); satori cannot read CSS variables.
+const PAPER = "#f8f7f2";
+const INK = "#29372c";
+const INK_SOFT = "#5d665b";
+const FOREST = "#293c31";
+const HIGHLIGHT = "#dde3b6";
+const ACCENT_DEEP = "#8e3b27";
 const VIOLET = "#6d28d9"; // showcase listings (not for sale/rent), as on /find
 
 const PHOTO_W = 460;
@@ -83,15 +85,15 @@ function Fallback() {
         flexDirection: "column",
         justifyContent: "space-between",
         padding: "80px 96px",
-        background: CREAM,
-        color: PLUM,
+        background: PAPER,
+        color: INK,
       }}
     >
       <div style={{ display: "flex", fontSize: 64, fontWeight: 700, letterSpacing: -2 }}>ArchIt.</div>
       <div style={{ display: "flex", fontSize: 84, fontWeight: 700, lineHeight: 1.05, letterSpacing: -3 }}>
         Find your next home on a 3D map.
       </div>
-      <div style={{ display: "flex", fontSize: 30, color: PLUM_SOFT }}>
+      <div style={{ display: "flex", fontSize: 30, color: INK_SOFT }}>
         Browse listings across India — list your own property free.
       </div>
     </div>
@@ -109,9 +111,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   if (!l) return asJpeg(new ImageResponse(<Fallback />, { ...size }));
 
   const sale = l.type === "sale";
-  // sale lime, rent magenta, showcase violet
-  const pillBg = l.type === "showcase" ? VIOLET : sale ? LIME : MAGENTA_DEEP;
-  const pillFg = sale ? PLUM : "#ffffff";
+  // sale highlight, rent accent, showcase violet (as on /find)
+  const pillBg = l.type === "showcase" ? VIOLET : sale ? HIGHLIGHT : ACCENT_DEEP;
+  const pillFg = sale ? INK : l.type === "showcase" ? "#ffffff" : PAPER;
   const photo = await photoDataUrl(l);
   const city = cityName(l.city);
   const facts = [
@@ -124,7 +126,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   return asJpeg(
     new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", background: CREAM, color: PLUM }}>
+      <div style={{ width: "100%", height: "100%", display: "flex", background: PAPER, color: INK }}>
         <div
           style={{
             flex: 1,
@@ -168,16 +170,16 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             <div style={{ display: "flex", fontSize: 54, fontWeight: 700, lineHeight: 1.1, letterSpacing: -1.5 }}>
               {clip(headline(l), photo ? 44 : 60)}
             </div>
-            <div style={{ display: "flex", fontSize: 30, color: PLUM_SOFT }}>
+            <div style={{ display: "flex", fontSize: 30, color: INK_SOFT }}>
               {clip([city, facts.join(" · ")].filter(Boolean).join(" — "), photo ? 52 : 72)}
             </div>
           </div>
-          <div style={{ display: "flex", fontSize: 26, color: PLUM_SOFT }}>See it on the 3D map at ArchIt</div>
+          <div style={{ display: "flex", fontSize: 26, color: INK_SOFT }}>See it on the 3D map at ArchIt</div>
         </div>
         {photo ? (
           <img src={photo} alt="" width={PHOTO_W} height={size.height} style={{ objectFit: "cover" }} />
         ) : (
-          // No photo: a plum panel with a line-drawn house keeps the card
+          // No photo: a forest panel with a line-drawn house keeps the card
           // balanced instead of leaving the right half empty.
           <div
             style={{
@@ -186,10 +188,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: PLUM,
+              background: FOREST,
             }}
           >
-            <svg width="220" height="220" viewBox="0 0 24 24" fill="none" stroke={LIME} strokeWidth="1.4" strokeLinejoin="round">
+            <svg width="220" height="220" viewBox="0 0 24 24" fill="none" stroke={HIGHLIGHT} strokeWidth="1.4" strokeLinejoin="round">
               <path d="M3 10.5 12 3l9 7.5" />
               <path d="M5 9v11h14V9" />
               <path d="M10 20v-6h4v6" />

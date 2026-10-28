@@ -175,7 +175,7 @@ export default function DesignerOverlay({
 
   return (
     <div
-      className={`fixed inset-0 z-50 bg-cream ${hidden ? "invisible pointer-events-none" : ""}`}
+      className={`fixed inset-0 z-50 bg-paper ${hidden ? "invisible pointer-events-none" : ""}`}
       aria-hidden={hidden || undefined}
     >
       <iframe

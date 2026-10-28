@@ -7,7 +7,24 @@ import { sumPaise } from "@/lib/admin-tools";
 import { db } from "@/lib/db";
 import { purposeLabel, rupees } from "@/lib/email-templates";
 import AdminAction from "../../AdminAction";
-import { AuditTable, Badge, cell, Empty, head, LoadError, Section, when } from "../../ui";
+import {
+  AuditTable,
+  Badge,
+  card,
+  cell,
+  Empty,
+  eyebrow,
+  head,
+  link,
+  LoadError,
+  num,
+  PageHeader,
+  row,
+  Section,
+  table,
+  tableWrap,
+  when,
+} from "../../ui";
 
 export const metadata = { title: "User" };
 
@@ -67,75 +84,80 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
   return (
     <>
       <LoadError errors={[listings.error?.message, purchases.error?.message, designs.error?.message, history.error]} />
-      <div className="mt-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold">
+      <PageHeader
+        label="User"
+        title={
+          <>
             {/* `||`: with no email, name is "" (not null) and must fall through to the id */}
             {user?.primaryEmailAddress?.emailAddress || name || id}{" "}
             {admin && <Badge label="admin" />} {user?.banned && <Badge label="banned" />}
-          </h1>
-          <p className="mt-1 text-[13px] text-plum-soft">
-            {name && `${name} · `}
-            <code>{id}</code>
+          </>
+        }
+        action={
+          user && !admin && id !== userId ? (
+            <AdminAction
+              endpoint={`/api/admin/users/${id}`}
+              actions={[
+                user.banned
+                  ? { action: "unban", label: "Unban", tone: "primary", confirm: "Let this user sign in again?" }
+                  : {
+                      action: "ban",
+                      label: "Ban user",
+                      tone: "danger",
+                      confirm: "Ban this user? They are signed out everywhere and can't sign back in. Their listings stay as they are.",
+                      askNote: true,
+                      notePrompt: "Reason for the ban (kept in the audit log)",
+                    },
+              ]}
+            />
+          ) : undefined
+        }
+      >
+        <p className="mt-3 text-[14px] text-ink-soft">
+          {name && `${name} · `}
+          <code className="text-[13px]">{id}</code>
+        </p>
+        {user ? (
+          <p className="mt-1 text-[14px] text-ink-soft">
+            Joined <span className="tabular-nums">{when(user.createdAt)}</span> · last sign-in{" "}
+            <span className="tabular-nums">{when(user.lastSignInAt)}</span>
+            {user.emailAddresses.length > 1 &&
+              ` · also ${user.emailAddresses
+                .filter((e) => e.id !== user.primaryEmailAddressId)
+                .map((e) => e.emailAddress)
+                .join(", ")}`}
           </p>
-          {user ? (
-            <p className="mt-1 text-[13px] text-plum-soft">
-              Joined {when(user.createdAt)} · last sign-in {when(user.lastSignInAt)}
-              {user.emailAddresses.length > 1 &&
-                ` · also ${user.emailAddresses
-                  .filter((e) => e.id !== user.primaryEmailAddressId)
-                  .map((e) => e.emailAddress)
-                  .join(", ")}`}
-            </p>
-          ) : (
-            <p className="mt-1 text-[13px] font-semibold">Not found in Clerk (account deleted?)</p>
-          )}
-        </div>
-        {user && !admin && id !== userId && (
-          <AdminAction
-            endpoint={`/api/admin/users/${id}`}
-            actions={[
-              user.banned
-                ? { action: "unban", label: "Unban", tone: "primary", confirm: "Let this user sign in again?" }
-                : {
-                    action: "ban",
-                    label: "Ban user",
-                    tone: "danger",
-                    confirm: "Ban this user? They are signed out everywhere and can't sign back in. Their listings stay as they are.",
-                    askNote: true,
-                    notePrompt: "Reason for the ban (kept in the audit log)",
-                  },
-            ]}
-          />
+        ) : (
+          <p className="mt-1 text-[14px] font-semibold text-accent">Not found in Clerk (account deleted?)</p>
         )}
-      </div>
+      </PageHeader>
 
-      <div className="mt-6 grid grid-cols-3 gap-3 sm:max-w-xl">
-        <div className="rounded-2xl bg-white/70 p-3">
-          <div className="text-[12px] font-bold uppercase text-plum-soft">Listings</div>
-          <div className="text-xl font-extrabold">{listings.data?.length ?? 0}</div>
+      <dl className="mt-8 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line sm:max-w-xl">
+        <div className="bg-paper p-4">
+          <dt className={eyebrow}>Listings</dt>
+          <dd className="mt-2 font-display text-[26px] leading-none tabular-nums">{listings.data?.length ?? 0}</dd>
         </div>
-        <div className="rounded-2xl bg-white/70 p-3">
-          <div className="text-[12px] font-bold uppercase text-plum-soft">Designs</div>
-          <div className="text-xl font-extrabold">{designs.count ?? 0}</div>
+        <div className="bg-paper p-4">
+          <dt className={eyebrow}>Designs</dt>
+          <dd className="mt-2 font-display text-[26px] leading-none tabular-nums">{designs.count ?? 0}</dd>
         </div>
-        <div className="rounded-2xl bg-white/70 p-3">
-          <div className="text-[12px] font-bold uppercase text-plum-soft">Spent</div>
-          <div className="text-xl font-extrabold">{rupees(sumPaise(purchases.data ?? []))}</div>
+        <div className="bg-paper p-4">
+          <dt className={eyebrow}>Spent</dt>
+          <dd className="mt-2 font-display text-[26px] leading-none tabular-nums">{rupees(sumPaise(purchases.data ?? []))}</dd>
         </div>
-      </div>
+      </dl>
 
       <Section title="Listings" count={listings.data?.length ?? 0}>
         {listings.data?.length ? (
           <ul className="grid gap-2 sm:grid-cols-2">
             {listings.data.map((l) => (
-              <li key={l.id} className="rounded-2xl bg-white/70 p-3 text-[13px]">
-                <Link href={`/admin/listings/${l.id}`} className="font-bold underline">
+              <li key={l.id} className={`${card} text-[14px]`}>
+                <Link href={`/admin/listings/${l.id}`} className={`${link} font-semibold`}>
                   {l.building_name || l.address}
                 </Link>{" "}
                 <Badge label={l.status} />
-                <div className="text-plum-soft">
-                  {l.city} · listed {when(l.created_at)}
+                <div className="mt-1 text-[13px] text-ink-soft">
+                  {l.city} · listed <span className="tabular-nums">{when(l.created_at)}</span>
                 </div>
               </li>
             ))}
@@ -147,26 +169,26 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
 
       <Section title="Purchases" count={purchases.data?.length ?? 0}>
         {purchases.data?.length ? (
-          <div className="overflow-x-auto rounded-2xl bg-white/70">
-            <table className="w-full text-[13px]">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
                 <tr>
                   <th className={head}>When</th>
                   <th className={head}>Purpose</th>
-                  <th className={head}>Amount</th>
+                  <th className={`${head} text-right`}>Amount</th>
                   <th className={head}>Payment</th>
                 </tr>
               </thead>
               <tbody>
                 {purchases.data.map((p) => (
-                  <tr key={p.id} className="border-t border-plum/10">
-                    <td className={cell}>{when(p.created_at)}</td>
+                  <tr key={p.id} className={row}>
+                    <td className={`${cell} whitespace-nowrap tabular-nums`}>{when(p.created_at)}</td>
                     <td className={cell}>
                       {purposeLabel(p.purpose)}
-                      {p.ref ? <div className="text-plum-soft">{p.ref}</div> : null}
+                      {p.ref ? <div className="text-ink-soft">{p.ref}</div> : null}
                     </td>
-                    <td className={cell}>{p.amount == null ? "—" : rupees(p.amount)}</td>
-                    <td className={cell}><code>{p.payment_id}</code></td>
+                    <td className={`${cell} ${num}`}>{p.amount == null ? "—" : rupees(p.amount)}</td>
+                    <td className={cell}><code className="text-[12px]">{p.payment_id}</code></td>
                   </tr>
                 ))}
               </tbody>

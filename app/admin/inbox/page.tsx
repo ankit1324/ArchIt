@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/admin";
 import { CONTACT_TOPIC_LABELS, isContactTopic, replyHref } from "@/lib/contact";
 import { db } from "@/lib/db";
 import AdminAction from "../AdminAction";
-import { Badge, Empty, LoadError, Section, UserLink, when } from "../ui";
+import { Badge, card, focus, Empty, link, LoadError, PageHeader, Section, UserLink, when } from "../ui";
 
 export const metadata = { title: "Inbox" };
 
@@ -29,15 +29,15 @@ const topicLabel = (t: string) => (isContactTopic(t) ? CONTACT_TOPIC_LABELS[t] :
 
 function MessageCard({ m }: { m: MessageRow }) {
   return (
-    <li className="rounded-2xl bg-white/70 p-4 text-[14px]">
+    <li className={`${card} text-[14px]`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <strong className="text-plum">{m.name}</strong>{" "}
-          <a href={replyHref(m.email, m.topic)} className="break-all underline">
+          <strong className="text-[15px] font-semibold">{m.name}</strong>{" "}
+          <a href={replyHref(m.email, m.topic)} className={`${link} break-all`}>
             {m.email}
           </a>
-          <div className="mt-0.5 text-[12px] text-plum-soft">
-            {topicLabel(m.topic)} · {when(m.created_at)}
+          <div className="mt-0.5 text-[13px] text-ink-soft">
+            {topicLabel(m.topic)} · <span className="tabular-nums">{when(m.created_at)}</span>
             {m.user_id && (
               <>
                 {" · "}
@@ -49,11 +49,11 @@ function MessageCard({ m }: { m: MessageRow }) {
         <Badge label={m.status} />
       </div>
       {/* Rendered as text (React escapes it); whitespace kept so lists read right. */}
-      <p className="mt-3 whitespace-pre-wrap break-words text-plum">{m.message}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <p className="mt-3 max-w-3xl whitespace-pre-wrap break-words leading-[1.7]">{m.message}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
         <a
           href={replyHref(m.email, m.topic)}
-          className="rounded-full bg-plum/10 px-4 py-1.5 text-[13px] font-bold text-plum hover:opacity-90"
+          className={`inline-flex min-h-11 items-center rounded-[5px] border border-line-strong px-4 text-[13px] font-semibold text-ink transition-colors hover:border-ink sm:min-h-9 ${focus}`}
         >
           Reply by email
         </a>
@@ -63,8 +63,8 @@ function MessageCard({ m }: { m: MessageRow }) {
             actions={[{ action: "handled", label: "Mark handled", tone: "primary" }]}
           />
         ) : (
-          <span className="text-[12px] text-plum-soft">
-            Handled {when(m.handled_at)}
+          <span className="text-[13px] text-ink-soft">
+            Handled <span className="tabular-nums">{when(m.handled_at)}</span>
             {m.handled_by && (
               <>
                 {" by "}
@@ -105,6 +105,9 @@ export default async function AdminInbox() {
   return (
     <>
       <LoadError errors={[open.error?.message, handled.error?.message]} />
+      <PageHeader title="Inbox">
+        <p className="mt-3 text-[14px] text-ink-soft">Messages sent through the contact form.</p>
+      </PageHeader>
       <Section title="Open messages" count={openRows.length}>
         {openRows.length ? (
           <ul className="space-y-3">

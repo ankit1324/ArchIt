@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIp } from "./client-ip";
 import { db } from "./db";
 
 /**
@@ -77,9 +78,27 @@ export async function checkRateLimit(
 }
 
 export function ipKey(request: Request, scope: string, userId?: string | null): string {
-  const xf = request.headers.get("x-forwarded-for");
-  const ip = (xf?.split(",")[0] ?? "anonymous").trim();
-  return `${scope}:${userId ?? ip}`;
+  // clientIp, not the first X-Forwarded-For entry: that one is client-chosen,
+  // so trusting it would let a caller rotate it for a fresh bucket per request.
+  return `${scope}:${userId ?? clientIp(request.headers)}`;
+}
+
+/**
+ * Rows older than this are dead: the longest window in use is 1 hour
+ * (contact, reports), so a day leaves a wide margin. Raise it if a route
+ * ever calls checkRateLimit with a longer window.
+ */
+export const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60_000;
+
+/**
+ * Delete expired rate_limits rows. rate_limit_hit() upserts one row per key
+ * and never deletes, so without this the table grows by one row per
+ * distinct IP/user and scope forever. Called from the daily keepalive cron.
+ */
+export async function pruneRateLimits(now: number = Date.now()): Promise<{ error: string | null }> {
+  const cutoff = new Date(now - RATE_LIMIT_RETENTION_MS).toISOString();
+  const { error } = await db.from("rate_limits").delete().lt("window_start", cutoff);
+  return { error: error ? error.message : null };
 }
 
 export function rateLimitedResponse(): Response {

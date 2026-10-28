@@ -1,39 +1,55 @@
-.canvas button:focus-visible, .canvas select:focus-visible { outline: 3px solid var(--color-plum); outline-offset: 3px; }
-.filters { pointer-events: auto; position: absolute; inset: 14px auto 14px 14px; width: 250px; display: flex; flex-direction: column; padding: 16px 12px; border: 1px solid #fff9; border-radius: 22px; background: #f5f1eaf0; box-shadow: 0 12px 36px #3d183018; }
-.filterHeading { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 8px; }
-.eyebrow { font-size: 9px; letter-spacing: .16em; font-weight: 700; color: var(--color-plum-soft); }
-.filterHeading h1 { font-size: 21px; font-weight: 800; letter-spacing: -.04em; }
+/* Planner language over the map: paper panels with a hairline border, and a
+   shadow only because they float over imagery. Squared 6px corners for panels;
+   pills stay for the small floating controls. */
+/* Layered, not :where(): an unlayered rule beats every Tailwind utility (they
+   live in @layer utilities), so a control's own focus-visible utilities, e.g.
+   an inset ring inside a clipped stack or outline-none on an input that rings
+   its wrapper, could never win. In @layer components they do. */
+@layer components {
+  .canvas :is(a, button, select, input, summary):focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+  .canvas :is(button, select, input):disabled { cursor: not-allowed; }
+}
+.filters { pointer-events: auto; position: absolute; inset: 14px auto 14px 14px; width: 250px; display: flex; flex-direction: column; padding: 16px 14px 14px; border: 1px solid var(--color-line); border-radius: 6px; background: rgb(248 247 242 / .96); box-shadow: 0 18px 35px -24px rgb(41 55 44 / .45); }
+.filterHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin: 0 2px 14px; padding-bottom: 14px; border-bottom: 1px solid var(--color-line); }
+.eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11px; line-height: 1.6; letter-spacing: .14em; font-weight: 700; text-transform: uppercase; color: var(--color-ink-soft); }
+.eyebrow::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--color-accent); }
+.filterHeading h1 { margin-top: 6px; font-family: var(--font-display); font-size: 25px; font-weight: 450; line-height: 1.1; letter-spacing: -.03em; color: var(--color-ink); }
 .closeFilters, .filterToggle { display: none; }
 .toolbar { pointer-events: auto; position: absolute; top: 14px; left: 280px; right: 14px; display: flex; align-items: center; gap: 10px; }
 .toolbar > button { white-space: nowrap; }
 .mapControls { pointer-events: auto; position: absolute; right: 14px; top: 32%; }
 .results { position: absolute; bottom: 26px; left: 280px; right: 14px; }
-.resultBar { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 12px 16px; border: 1px solid #fff9; border-radius: 18px; background: #f5f1eaf0; box-shadow: 0 8px 24px #3d183018; }
-.resultBar strong { display: block; font-size: 15px; letter-spacing: -.03em; }
-.resultBar > div:first-child > span { display: block; max-width: 240px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--color-plum-soft); }
-.resultActions { display: flex; align-items: center; gap: 16px; font-size: 11px; font-weight: 700; }
-.resultActions button:disabled { opacity: .4; }
-.resultActions select { max-width: 145px; border-radius: 10px; padding: 8px; background: #fff9; }
+.resultBar { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 10px 14px 10px 16px; border: 1px solid var(--color-line); border-radius: 6px; background: rgb(248 247 242 / .96); box-shadow: 0 18px 35px -24px rgb(41 55 44 / .45); color: var(--color-ink); }
+.resultBar strong { display: block; font-family: var(--font-display); font-size: 19px; font-weight: 450; line-height: 1.2; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.resultBar > div:first-child > span { display: block; max-width: 260px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--color-ink-soft); }
+.resultActions { display: flex; align-items: center; gap: 18px; font-size: 13px; font-weight: 600; }
+.resultActions button { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; text-decoration: underline; text-decoration-color: var(--color-line-strong); text-underline-offset: 4px; transition: color .15s; }
+.resultActions button:hover:not(:disabled) { color: var(--color-accent); text-decoration-color: currentColor; }
+.resultActions button:disabled { opacity: .45; }
+.resultActions select { max-width: 160px; min-height: 36px; border: 1px solid var(--color-line-strong); border-radius: 5px; padding: 6px 8px; background: var(--color-paper); color: var(--color-ink); font-weight: 600; cursor: pointer; transition: border-color .15s; }
+.resultActions select:hover { border-color: var(--color-ink); }
 .detailPanel { pointer-events: auto; position: absolute; top: 76px; bottom: 26px; right: 14px; display: flex; align-items: flex-start; max-width: calc(100% - 28px); z-index: 20; }
 .detailPanel > * { max-width: 100%; }
 .pickHint { position: absolute; top: 80px; left: 280px; right: 80px; text-align: center; }
-.areaToggle { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+.areaToggle { display: flex; align-items: center; gap: 8px; min-height: 24px; white-space: nowrap; cursor: pointer; }
 .areaShort { display: none; }
 .resultBar > div:first-child { min-width: 0; }
-.areaToggle input { width: 15px; height: 15px; accent-color: var(--color-plum); }
+.areaToggle input { width: 16px; height: 16px; accent-color: var(--color-ink); cursor: pointer; }
 .detailPanel :global(.sheet-handle) { display: none; }
 /* the detail / add panel overlaps the result bar, the card strip and the zoom
    controls: keep it opaque so they don't show through its text, and slide the
    bar (sort, "search as I move") and the controls left of it on desktop so
    they stay usable while it is open */
-.detailPanel > section { background: rgb(245 241 234 / .97); }
+.detailPanel > section { background: rgb(248 247 242 / .97); }
 .resultsUnderSheet, .mapControlsShifted { right: 328px; }
 @media (max-width: 1023px) {
   .mapControlsShifted { right: 14px; }
-  .filters { display: none; z-index: 40; top: 124px; bottom: 26px; width: min(300px, calc(100% - 28px)); background: var(--color-cream); }
+  .filters { display: none; z-index: 40; top: 124px; bottom: 26px; width: min(300px, calc(100% - 28px)); background: var(--color-paper); }
   .filtersOpen { display: flex; }
-  .closeFilters { display: block; padding: 10px; border-radius: 50%; }
-  .filterToggle { display: block; padding: 10px 14px; border-radius: 999px; background: var(--color-cream); font-size: 12px; font-weight: 700; }
+  .closeFilters { display: grid; place-items: center; width: 40px; height: 40px; margin: -6px -6px 0 0; border-radius: 5px; color: var(--color-ink); font-size: 14px; transition: background-color .15s; }
+  .closeFilters:hover { background: var(--color-paper-soft); }
+  .filterToggle { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--color-line-strong); border-radius: 999px; background: rgb(248 247 242 / .96); color: var(--color-ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: 0 18px 35px -24px rgb(41 55 44 / .45); transition: border-color .15s; }
+  .filterToggle:hover, .filterToggle[aria-expanded="true"] { border-color: var(--color-ink); }
   .toolbar { left: 14px; flex-wrap: wrap; gap: 8px; }
   .toolbar form { flex-basis: 100%; }
   .toolbar > button:last-child { margin-left: auto; }
@@ -41,15 +57,16 @@
   /* detail / add panels dock to the bottom as a sheet; the card strip they
      would cover is hidden meanwhile */
   .detailPanel { top: auto; left: 0; right: 0; bottom: 0; max-width: none; max-height: min(74%, 600px); flex-direction: column; align-items: stretch; padding: 0 6px 6px; transition: transform .2s ease; }
-  .detailPanel > * { width: 100%; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px; }
-  .detailPanel :global(.sheet-handle) { display: block; flex: none; align-self: center; width: 64px; height: 22px; margin-bottom: -22px; position: relative; z-index: 1; touch-action: none; cursor: grab; }
-  .detailPanel :global(.sheet-handle)::before { content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 99px; background: rgb(61 24 48 / .28); }
+  .detailPanel > * { width: 100%; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+  .detailPanel :global(.sheet-handle) { display: block; flex: none; align-self: center; width: 64px; height: 24px; margin-bottom: -24px; position: relative; z-index: 1; touch-action: none; cursor: grab; border-radius: 5px; }
+  .detailPanel :global(.sheet-handle)::before { content: ""; display: block; width: 40px; height: 4px; margin: 9px auto 0; border-radius: 99px; background: var(--color-line-strong); }
   .formPanel { max-height: 82%; }
   .resultsUnderSheet { visibility: hidden; }
   .pickHint { top: 124px; left: 14px; right: 14px; }
 }
 @media (max-width: 600px) {
-  .resultBar { padding: 10px 12px; gap: 8px; }
+  .resultBar { padding: 9px 10px 9px 12px; gap: 8px; }
+  .resultBar strong { font-size: 17px; }
   .resultBar > div:first-child > span { max-width: 145px; }
   .resultActions button { display: none; }
   .resultActions { gap: 10px; }
@@ -62,4 +79,7 @@
 @media (max-height: 650px) and (min-width: 1024px) {
   .results > div:last-child > button { height: 150px; }
   .mapControls { top: 100px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detailPanel, .canvas * { transition: none !important; }
 }
