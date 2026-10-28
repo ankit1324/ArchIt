@@ -84,9 +84,11 @@ export const MinusIcon = (p: P) => (
   </svg>
 );
 
+// Same mark as the landing header, app/icon.png and the PWA icons: a house
+// outline with a chimney. Drawn on the 24px grid the other icons share.
 export const LogoMark = (p: P) => (
-  <svg {...base} strokeWidth={1.6} {...p}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M8 16V8M16 16V8M8 12c2 3 6 3 8 0" />
+  <svg {...base} strokeWidth={1.6} strokeLinecap="square" strokeLinejoin="miter" {...p}>
+    <path d="M3 10.5 12 2.5l9 8V21.5H3Z" />
+    <path d="M15.5 3.4V1.5h3.6v5.3" />
   </svg>
 );

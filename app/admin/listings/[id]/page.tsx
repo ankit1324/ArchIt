@@ -6,7 +6,7 @@ import { auditHistory } from "@/lib/admin-audit";
 import { db, type PropertyRow } from "@/lib/db";
 import { REPORT_REASONS, isReportReason } from "@/lib/moderation";
 import AdminAction from "../../AdminAction";
-import { AuditTable, Badge, Empty, LoadError, Section, UserLink, when } from "../../ui";
+import { AuditTable, Badge, card, Empty, link, LoadError, PageHeader, Section, UserLink, when } from "../../ui";
 import ListingEditForm from "./ListingEditForm";
 
 export const metadata = { title: "Listing" };
@@ -51,46 +51,56 @@ export default async function AdminListing({ params }: { params: Promise<{ id: s
       <LoadError errors={[error?.message, reports.error?.message, history.error]} />
       {l && (
         <>
-          <div className="mt-8 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-extrabold">
+          <PageHeader
+            label="Listing"
+            title={
+              <>
                 {l.building_name || l.address} <Badge label={l.status} />
-                {l.featured && <span className="ml-2 text-[13px]">★ featured</span>}
-              </h1>
-              <p className="mt-1 text-[13px] text-plum-soft">
-                <code>{l.id}</code> · listed {when(l.created_at)} by <UserLink id={l.user_id} />
+                {l.featured && (
+                  <span className="ml-2 align-middle font-sans text-[13px] font-semibold text-ink-soft">
+                    ★ featured
+                  </span>
+                )}
+              </>
+            }
+            action={
+              <AdminAction
+                endpoint={`/api/admin/listings/${l.id}`}
+                actions={[
+                  l.status === "live"
+                    ? { action: "reject", label: "Hide", tone: "neutral", askNote: true }
+                    : { action: "approve", label: l.status === "pending" ? "Approve" : "Unhide", tone: "primary" },
+                  {
+                    action: "delete",
+                    label: "Delete",
+                    tone: "danger",
+                    method: "DELETE",
+                    confirm: "Permanently delete this listing and its photos? This can't be undone.",
+                    askNote: true,
+                    notePrompt: "Reason for deleting (kept in the audit log)",
+                    redirectTo: "/admin/listings",
+                  },
+                ]}
+              />
+            }
+          >
+            <p className="mt-3 text-[14px] text-ink-soft">
+              <code className="text-[13px]">{l.id}</code> · listed{" "}
+              <span className="tabular-nums">{when(l.created_at)}</span> by <UserLink id={l.user_id} />
+            </p>
+            {l.reviewed_at && (
+              <p className="mt-1 text-[14px] text-ink-soft">
+                Last reviewed <span className="tabular-nums">{when(l.reviewed_at)}</span> by{" "}
+                <UserLink id={l.reviewed_by} />
+                {l.review_note ? ` — “${l.review_note}”` : ""}
               </p>
-              {l.reviewed_at && (
-                <p className="mt-1 text-[13px] text-plum-soft">
-                  Last reviewed {when(l.reviewed_at)} by <UserLink id={l.reviewed_by} />
-                  {l.review_note ? ` — “${l.review_note}”` : ""}
-                </p>
-              )}
-              {l.status === "live" && (
-                <Link href={`/property/${l.id}`} className="mt-1 inline-block text-[13px] underline">
-                  Open public page ↗
-                </Link>
-              )}
-            </div>
-            <AdminAction
-              endpoint={`/api/admin/listings/${l.id}`}
-              actions={[
-                l.status === "live"
-                  ? { action: "reject", label: "Hide", tone: "neutral", askNote: true }
-                  : { action: "approve", label: l.status === "pending" ? "Approve" : "Unhide", tone: "primary" },
-                {
-                  action: "delete",
-                  label: "Delete",
-                  tone: "danger",
-                  method: "DELETE",
-                  confirm: "Permanently delete this listing and its photos? This can't be undone.",
-                  askNote: true,
-                  notePrompt: "Reason for deleting (kept in the audit log)",
-                  redirectTo: "/admin/listings",
-                },
-              ]}
-            />
-          </div>
+            )}
+            {l.status === "live" && (
+              <Link href={`/property/${l.id}`} className={`${link} mt-1 text-[14px] font-semibold`}>
+                Open public page <span aria-hidden="true" className="ml-1">↗</span>
+              </Link>
+            )}
+          </PageHeader>
 
           <Section title="Details">
             <ListingEditForm
@@ -122,12 +132,12 @@ export default async function AdminListing({ params }: { params: Promise<{ id: s
         {reports.data?.length ? (
           <ul className="grid gap-2">
             {reports.data.map((r) => (
-              <li key={r.id} className="rounded-2xl bg-white/70 p-3 text-[13px]">
-                <strong>{isReportReason(r.reason) ? REPORT_REASONS[r.reason] : r.reason}</strong>{" "}
+              <li key={r.id} className={`${card} text-[14px]`}>
+                <strong className="font-semibold">{isReportReason(r.reason) ? REPORT_REASONS[r.reason] : r.reason}</strong>{" "}
                 <Badge label={r.status} />
-                {r.details ? <div>{r.details}</div> : null}
-                <div className="text-plum-soft">
-                  {when(r.created_at)} by <UserLink id={r.reporter_id} />
+                {r.details ? <div className="mt-1">{r.details}</div> : null}
+                <div className="mt-1 text-[13px] text-ink-soft">
+                  <span className="tabular-nums">{when(r.created_at)}</span> by <UserLink id={r.reporter_id} />
                 </div>
               </li>
             ))}

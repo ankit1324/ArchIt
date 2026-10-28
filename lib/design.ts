@@ -60,9 +60,9 @@ export interface NeighborPoly {
 export type Neighbor = NeighborBox | NeighborPoly;
 
 const NEIGHBOR_COLORS: Record<Listing["type"], string> = {
-  rent: "#a06ae8",
-  sale: "#ccdb2a",
-  showcase: "#8b5cf6",
+  rent: "#d9a28c",
+  sale: "#dde3b6",
+  showcase: "#b8c6c4",
 };
 const DESIGN_COLOR = "#ff7a59";
 const DESIGN_NEIGHBOR_COLOR = "#7a8699";

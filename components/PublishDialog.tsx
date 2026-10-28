@@ -9,10 +9,13 @@ import type { FlyTarget } from "@/components/PinPickerMap";
 
 const PinPickerMap = dynamic(() => import("@/components/PinPickerMap"), {
   ssr: false,
-  loading: () => <div className="h-full w-full rounded-2xl bg-white/60" />,
+  loading: () => <div className="h-full w-full rounded-md border border-line bg-paper-soft" />,
 });
 
 const MAX_PLACE = 120; // same cap as the publish route (lib/showcase.ts)
+
+const focusRing =
+  "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const publishErrorText = (status: number) =>
   status === 404
@@ -158,7 +161,7 @@ export default function PublishDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-plum/35 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel();
       }}
@@ -167,15 +170,16 @@ export default function PublishDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-dialog-title"
-        className="glass flex max-h-full w-[440px] max-w-full flex-col gap-3 overflow-y-auto rounded-[28px] p-5 shadow-[0_30px_80px_-30px_rgba(61,24,48,.35)]"
+        className="flex max-h-full w-[460px] max-w-full flex-col gap-3 overflow-y-auto rounded-md border border-line bg-paper p-6 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)]"
       >
         <div>
-          <span className="text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-coral">
+          <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
             {movingPin ? "Move pin" : design.publishedAt ? "Add map pin" : "Publish to showcase"}
           </span>
           <h2
             id="publish-dialog-title"
-            className="mt-0.5 truncate text-[19px] font-extrabold tracking-tight text-plum"
+            className="mt-2 truncate font-display text-[26px] font-normal leading-tight tracking-[-0.02em] text-ink"
           >
             {design.name}
           </h2>
@@ -193,26 +197,26 @@ export default function PublishDialog({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search a place, e.g. Sector 8, Chandigarh"
             aria-label="Search a place"
-            className="min-w-0 flex-1 rounded-full bg-white/70 px-3.5 py-2 text-[13px] font-semibold text-plum outline-none placeholder:font-medium placeholder:text-plum-soft/60"
+            className="min-h-11 min-w-0 flex-1 rounded-[5px] border border-line bg-paper-soft/60 px-3.5 text-[14px] font-semibold text-ink outline-none placeholder:font-medium placeholder:text-ink-soft/80 focus:border-ink"
           />
           <button
             type="submit"
             disabled={searching || !query.trim()}
-            className="shrink-0 rounded-full bg-white/80 px-3.5 py-2 text-[12.5px] font-bold text-plum transition-colors hover:bg-white disabled:opacity-50"
+            className={`min-h-11 shrink-0 rounded-[5px] border border-line-strong px-4 text-[13px] font-semibold text-ink transition-colors hover:border-ink disabled:opacity-50 ${focusRing}`}
           >
             {searching ? "Searching…" : "Search"}
           </button>
         </form>
         {searchMsg && (
-          <p className="-mt-1 px-1 text-[11.5px] font-semibold text-coral">{searchMsg}</p>
+          <p role="status" className="-mt-1 px-1 text-[14px] font-semibold text-accent">{searchMsg}</p>
         )}
 
         <div className="h-[260px] shrink-0">
           <PinPickerMap value={pin} onChange={dropPin} flyTo={flyTo} />
         </div>
 
-        <label className="flex items-baseline gap-1.5 rounded-full bg-white/55 px-3.5 py-2 text-[13px]">
-          <span className="shrink-0 font-medium text-plum-soft">Place</span>
+        <label className="flex items-baseline gap-1.5 rounded-[5px] border border-line bg-paper-soft/60 px-3.5 py-2.5 text-[14px] focus-within:border-ink">
+          <span className="shrink-0 text-[13px] font-medium text-ink-soft">Place</span>
           <input
             value={place}
             onChange={(e) => setPlace(e.target.value)}
@@ -221,23 +225,27 @@ export default function PublishDialog({
             placeholder={
               !pin ? "Click the map to drop a pin" : locating ? "Looking up…" : "optional label"
             }
-            className="w-full min-w-0 bg-transparent font-bold text-plum outline-none placeholder:font-medium placeholder:text-plum-soft/50 disabled:cursor-not-allowed"
+            className="w-full min-w-0 bg-transparent font-semibold text-ink outline-none placeholder:font-medium placeholder:text-ink-soft/80 disabled:cursor-not-allowed"
           />
         </label>
 
-        <p className="px-1 text-[12px] font-medium text-plum-soft">
+        <p className="px-1 text-[14px] leading-relaxed text-ink-soft">
           Anyone, including people who are not signed in, can see this design, the spot you
           pick and your name as the author (your first name, or your username).
         </p>
 
-        {error && <p className="px-1 text-[12px] font-semibold text-coral">{error}</p>}
+        {error && (
+          <p role="alert" className="px-1 text-[14px] font-semibold text-accent">
+            {error}
+          </p>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <button
             type="button"
             onClick={() => submit(true)}
             disabled={busy || !pin}
-            className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream shadow-[0_12px_28px_-10px_rgba(61,24,48,.55)] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+            className={`min-h-11 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep disabled:opacity-50 disabled:hover:bg-accent ${focusRing}`}
           >
             {busy ? "Saving…" : movingPin ? "Save pin" : design.publishedAt ? "Add pin" : "Publish"}
           </button>
@@ -248,7 +256,7 @@ export default function PublishDialog({
               type="button"
               onClick={() => submit(false)}
               disabled={busy}
-              className="rounded-full bg-white/70 py-2 text-[12.5px] font-bold text-plum transition-colors hover:bg-white disabled:opacity-50"
+              className={`min-h-11 rounded-[5px] border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-ink disabled:opacity-50 ${focusRing}`}
             >
               {design.publishedAt ? "Remove map pin (gallery only)" : "Publish without map pin"}
             </button>
@@ -257,7 +265,7 @@ export default function PublishDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-full py-1.5 text-[12px] font-semibold text-plum-soft transition-colors hover:text-plum"
+            className={`inline-flex min-h-6 items-center justify-center self-center text-[13px] font-semibold text-ink-soft underline underline-offset-4 transition-colors hover:text-ink ${focusRing}`}
           >
             Cancel
           </button>

@@ -30,13 +30,13 @@ function render2D(){
   planOff = {ox, oy};
   let s = `<defs>
     <pattern id="g1" width="${S}" height="${S}" patternUnits="userSpaceOnUse">
-      <path d="M ${S} 0 L 0 0 0 ${S}" fill="none" stroke="#e2e7ef" stroke-width="1"/>
+      <path d="M ${S} 0 L 0 0 0 ${S}" fill="none" stroke="#e4e6dc" stroke-width="1"/>
     </pattern>
     <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#2c3b58" flood-opacity="0.14"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#29372c" flood-opacity="0.14"/>
     </filter>
   </defs>
-  <rect width="100%" height="100%" fill="#f7f9fc"/>
+  <rect width="100%" height="100%" fill="#f8f7f2"/>
   <rect width="100%" height="100%" fill="url(#g1)"/>`;
 
   // ghost outline of the floor below, for aligning walls and stairs
@@ -44,8 +44,8 @@ function render2D(){
     state.floors[state.floor-1].blocks.forEach(b=>{
       const [w,d] = footprint(b);
       const [gx,gy] = P(b.cx-w/2, b.cz-d/2, ox, oy);
-      s += `<rect x="${gx}" y="${gy}" width="${w*S}" height="${d*S}" fill="#dfe4ec" fill-opacity=".4"
-        stroke="#b6c0d0" stroke-width="2" stroke-dasharray="6 5"/>`;
+      s += `<rect x="${gx}" y="${gy}" width="${w*S}" height="${d*S}" fill="#d8dcd2" fill-opacity=".4"
+        stroke="#a1a99b" stroke-width="2" stroke-dasharray="6 5"/>`;
     });
   }
 
@@ -82,7 +82,7 @@ function render2D(){
 // its resize handles — everything that moves with it, in one <g class="blk">.
 function blockSvg(b, ox, oy){
   const seld = sel && sel.blockId===b.id && sel.kind==='block';
-  const col = seld ? '#e5476f' : '#1d5bb4';
+  const col = seld ? '#ad4a31' : '#29372c';
   const [w,d] = footprint(b);
   const spec = C.rooms[b.type];
   const [x0,y0] = P(b.cx-w/2, b.cz-d/2, ox,oy);
@@ -95,8 +95,8 @@ function blockSvg(b, ox, oy){
   b.windows.forEach(wd=>{
     const seg = openSeg2D(b, wd.wall, wd.t, wd.kind==='pano' ? 2.2 : 1.2, ox, oy);
     s += `<g data-win="${wd.id}" data-blk="${b.id}" style="cursor:grab">
-          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#9cc3ea" stroke-width="7" stroke-linecap="butt"/>
-          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#ffffff" stroke-width="2.5"/>
+          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#b8c6c4" stroke-width="7" stroke-linecap="butt"/>
+          <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#f8f7f2" stroke-width="2.5"/>
           <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="transparent" stroke-width="16"/>
           </g>`;
   });
@@ -120,11 +120,11 @@ function blockSvg(b, ox, oy){
     }).join(' ');
     const selF = sel && sel.kind==='furn' && sel.furnId===f.id;
     s += `<g data-furn="${f.id}" data-blk="${b.id}" style="cursor:grab">
-      <polygon points="${pts}" fill="rgba(255,255,255,.55)" stroke="${selF?'#e5476f':'#8b96ab'}" stroke-width="1.6"/>
+      <polygon points="${pts}" fill="rgba(248,247,242,.55)" stroke="${selF?'#ad4a31':'#5d665b'}" stroke-width="1.6"/>
       </g>`;
   });
   // doors (gap + swing)
-  b.doors.forEach(dd=>{ s += door2D(b, dd, ox, oy, sel&&sel.kind==='door'&&sel.doorId===dd.id ? '#e5476f' : col); });
+  b.doors.forEach(dd=>{ s += door2D(b, dd, ox, oy, sel&&sel.kind==='door'&&sel.doorId===dd.id ? '#ad4a31' : col); });
   // Quiet, bounded labels keep the plan readable at whole-house zoom.
   const [ncx,ncy] = P(b.cx, b.cz, ox, oy);
   const fullName = b.name || spec.name;
@@ -133,20 +133,20 @@ function blockSvg(b, ox, oy){
   const label = fullName.length>maxChars ? fullName.slice(0,maxChars-1)+'…' : fullName;
   const showDims = W2>85 && D2>55;
   s += `<g pointer-events="none"><title>${escapeMarkup(fullName)}</title>
-    <rect x="${x0+5}" y="${ncy-12}" width="${Math.max(0,W2-10)}" height="${showDims?34:23}" rx="4" fill="#fff" fill-opacity=".82"/>
-    <text x="${ncx}" y="${ncy+3}" text-anchor="middle" style="font-size:${labelSize}px;font-weight:700;fill:#394b51">${escapeMarkup(label)}</text>`;
-  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#62747c">${round1(b.len)} × ${round1(b.w)} m</text>`;
+    <rect x="${x0+5}" y="${ncy-12}" width="${Math.max(0,W2-10)}" height="${showDims?34:23}" rx="4" fill="#f8f7f2" fill-opacity=".82"/>
+    <text x="${ncx}" y="${ncy+3}" text-anchor="middle" style="font-size:${labelSize}px;font-weight:700;fill:#29372c">${escapeMarkup(label)}</text>`;
+  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#5d665b">${round1(b.len)} × ${round1(b.w)} m</text>`;
   s += '</g>';
   if(seld){
     // side dimension pills + corner handles
-    s += chip2D(x0+W2/2-24, y0-9, `${round1(b.rot%2? b.w : b.len)} m`, '#e5476f');
-    s += chip2D(x0-14, y0+D2/2-9, `${round1(b.rot%2? b.len : b.w)} m`, '#e5476f', true);
+    s += chip2D(x0+W2/2-24, y0-9, `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
+    s += chip2D(x0-14, y0+D2/2-9, `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
     [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
      [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
       const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
       s += `<g data-hdl data-sx="${sx}" data-sz="${sz}" data-blk="${b.id}" style="cursor:${cur}">
         <rect x="${hx-11}" y="${hy-11}" width="22" height="22" fill="transparent"/>
-        <rect x="${hx-4}" y="${hy-4}" width="8" height="8" rx="2" fill="#fff" stroke="#e5476f" stroke-width="2"/></g>`;
+        <rect x="${hx-4}" y="${hy-4}" width="8" height="8" rx="2" fill="#f8f7f2" stroke="#ad4a31" stroke-width="2"/></g>`;
     });
   }
   return s + `</g>`;

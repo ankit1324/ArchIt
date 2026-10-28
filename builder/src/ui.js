@@ -22,7 +22,7 @@ function updateChip(){
   const iss = designIssues();
   const wv = document.getElementById('warnV');
   wv.textContent = iss.length ? iss.length + ' issue' + (iss.length>1?'s':'') : 'OK';
-  wv.style.color = iss.length ? '#e5476f' : '#3aa06b';
+  wv.style.color = iss.length ? '#ad4a31' : '#547548';
   const wc = document.getElementById('warnCell');
   wc.title = iss.join('\n');
   wc.onclick = ()=>{ if(iss.length) toast(iss.slice(0,3).join(' · ') + (iss.length>3 ? ` (+${iss.length-3} more)` : '')); };
@@ -55,7 +55,7 @@ $('#resetB').addEventListener('click', ()=>{
   showModal(`
     <h3>Start over?</h3>
     <p class="hint">The current project will be deleted and replaced with a fresh single-room house.</p>
-    <button class="mbtn" data-reset style="background:#e5476f">Yes, start over</button>
+    <button class="mbtn" data-reset style="background:#ad4a31">Yes, start over</button>
     <button class="mbtn ghost" data-close>Cancel</button>`);
 });
 

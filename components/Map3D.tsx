@@ -67,11 +67,17 @@ function hashOf(s: string): number {
   return Math.abs(h);
 }
 
+// Planner palette (app/globals.css) as hex: paint properties cannot read CSS
+// variables. Pale fills at 55% opacity stay legible over the dark satellite
+// imagery and over the paper-coloured fallback background alike. Keep in step
+// with NEIGHBOR_COLORS in lib/design.ts (the builder's context boxes).
 const PRISM_COLORS: Record<Listing["type"], string> = {
-  rent: "#a06ae8",
-  sale: "#ccdb2a",
-  showcase: "#8b5cf6",
+  rent: "#d9a28c", // clay
+  sale: "#dde3b6", // highlight
+  showcase: "#b8c6c4", // mist
 };
+/** featured prisms take the accent, like their pills' emphasis */
+const PRISM_FEATURED = "#ad4a31";
 
 const POI_SVGS: Record<Poi["icon"], string> = {
   building:
@@ -108,8 +114,8 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
     features: listings.map((l) => ({
       type: "Feature",
       properties: {
-        // Featured listings get a glowing amber prism; regular by sale/rent
-        color: l.featured ? "#f59e0b" : PRISM_COLORS[l.type],
+        // Featured listings get an accent prism; regular by sale/rent
+        color: l.featured ? PRISM_FEATURED : PRISM_COLORS[l.type],
         height: 30 + (l.floors ?? 5) * 3.2,
       },
       geometry: { type: "Polygon", coordinates: squareAround(l.coords, 46) },
@@ -124,19 +130,25 @@ function prismGeoJSON(listings: Listing[]): GeoJSON.FeatureCollection {
 // `styleimagemissing`), keyed by everything it shows, so a changed price or
 // selection simply asks for a new key.
 
-// Contrast (WCAG AA, 12.5px bold text needs 4.5:1): white on #c8322a is 5.3:1,
-// plum (#3d1830) on the featured amber is 7.1:1 at #f59e0b and 4.8:1 at the
-// #d97706 end of its gradient. The old white-on-amber pill was 2.15:1.
+// Contrast (WCAG AA, 12.5px bold text needs 4.5:1): paper on the accent pill is
+// 5.1:1; ink on the featured highlight is 9.4:1 at #dde3b6 and 6.7:1 at the
+// #b9c47f end of its gradient; paper on the forest cluster is 11:1. The
+// selected ring is paper inside an ink hairline so it reads on dark imagery
+// and on the paper fallback background.
 const PIN = {
-  fill: "#c8322a",
-  text: "#ffffff",
-  featuredFrom: "#f59e0b",
-  featuredTo: "#d97706",
-  featuredText: "#3d1830",
-  featuredRing: "rgba(251, 191, 36, 0.6)",
-  selectedRing: "#e2ef6a",
-  plum: "#3d1830",
-  cream: "#f5f1ea",
+  fill: "#ad4a31", // accent
+  text: "#f8f7f2", // paper
+  shadow: "rgba(142, 59, 39, 0.4)", // accent-deep
+  featuredFrom: "#dde3b6", // highlight
+  featuredTo: "#b9c47f", // highlight-deep
+  featuredText: "#29372c", // ink
+  featuredRing: "rgba(41, 55, 44, 0.55)",
+  featuredShadow: "rgba(41, 55, 44, 0.45)",
+  selectedRing: "#f8f7f2",
+  selectedOutline: "#29372c",
+  ink: "#29372c",
+  forest: "#293c31",
+  paper: "#f8f7f2",
 };
 const PIN_H = 30;
 const PIN_MARGIN = 7; // room for the shadow / rings around the pill
@@ -199,6 +211,21 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 type ThumbSource = HTMLImageElement | ImageBitmap;
 
+/**
+ * Selection ring shared by listing and design pills: a 3px paper band with an
+ * ink hairline outside it (ends 4.75px out, inside PIN_MARGIN).
+ */
+function strokeSelected(ctx: CanvasRenderingContext2D, x: number, y: number, pillW: number, r: number) {
+  roundRect(ctx, x - 3.5, y - 3.5, pillW + 7, PIN_H + 7, r + 3.5);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = PIN.selectedOutline;
+  ctx.stroke();
+  roundRect(ctx, x - 1.5, y - 1.5, pillW + 3, PIN_H + 3, r + 1.5);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = PIN.selectedRing;
+  ctx.stroke();
+}
+
 /** px between a pin's bottom edge and its listing point (see drawPin) */
 const PIN_LIFT = 12;
 
@@ -232,7 +259,7 @@ function drawPin(l: Listing, selected: boolean, thumb: ThumbSource | null): Imag
 
   // soft drop shadow under the pill
   ctx.save();
-  ctx.shadowColor = l.featured ? "rgba(217, 119, 6, 0.5)" : "rgba(120, 30, 25, 0.4)";
+  ctx.shadowColor = l.featured ? PIN.featuredShadow : PIN.shadow;
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 3;
   roundRect(ctx, x, y, pillW, PIN_H, r);
@@ -247,10 +274,12 @@ function drawPin(l: Listing, selected: boolean, thumb: ThumbSource | null): Imag
   ctx.fill();
   ctx.restore();
 
-  if (l.featured || selected) {
+  if (selected) {
+    strokeSelected(ctx, x, y, pillW, r);
+  } else if (l.featured) {
     roundRect(ctx, x - 1.5, y - 1.5, pillW + 3, PIN_H + 3, r + 1.5);
-    ctx.lineWidth = selected ? 3 : 2;
-    ctx.strokeStyle = selected ? PIN.selectedRing : PIN.featuredRing;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = PIN.featuredRing;
     ctx.stroke();
   }
 
@@ -268,14 +297,14 @@ function drawPin(l: Listing, selected: boolean, thumb: ThumbSource | null): Imag
       const side = Math.min(sw, sh);
       ctx.drawImage(thumb, (sw - side) / 2, (sh - side) / 2, side, side, cx - THUMB / 2, cy - THUMB / 2, THUMB, THUMB);
     } else {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.fillStyle = l.featured ? "rgba(41, 55, 44, 0.18)" : "rgba(248, 247, 242, 0.35)";
       ctx.fillRect(cx - THUMB / 2, cy - THUMB / 2, THUMB, THUMB);
     }
     ctx.restore();
     ctx.beginPath();
     ctx.arc(cx, cy, THUMB / 2, 0, Math.PI * 2);
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.strokeStyle = "rgba(248, 247, 242, 0.85)";
     ctx.stroke();
   }
 
@@ -298,34 +327,35 @@ function drawCluster(label: string): ImageData {
   ctx.scale(pr, pr);
   const c = size / 2;
   ctx.save();
-  ctx.shadowColor = "rgba(61, 24, 48, 0.35)";
+  ctx.shadowColor = "rgba(41, 55, 44, 0.4)";
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 3;
   ctx.beginPath();
   ctx.arc(c, c, d / 2, 0, Math.PI * 2);
-  ctx.fillStyle = PIN.plum;
+  ctx.fillStyle = PIN.forest;
   ctx.fill();
   ctx.restore();
   ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(245, 241, 234, 0.85)";
+  ctx.strokeStyle = "rgba(248, 247, 242, 0.85)";
   ctx.stroke();
   ctx.font = pinFont(13);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = PIN.cream;
+  ctx.fillStyle = PIN.paper;
   ctx.fillText(label, c, c + 0.5);
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
 // ── Design pins ─────────────────────────────────────────────────────────────
 // Published designs (the showcase) ride their own unclustered GeoJSON source
-// and symbol layer, painted the same way as listing pills: a violet pill with
+// and symbol layer, painted the same way as listing pills: a forest pill with
 // a "3D" badge (or the design's snapshot thumbnail) and its name, no price.
 const DESIGN_PIN = {
-  fill: "#6d28d9", // violet-700: white text is 7.1:1
-  badge: "#ede9fe",
-  badgeText: "#4c1d95",
-  selectedRing: "#e2ef6a",
+  fill: "#293c31", // forest: paper text is 11:1
+  text: "#f8f7f2", // paper
+  shadow: "rgba(41, 55, 44, 0.45)",
+  badge: "#dde3b6", // highlight
+  badgeText: "#29372c", // ink, 9.4:1
 };
 const DESIGN_NAME_MAX = 22;
 
@@ -387,7 +417,7 @@ function drawDesignPin(d: PublishedDesign, selected: boolean, thumb: ThumbSource
   const r = PIN_H / 2;
 
   ctx.save();
-  ctx.shadowColor = "rgba(76, 29, 149, 0.45)";
+  ctx.shadowColor = DESIGN_PIN.shadow;
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 3;
   roundRect(ctx, x, y, pillW, PIN_H, r);
@@ -395,12 +425,7 @@ function drawDesignPin(d: PublishedDesign, selected: boolean, thumb: ThumbSource
   ctx.fill();
   ctx.restore();
 
-  if (selected) {
-    roundRect(ctx, x - 1.5, y - 1.5, pillW + 3, PIN_H + 3, r + 1.5);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = DESIGN_PIN.selectedRing;
-    ctx.stroke();
-  }
+  if (selected) strokeSelected(ctx, x, y, pillW, r);
 
   const cx = x + 5 + THUMB / 2;
   const cy = y + PIN_H / 2;
@@ -427,18 +452,18 @@ function drawDesignPin(d: PublishedDesign, selected: boolean, thumb: ThumbSource
   ctx.font = pinFont(PIN_FONT_SIZE);
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = DESIGN_PIN.text;
   ctx.fillText(label, x + padL, y + PIN_H / 2 + 0.5);
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-/** POI bubble (icon tile + white label), rasterised once per POI */
+/** POI bubble (icon tile + paper label), rasterised once per POI */
 async function drawPoi(p: Poi): Promise<ImageData> {
   const pr = pixelRatio();
   // an <img>-loaded svg needs its namespace
   const svg = (POI_SVGS[p.icon] ?? "")
     .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ')
-    .replace(/currentColor/g, PIN.plum);
+    .replace(/currentColor/g, PIN.ink);
   const icon = new Image();
   icon.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   await icon.decode().catch(() => {});
@@ -455,20 +480,22 @@ async function drawPoi(p: Poi): Promise<ImageData> {
   const ctx = canvas.getContext("2d")!;
   ctx.scale(pr, pr);
   ctx.save();
-  ctx.shadowColor = "rgba(61, 24, 48, 0.18)";
+  ctx.shadowColor = "rgba(41, 55, 44, 0.22)";
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
-  roundRect(ctx, 4, 4, 34, 34, 12);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  roundRect(ctx, 4, 4, 34, 34, 8);
+  ctx.fillStyle = "rgba(248, 247, 242, 0.94)";
   ctx.fill();
   ctx.restore();
   if (icon.complete && icon.naturalWidth) ctx.drawImage(icon, 4 + 9, 4 + 9, 16, 16);
   if (p.label) {
     ctx.font = font;
     ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(61, 24, 48, 0.7)";
+    // a dark halo keeps the paper label readable over light imagery and the
+    // paper fallback background
+    ctx.shadowColor = "rgba(41, 55, 44, 0.85)";
     ctx.shadowBlur = 6;
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = PIN.paper;
     ctx.fillText(p.label, 4 + 34 + 7, 4 + 17, 110);
   }
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -490,7 +517,7 @@ const FALLBACK_STYLE: StyleSpecification = {
   version: 8,
   sources: { satellite: SATELLITE_SOURCE },
   layers: [
-    { id: "background", type: "background", paint: { "background-color": "#efe9df" } },
+    { id: "background", type: "background", paint: { "background-color": "#eeeee5" } },
     { id: "satellite", type: "raster", source: "satellite" },
   ],
 };
@@ -884,7 +911,8 @@ export default function Map3D({
     draftMarkerRef.current?.remove();
     draftMarkerRef.current = null;
     if (draftCoords) {
-      draftMarkerRef.current = new maplibregl.Marker({ color: "#3d1830" })
+      // accent, so the pin being placed matches the listing pills
+      draftMarkerRef.current = new maplibregl.Marker({ color: "#ad4a31" })
         .setLngLat(draftCoords)
         .addTo(map);
     }

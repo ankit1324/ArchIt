@@ -4,6 +4,12 @@ import { useEffect, useRef } from "react";
 import type { Listing } from "@/lib/types";
 import PropertyCard from "./PropertyCard";
 
+// state notices float over the map, so they keep the floating shadow
+const notice =
+  "rounded-md border border-line bg-paper/95 text-[14px] leading-relaxed text-ink shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] backdrop-blur";
+const focusRing =
+  "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 export default function PropertyCarousel({
   listings,
   onSelect,
@@ -37,18 +43,18 @@ export default function PropertyCarousel({
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     strip.scrollTo({ left: Math.max(0, left), behavior: reduce ? "auto" : "smooth" });
   }, [selectedId, listings]);
-  if (status === "loading") return <div role="status" className="rounded-2xl bg-cream/95 p-6 text-sm font-semibold text-plum">Loading properties…</div>;
-  if (status === "error") return <div role="alert" className="pointer-events-auto rounded-2xl bg-cream/95 p-5 text-sm text-plum"><p className="font-bold">Properties couldn’t be loaded.</p><p className="mt-1 text-xs">Check your connection and try again.</p><button onClick={onRetry} className="mt-3 rounded-full bg-plum px-4 py-2 text-xs font-bold text-cream">Try again</button></div>;
+  if (status === "loading") return <div role="status" className={`${notice} p-5 font-semibold`}>Loading properties…</div>;
+  if (status === "error") return <div role="alert" className={`${notice} pointer-events-auto p-5`}><p className="font-display text-[18px] font-medium tracking-[-0.01em]">Properties couldn’t be loaded.</p><p className="mt-1 text-ink-soft">Check your connection and try again.</p><button onClick={onRetry} className={`${focusRing} mt-3 min-h-11 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep`}>Try again</button></div>;
   if (listings.length === 0 && emptyMessage) {
-    return <div role="status" className="bg-cream/95 pointer-events-auto rounded-2xl px-5 py-4 text-[13px] font-semibold text-plum">{emptyMessage}</div>;
+    return <div role="status" className={`${notice} pointer-events-auto px-5 py-4 font-semibold`}>{emptyMessage}</div>;
   }
   if (listings.length === 0) {
     return (
-      <div role="status" className="bg-cream/95 pointer-events-auto rounded-2xl px-5 py-4 text-[13px] font-semibold text-plum">
+      <div role="status" className={`${notice} pointer-events-auto px-5 py-4 font-semibold`}>
         {hasAny
           ? "No properties match your search."
           : "No properties yet — press “+ Add property”, then click a spot on the map."}
-        {hasAny && <div className="mt-2"><p className="mb-3 text-xs font-normal text-plum-soft">Try another location or clear your filters to explore more places.</p><button onClick={onReset} className="rounded-full bg-plum px-4 py-2 text-xs text-cream">Clear search & filters</button></div>}
+        {hasAny && <div className="mt-2"><p className="mb-3 font-normal text-ink-soft">Try another location or clear your filters to explore more places.</p><button onClick={onReset} className={`${focusRing} min-h-11 rounded-[5px] border border-line-strong px-5 py-3 text-[13px] font-semibold text-ink transition-colors hover:border-ink`}>Clear search & filters</button></div>}
       </div>
     );
   }

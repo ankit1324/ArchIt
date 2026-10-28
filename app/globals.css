@@ -2,37 +2,78 @@
    (components/Map3D.tsx -> components/map.css) so only /find loads them */
 @import "tailwindcss";
 
+/* ArchIt design tokens: the "practical planner" palette the landing page
+   introduced (components/MarketingLanding.module.css). Warm paper, forest ink,
+   a terracotta accent, Fraunces for display type over Manrope text.
+
+   Prefer the semantic names (paper, ink, accent, ...) in new code. The original
+   names (cream, plum, coral, lime, magenta, lavender) predate this palette and
+   stay as aliases because ~50 files use them as classes (text-plum, bg-cream);
+   they now resolve to the planner colours, so read "plum" as "ink". */
 @theme inline {
-  --color-cream: #f5f1ea;
-  --color-cream-soft: #efe9df;
-  --color-plum: #3d1830;
-  --color-plum-soft: #6b4560;
-  --color-coral: #f0483e;
-  --color-lime: #e2ef6a;
-  --color-lime-deep: #ccdb2a;
-  --color-magenta: #e857c2;
-  /* magenta for text-bearing fills: white on it is 5.3:1 (WCAG AA); the
-     brighter --color-magenta is 3.2:1 and only suits decoration */
-  --color-magenta-deep: #b5359a;
-  --color-lavender: #b18cf0;
-  --font-sans: var(--font-jakarta);
+  --color-paper: #f8f7f2;
+  --color-paper-soft: #eeeee5;
+  /* dark band behind the landing finale, the dashboard hero and the builder bar */
+  --color-forest: #293c31;
+  --color-ink: #29372c;
+  /* muted text: 5.6:1 on paper (WCAG AA) */
+  --color-ink-soft: #5d665b;
+  --color-line: #d8dcd2;
+  --color-line-strong: #a1a99b;
+  /* CTAs, links, errors. Paper text on it is 5.1:1 */
+  --color-accent: #ad4a31;
+  /* accent hover, and accent fills that carry small text: paper on it is 7.0:1 */
+  --color-accent-deep: #8e3b27;
+  /* highlight fills under ink text: badges, selected chips (ink on it 9.4:1) */
+  --color-highlight: #dde3b6;
+  --color-highlight-deep: #b9c47f;
+  /* secondary category fill, e.g. "for rent" next to a highlight "for sale" */
+  --color-clay: #d9a28c;
+  --color-mist: #b8c6c4;
+
+  /* legacy names, see above */
+  --color-cream: var(--color-paper);
+  --color-cream-soft: var(--color-paper-soft);
+  --color-plum: var(--color-ink);
+  --color-plum-soft: var(--color-ink-soft);
+  --color-coral: var(--color-accent);
+  --color-lime: var(--color-highlight);
+  --color-lime-deep: var(--color-highlight-deep);
+  /* decoration or ink text only: paper text on clay is 2.1:1, ink is 5.7:1 */
+  --color-magenta: var(--color-clay);
+  --color-magenta-deep: var(--color-accent-deep);
+  --color-lavender: var(--color-mist);
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  /* headings: class `font-display` */
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
 }
 
 html,
 body {
   height: 100%;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Full-screen app shells (the /find map, the designer) own all of their
+   scrolling and gestures: the document must neither scroll nor rubber-band
+   under them. Their root element carries `app-shell`. Every other page scrolls
+   the document itself, so mobile browsers can collapse their toolbars and
+   restore the scroll position on back navigation. */
+html:has(.app-shell),
+html:has(.app-shell) body {
   overflow: hidden;
-  background: var(--color-cream);
-  color: var(--color-plum);
-  font-family: var(--font-jakarta), sans-serif;
+  overscroll-behavior: none;
 }
 
 /* frosted glass panel */
 @utility glass {
-  background: rgb(245 241 234 / 0.62);
+  background: rgb(248 247 242 / 0.66);
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  box-shadow: 0 8px 28px rgb(61 24 48 / 0.1);
+  box-shadow: 0 8px 28px rgb(41 55 44 / 0.1);
 }
 
 @utility no-scrollbar {
@@ -59,16 +100,16 @@ body {
   height: 22px;
   border-radius: 999px;
   background: var(--color-cream);
-  border: 1px solid rgb(61 24 48 / 0.12);
-  box-shadow: 0 2px 8px rgb(61 24 48 / 0.25);
+  border: 1px solid rgb(41 55 44 / 0.14);
+  box-shadow: 0 2px 8px rgb(41 55 44 / 0.25);
   background-image: repeating-linear-gradient(
     90deg,
     transparent 0 12px,
-    rgb(61 24 48 / 0.45) 12px 13.5px,
+    rgb(41 55 44 / 0.45) 12px 13.5px,
     transparent 13.5px 15px,
-    rgb(61 24 48 / 0.45) 15px 16.5px,
+    rgb(41 55 44 / 0.45) 15px 16.5px,
     transparent 16.5px 18px,
-    rgb(61 24 48 / 0.45) 18px 19.5px,
+    rgb(41 55 44 / 0.45) 18px 19.5px,
     transparent 19.5px 34px
   );
   cursor: grab;
@@ -79,8 +120,8 @@ body {
   height: 22px;
   border-radius: 999px;
   background: var(--color-cream);
-  border: 1px solid rgb(61 24 48 / 0.12);
-  box-shadow: 0 2px 8px rgb(61 24 48 / 0.25);
+  border: 1px solid rgb(41 55 44 / 0.14);
+  box-shadow: 0 2px 8px rgb(41 55 44 / 0.25);
   cursor: grab;
 }
 

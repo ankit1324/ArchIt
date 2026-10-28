@@ -103,22 +103,22 @@ export default function PriceHistogram({
               key={i}
               style={{ height: `${Math.round(h * 100)}%` }}
               className={`w-full rounded-full transition-colors ${
-                inRange ? "bg-plum" : "bg-plum/20"
+                inRange ? "bg-ink" : "bg-line"
               }`}
             />
           );
         })}
       </div>
 
-      <div className="text-center text-[15px] font-bold text-plum">
+      <div className="text-center font-display text-[17px] font-normal tracking-[-0.01em] text-ink tabular-nums">
         {lo === 0 && !Number.isFinite(hi) ? "Any price" : `${compact(lo)} – ${Number.isFinite(hi) ? compact(hi) : "No limit"}`}
       </div>
 
       {/* dual-thumb slider */}
-      <div className="relative h-[22px]">
-        <div className="absolute inset-x-1 top-1/2 h-[22px] -translate-y-1/2 rounded-full bg-white/55" />
+      <div className="relative h-[22px] rounded-full has-[input:focus-visible]:outline-3 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-accent">
+        <div className="absolute inset-x-1 top-1/2 h-[22px] -translate-y-1/2 rounded-full border border-line bg-paper-soft" />
         <div
-          className="absolute top-1/2 h-[22px] -translate-y-1/2 rounded-full bg-plum"
+          className="absolute top-1/2 h-[22px] -translate-y-1/2 rounded-full bg-ink"
           style={{ left: `${loPos}%`, right: `${100 - hiPos}%` }}
         />
         <input
@@ -133,7 +133,7 @@ export default function PriceHistogram({
           onTouchEnd={commit}
           onKeyUp={commitOnKey}
           onBlur={commit}
-          className="range-input"
+          className="range-input focus-visible:outline-none"
           aria-label="Minimum price"
           aria-valuetext={lo === 0 ? "No minimum" : compact(lo)}
         />
@@ -149,7 +149,7 @@ export default function PriceHistogram({
           onTouchEnd={commit}
           onKeyUp={commitOnKey}
           onBlur={commit}
-          className="range-input"
+          className="range-input focus-visible:outline-none"
           aria-label="Maximum price"
           aria-valuetext={Number.isFinite(hi) ? compact(hi) : "No maximum"}
         />

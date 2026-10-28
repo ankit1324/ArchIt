@@ -417,7 +417,7 @@ modal.addEventListener('click', e=>{
       let note = modal.querySelector('.tpl-signin');
       if(!note){
         note = document.createElement('p');
-        note.className = 'hint tpl-signin'; note.style.color = '#e5476f'; note.style.fontWeight = '700';
+        note.className = 'hint tpl-signin'; note.style.color = '#ad4a31'; note.style.fontWeight = '700';
         modal.querySelector('.tpl-tabs')?.before(note);
       }
       note.textContent = 'Sign in to ArchIt and open the Designer to unlock '+(entry ? entry.name : 'this layout')+'.';

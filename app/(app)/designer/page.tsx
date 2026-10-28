@@ -45,55 +45,60 @@ function saveErrorMessage(status: number): string {
   return `server error (${status}) — try again`;
 }
 
-/** blueprint-grid + colour-wash stage behind the designer's card screens */
+/** drafting-paper stage behind the designer's card screens */
 function Backdrop({
+  as: Tag = "div",
   className,
   children,
 }: {
+  /** "main" when the backdrop is the page itself (the locked screen) */
+  as?: "main" | "div";
   className: string;
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className={`${className} flex items-center justify-center overflow-hidden bg-cream`}
+    // my-auto on the card, not items-center, so a card taller than a short
+    // phone screen scrolls from its top instead of being cut off above it
+    <Tag
+      className={`${className} flex flex-col items-center overflow-y-auto bg-paper p-4`}
     >
+      {/* the builder's 2D plan grid, faded out toward the edges */}
       <div
         aria-hidden
-        className="absolute inset-0"
+        className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(61,24,48,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(61,24,48,.05) 1px, transparent 1px)",
+            "linear-gradient(rgb(41 55 44 / 0.06) 1px, transparent 1px), linear-gradient(90deg, rgb(41 55 44 / 0.06) 1px, transparent 1px)",
           backgroundSize: "42px 42px",
           maskImage:
-            "radial-gradient(ellipse 90% 80% at 50% 45%, black 55%, transparent 100%)",
+            "radial-gradient(ellipse 90% 80% at 50% 45%, black 45%, transparent 100%)",
         }}
       />
-      <div
-        aria-hidden
-        className="absolute -left-28 top-[10%] h-80 w-80 rounded-full bg-lavender/40 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="absolute -right-24 bottom-[4%] h-96 w-96 rounded-full bg-lime/50 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="absolute -top-24 right-[18%] h-72 w-72 rounded-full bg-magenta/25 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="absolute bottom-[12%] left-[16%] h-56 w-56 rounded-full bg-coral/20 blur-3xl"
-      />
-      <div className="relative">{children}</div>
-    </div>
+      <div className="relative my-auto">{children}</div>
+    </Tag>
   );
 }
 
-const field =
-  "flex items-baseline gap-1.5 rounded-full bg-white/55 px-3.5 py-2 text-[13px]";
-const fieldLabel = "shrink-0 font-medium text-plum-soft";
+const card =
+  "flex flex-col gap-3 rounded-md border border-line bg-paper p-6 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)]";
+const eyebrow =
+  "flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
+const focusRing =
+  "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const field = `flex items-baseline gap-1.5 rounded-[5px] border border-line bg-paper-soft/60 px-3.5 py-2.5 text-[14px] focus-within:border-ink`;
+const fieldLabel = "shrink-0 text-[13px] font-medium text-ink-soft";
 const fieldInput =
-  "w-full min-w-0 bg-transparent font-bold text-plum outline-none placeholder:font-medium placeholder:text-plum-soft/50";
+  "w-full min-w-0 bg-transparent font-semibold text-ink outline-none placeholder:font-medium placeholder:text-ink-soft/70";
+const rowLabel = "text-[13px] font-semibold text-ink-soft";
+/** small pill toggle (unit, floors, facing) */
+const chip = (on: boolean) =>
+  `min-h-8 rounded-full px-3 text-[12px] font-bold transition-colors ${focusRing} ${
+    on
+      ? "bg-forest text-paper"
+      : "border border-line-strong text-ink hover:border-ink"
+  }`;
+const primaryBtn = `inline-flex min-h-11 items-center justify-center gap-3 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep disabled:opacity-50 ${focusRing}`;
+const textLink = `inline-flex min-h-6 items-center justify-center self-center text-[13px] font-semibold text-ink-soft underline underline-offset-4 transition-colors hover:text-ink ${focusRing}`;
 
 function SetupDialog({
   onStart,
@@ -154,14 +159,21 @@ function SetupDialog({
 
   return (
     <Backdrop className="fixed inset-0 z-[70]">
-      <section className="glass flex w-[360px] flex-col gap-3 rounded-[28px] p-6 shadow-[0_30px_80px_-30px_rgba(61,24,48,.35)]">
-        <div>
-          <span className="text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-coral">
+      <section
+        aria-labelledby="setup-title"
+        className={`${card} w-[380px] max-w-[calc(100vw-32px)]`}
+      >
+        <div className="mb-1">
+          <span className={eyebrow}>
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
             Project setup
           </span>
-          <h2 className="mt-0.5 text-[20px] font-extrabold tracking-tight text-plum">
+          <h1
+            id="setup-title"
+            className="mt-2 font-display text-[28px] font-normal leading-tight tracking-[-0.02em] text-ink"
+          >
             New home design
-          </h2>
+          </h1>
         </div>
 
         <label className={field}>
@@ -176,19 +188,15 @@ function SetupDialog({
         </label>
 
         <div className="flex items-center justify-between px-1">
-          <span className="text-[12px] font-semibold text-plum-soft">
-            Plot size in
-          </span>
+          <span className={rowLabel}>Plot size in</span>
           <div className="flex gap-1">
             {(["m", "ft"] as const).map((u) => (
               <button
                 key={u}
+                type="button"
+                aria-pressed={unit === u}
                 onClick={() => switchUnit(u)}
-                className={`rounded-full px-3 py-1 text-[12px] font-bold transition-colors ${
-                  unit === u
-                    ? "bg-plum text-cream"
-                    : "bg-white/55 text-plum hover:bg-white/85"
-                }`}
+                className={chip(unit === u)}
               >
                 {u === "m" ? "meters" : "feet"}
               </button>
@@ -217,9 +225,9 @@ function SetupDialog({
           </label>
         </div>
 
-        <p className="px-1 text-[12px] font-medium text-plum-soft">
+        <p className="px-1 text-[14px] leading-relaxed text-ink-soft">
           Plot area:{" "}
-          <span className="font-bold text-plum">
+          <span className="font-bold tabular-nums text-ink">
             {wM > 0 && dM > 0
               ? `${Math.round(wM * dM)} m²${
                   unit === "ft"
@@ -232,17 +240,15 @@ function SetupDialog({
         </p>
 
         <div className="flex items-center justify-between px-1">
-          <span className="text-[12px] font-semibold text-plum-soft">Floors</span>
+          <span className={rowLabel}>Floors</span>
           <div className="flex gap-1">
             {[1, 2, 3].map((f) => (
               <button
                 key={f}
+                type="button"
+                aria-pressed={floors === f}
                 onClick={() => setFloors(f)}
-                className={`w-9 rounded-full py-1 text-[12px] font-bold transition-colors ${
-                  floors === f
-                    ? "bg-plum text-cream"
-                    : "bg-white/55 text-plum hover:bg-white/85"
-                }`}
+                className={`w-9 ${chip(floors === f)}`}
               >
                 {f}
               </button>
@@ -251,19 +257,15 @@ function SetupDialog({
         </div>
 
         <div className="flex items-center justify-between px-1">
-          <span className="text-[12px] font-semibold text-plum-soft">
-            Plot facing
-          </span>
+          <span className={rowLabel}>Plot facing</span>
           <div className="flex gap-1">
             {(["N", "E", "S", "W"] as const).map((f) => (
               <button
                 key={f}
+                type="button"
+                aria-pressed={facing === f}
                 onClick={() => setFacing(facing === f ? undefined : f)}
-                className={`w-9 rounded-full py-1 text-[12px] font-bold transition-colors ${
-                  facing === f
-                    ? "bg-plum text-cream"
-                    : "bg-white/55 text-plum hover:bg-white/85"
-                }`}
+                className={`w-9 ${chip(facing === f)}`}
               >
                 {f}
               </button>
@@ -282,7 +284,7 @@ function SetupDialog({
           />
         </label>
 
-        <label className={`${field} !rounded-2xl`}>
+        <label className={field}>
           <span className={fieldLabel}>Notes</span>
           <textarea
             className={`${fieldInput} resize-none`}
@@ -294,19 +296,15 @@ function SetupDialog({
         </label>
 
         {error && (
-          <p className="text-[12px] font-semibold text-coral">{error}</p>
+          <p role="alert" className="px-1 text-[14px] font-semibold text-accent">
+            {error}
+          </p>
         )}
 
-        <button
-          onClick={start}
-          className="rounded-full bg-plum py-2.5 text-[13.5px] font-bold text-cream shadow-[0_12px_28px_-10px_rgba(61,24,48,.55)] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]"
-        >
-          Start designing
+        <button type="button" onClick={start} className={`${primaryBtn} mt-1`}>
+          Start designing <span aria-hidden>↗</span>
         </button>
-        <button
-          onClick={onBack}
-          className="rounded-full py-1.5 text-[12px] font-semibold text-plum-soft transition-colors hover:text-plum"
-        >
+        <button type="button" onClick={onBack} className={textLink}>
           ← Back to map
         </button>
       </section>
@@ -544,53 +542,64 @@ export default function DesignerPage() {
 
   if (unlocked !== true) {
     return (
-      <Backdrop className="relative h-full">
+      <Backdrop as="main" className="app-shell relative h-full">
         {unlocked === false && (
-          <section className="glass flex w-[400px] flex-col gap-4 rounded-[28px] p-7 shadow-[0_30px_80px_-30px_rgba(61,24,48,.35)]">
-            <span className="text-[10.5px] font-extrabold uppercase tracking-[0.22em] text-coral">
+          <section
+            aria-labelledby="unlock-title"
+            className={`${card} w-[420px] max-w-[calc(100vw-32px)] gap-4 p-7`}
+          >
+            <span className={eyebrow}>
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
               ArchIt Builder
             </span>
-            <h2 className="text-[27px] font-extrabold leading-[1.12] tracking-tight text-plum">
+            <h1
+              id="unlock-title"
+              className="font-display text-[32px] font-normal leading-[1.1] tracking-[-0.02em] text-ink"
+            >
               Design your dream home in&nbsp;3D.
-            </h2>
-            <ul className="flex flex-col gap-2">
-              {(
-                [
-                  ["bg-lime-deep", "Drag-and-drop rooms, doors, windows & furniture"],
-                  ["bg-magenta", "Up to 3 floors, finishes & materials"],
-                  ["bg-lavender", "Plot outline, facing & real plot sizes"],
-                  ["bg-coral", "Unlimited saved projects with 3D snapshots"],
-                ] as const
-              ).map(([dot, t]) => (
+            </h1>
+            <ul className="flex flex-col border-y border-line">
+              {[
+                "Drag-and-drop rooms, doors, windows & furniture",
+                "Up to 3 floors, finishes & materials",
+                "Plot outline, facing & real plot sizes",
+                "Unlimited saved projects with 3D snapshots",
+              ].map((t, i) => (
                 <li
                   key={t}
-                  className="flex items-start gap-2.5 text-[13px] font-semibold leading-snug text-plum"
+                  className="flex items-start gap-3 border-b border-line py-2.5 text-[14px] leading-snug text-ink last:border-b-0"
                 >
                   <span
-                    className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dot}`}
-                  />
+                    aria-hidden
+                    className="pt-px text-[11px] font-bold tabular-nums text-accent"
+                  >
+                    0{i + 1}
+                  </span>
                   {t}
                 </li>
               ))}
             </ul>
-            <div className="flex items-baseline gap-2.5 rounded-2xl bg-white/60 px-4 py-3">
-              <span className="text-[30px] font-extrabold tracking-tight text-plum">
+            <div className="flex items-baseline gap-2.5 rounded-[5px] bg-paper-soft px-4 py-3">
+              <span className="font-display text-[30px] font-normal tabular-nums tracking-[-0.02em] text-ink">
                 {feeLabel("builder_unlock")}
               </span>
-              <span className="text-[12px] font-bold text-plum-soft">
+              <span className="text-[13px] font-semibold text-ink-soft">
                 one-time · yours forever
               </span>
             </div>
             <button
+              type="button"
               onClick={buyUnlock}
               disabled={paying}
-              className="rounded-full bg-plum py-3 text-[14px] font-bold text-cream shadow-[0_12px_28px_-10px_rgba(61,24,48,.55)] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+              className={primaryBtn}
             >
               {paying ? "Opening checkout…" : "Unlock the builder"}
+              {!paying && <span aria-hidden>↗</span>}
             </button>
             <button
+              type="button"
               onClick={() => router.push("/")}
-              className="rounded-full py-1 text-[12px] font-semibold text-plum-soft transition-colors hover:text-plum"
+              className={textLink}
             >
               ← Back to map
             </button>
@@ -601,7 +610,9 @@ export default function DesignerPage() {
   }
 
   return (
-    <div className="h-full bg-cream">
+    <main className="app-shell h-full bg-paper">
+      {/* the visible heading lives in the setup card and the builder iframe */}
+      {setup && <h1 className="sr-only">Home designer: {setup.name}</h1>}
       {builderSetup && (
         <DesignerOverlay
           session={session}
@@ -624,26 +635,30 @@ export default function DesignerPage() {
       <div
         className={`fixed left-[118px] top-[76px] z-[80] w-[230px] max-[760px]:left-12 max-[760px]:top-2 ${listOpen ? "" : "max-[760px]:w-auto"}`}
       >
-        <div className="glass flex flex-col gap-2 rounded-3xl p-3 max-[760px]:p-1.5">
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 rounded-md border border-line bg-paper p-3 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] max-[760px]:p-1.5">
+          <div className="flex items-center justify-between gap-1">
             <span
-              className={`text-[13px] font-bold text-plum ${listOpen ? "" : "max-[760px]:hidden"}`}
+              className={`text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft ${listOpen ? "" : "max-[760px]:hidden"}`}
             >
               My designs
             </span>
             <Link
               href="/showcase"
-              className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5 hover:text-plum ${listOpen ? "" : "max-[760px]:hidden"}`}
+              className={`ml-auto inline-flex min-h-6 items-center rounded-[4px] px-1.5 text-[12px] font-semibold text-ink-soft underline-offset-4 hover:text-ink hover:underline ${focusRing} ${listOpen ? "" : "max-[760px]:hidden"}`}
             >
               Showcase
             </Link>
             <button
+              type="button"
+              // null until the visitor toggles: CSS decides (open on desktop,
+              // collapsed on phones), so claim no state rather than a wrong one
+              aria-expanded={listOpen ?? undefined}
               onClick={() =>
                 setListOpen(
                   !(listOpen ?? !window.matchMedia("(max-width: 760px)").matches),
                 )
               }
-              className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-plum-soft hover:bg-plum/5"
+              className={`inline-flex min-h-6 items-center rounded-full px-2 text-[12px] font-semibold text-ink-soft hover:bg-ink/5 hover:text-ink max-[760px]:min-h-8 max-[760px]:text-ink ${focusRing}`}
             >
               <span className="max-[760px]:hidden">
                 {listOpen === false ? "Show" : "Hide"}
@@ -659,11 +674,13 @@ export default function DesignerPage() {
               className={`flex flex-col gap-2 ${listOpen === null ? "max-[760px]:hidden" : ""}`}
             >
               <button
+                type="button"
                 onClick={newDesign}
-                className={`rounded-full py-2 text-[12.5px] font-bold transition-colors ${
+                aria-pressed={currentId === null}
+                className={`min-h-9 rounded-[5px] text-[13px] font-semibold transition-colors ${focusRing} ${
                   currentId === null
-                    ? "bg-plum text-cream"
-                    : "bg-white/55 text-plum hover:bg-white/85"
+                    ? "bg-forest text-paper"
+                    : "border border-line-strong text-ink hover:border-ink"
                 }`}
               >
                 + New design
@@ -671,23 +688,27 @@ export default function DesignerPage() {
 
               <div className="no-scrollbar flex max-h-[50vh] flex-col gap-1.5 overflow-y-auto">
                 {designs.length === 0 && (
-                  <p className="px-1 py-2 text-[11.5px] font-medium text-plum-soft">
+                  <p className="px-1 py-2 text-[14px] leading-snug text-ink-soft">
                     Nothing saved yet — design a home and hit “Save design”.
                   </p>
                 )}
                 {designs.map((d) => (
                   <div
                     key={d.id}
-                    className={`flex flex-col gap-1 rounded-2xl p-1.5 transition-colors ${
-                      d.id === currentId ? "bg-plum/10" : "hover:bg-white/55"
+                    className={`flex flex-col gap-1 rounded-[5px] p-1.5 transition-colors ${
+                      d.id === currentId
+                        ? "bg-paper-soft shadow-[inset_2px_0_0_var(--color-accent)]"
+                        : "hover:bg-paper-soft/70"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => openDesign(d)}
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        aria-current={d.id === currentId || undefined}
+                        className={`flex min-w-0 flex-1 items-center gap-2 rounded-[4px] text-left ${focusRing}`}
                       >
-                        <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-white/60">
+                        <span className="relative h-10 w-12 shrink-0 overflow-hidden rounded-[4px] border border-line bg-paper-soft">
                           {safeImageUrl(d.snapshot) && (
                             <Image
                               src={safeImageUrl(d.snapshot)!}
@@ -699,20 +720,21 @@ export default function DesignerPage() {
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12px] font-semibold text-plum">
+                          <span className="block truncate text-[13px] font-semibold text-ink">
                             {d.name}
                           </span>
                           {d.meta?.budget ? (
-                            <span className="block text-[10.5px] font-medium text-plum-soft">
+                            <span className="block text-[11px] font-medium tabular-nums text-ink-soft">
                               ₹{d.meta.budget.toLocaleString("en-IN")}
                             </span>
                           ) : null}
                         </span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => deleteDesign(d.id)}
                         aria-label={`Delete ${d.name}`}
-                        className="shrink-0 rounded-full p-1 text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral"
+                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-accent/10 hover:text-accent ${focusRing}`}
                       >
                         <CloseIcon width={12} height={12} />
                       </button>
@@ -720,12 +742,13 @@ export default function DesignerPage() {
                     <div className="flex flex-wrap items-center gap-1 pl-14">
                       {d.publishedAt ? (
                         <>
-                          <span className="rounded-full bg-lime/70 px-1.5 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider text-plum">
+                          <span className="rounded-full bg-highlight px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-ink">
                             Published
                           </span>
                           <button
+                            type="button"
                             onClick={() => setPublishing(d)}
-                            className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum"
+                            className={`inline-flex min-h-6 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink ${focusRing}`}
                           >
                             {hasLocation(d.plotCenter[0], d.plotCenter[1]) ? "Move pin" : "Add pin"}
                           </button>
@@ -733,23 +756,25 @@ export default function DesignerPage() {
                             <button
                               onClick={() => removePin(d)}
                               disabled={unpublishingId === d.id}
-                              className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-white/80 hover:text-plum disabled:opacity-50"
+                              className={`inline-flex min-h-6 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50 ${focusRing}`}
                             >
                               Remove pin
                             </button>
                           )}
                           <button
+                            type="button"
                             onClick={() => unpublishDesign(d)}
                             disabled={unpublishingId === d.id}
-                            className="rounded-full px-1.5 py-0.5 text-[10.5px] font-bold text-plum-soft transition-colors hover:bg-coral/10 hover:text-coral disabled:opacity-50"
+                            className={`inline-flex min-h-6 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 ${focusRing}`}
                           >
                             {unpublishingId === d.id ? "Saving…" : "Unpublish"}
                           </button>
                         </>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => setPublishing(d)}
-                          className="rounded-full bg-white/70 px-2 py-0.5 text-[10.5px] font-bold text-plum transition-colors hover:bg-white"
+                          className={`inline-flex min-h-6 items-center rounded-full border border-line-strong px-2 text-[11px] font-bold text-ink transition-colors hover:border-ink ${focusRing}`}
                         >
                           Publish
                         </button>
@@ -775,6 +800,6 @@ export default function DesignerPage() {
           onCancel={() => setPublishing(null)}
         />
       )}
-    </div>
+    </main>
   );
 }

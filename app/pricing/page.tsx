@@ -54,70 +54,115 @@ const FREE = [
   "ArchIt Lite",
 ];
 
+// The landing's starter-card tints, cycled so neighbouring cards differ.
+const TINTS = ["bg-[#f0f0e7]", "bg-[#eee5d9]", "bg-[#e7ece4]", "bg-paper-soft"];
+const EYEBROW = "text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
+const LINK =
+  "inline-flex min-h-6 items-center rounded-[2px] text-accent underline underline-offset-4 hover:text-accent-deep focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 export default function PricingPage() {
   // Paywall off: same page, every unlock shown as free. Featuring is hidden in
   // the app while it's off, so it's left out here too. Prices come back with
   // PAYWALL_ENABLED.
   const plans = PAYWALL_ENABLED ? PLANS : PLANS.filter((p) => p.purpose !== "featured_property");
   return (
-    <div className="h-full overflow-y-auto bg-cream text-plum">
+    <div className="flex min-h-full flex-col bg-paper text-ink">
       <Navbar />
-      <main className="mx-auto max-w-4xl px-6 py-14">
-        <h1 className="text-3xl font-extrabold tracking-wide text-plum">Pricing</h1>
-        {PAYWALL_ENABLED ? (
-          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-plum-soft">
-            No subscriptions. Everything below is a one-time UPI payment in Indian Rupees,
-            and each unlock is delivered the moment your payment is confirmed.
-          </p>
-        ) : (
-          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-plum-soft">
-            <strong className="text-plum">Everything on ArchIt is free right now.</strong>{" "}
-            The 3D builder, premium templates and owner contacts are unlocked for every
-            signed-in account. No payment needed.
-          </p>
-        )}
+      <main id="main-content" className="mx-auto w-full max-w-[1400px] px-[clamp(20px,5.5vw,84px)] pb-20 md:pb-28">
+        <header className="grid items-end gap-6 border-b border-line pt-12 pb-10 md:grid-cols-[1fr_minmax(0,46ch)] md:gap-16 md:pt-20 md:pb-14">
+          <div>
+            <p className={`flex items-center gap-2 ${EYEBROW}`}>
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
+              {PAYWALL_ENABLED ? "One-time UPI payments" : "Free right now"}
+            </p>
+            <h1 className="mt-5 font-display text-[clamp(44px,6vw,80px)] leading-[1.02] font-normal tracking-[-0.035em] text-ink">
+              Pricing
+            </h1>
+          </div>
+          {PAYWALL_ENABLED ? (
+            <p className="text-[16px] leading-[1.75] text-ink-soft">
+              No subscriptions. Everything below is a one-time UPI payment in Indian Rupees,
+              and each unlock is delivered the moment your payment is confirmed.
+            </p>
+          ) : (
+            <p className="text-[16px] leading-[1.75] text-ink-soft">
+              <strong className="font-semibold text-ink">Everything on ArchIt is free right now.</strong>{" "}
+              The 3D builder, premium templates and owner contacts are unlocked for every
+              signed-in account. No payment needed.
+            </p>
+          )}
+        </header>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          {plans.map((p) => (
+        <div
+          className={`mt-10 grid gap-4 md:mt-14 md:grid-cols-2 lg:gap-5 ${
+            plans.length === 4 ? "xl:grid-cols-4" : "lg:grid-cols-3"
+          }`}
+        >
+          {plans.map((p, i) => (
             <section
               key={p.purpose}
-              className="rounded-2xl border border-plum/10 bg-white/60 p-6"
+              aria-labelledby={`plan-${p.purpose}`}
+              className={`flex flex-col rounded-[5px] border border-line px-6 pt-7 pb-6 md:min-h-[320px] ${TINTS[i % TINTS.length]}`}
             >
-              <h2 className="text-lg font-bold text-plum">{p.name}</h2>
-              <p className="mt-2">
+              <p className={`flex justify-between gap-4 ${EYEBROW}`}>
+                <span className="tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                <span>{PAYWALL_ENABLED ? p.unit : "Included"}</span>
+              </p>
+              <h2
+                id={`plan-${p.purpose}`}
+                className="mt-6 font-display text-[28px] leading-[1.15] font-normal tracking-[-0.02em] text-ink"
+              >
+                {p.name}
+              </h2>
+              <p className="mt-5 flex items-baseline gap-2">
                 {PAYWALL_ENABLED ? (
                   <>
-                    <span className="text-3xl font-extrabold text-plum">
+                    <span className="font-display text-[52px] leading-none font-normal tracking-[-0.03em] text-ink tabular-nums">
                       ₹{(FEES[p.purpose] / 100).toLocaleString("en-IN")}
                     </span>{" "}
-                    <span className="text-sm font-semibold text-plum-soft">{p.unit}</span>
+                    <span className="text-[14px] font-semibold text-ink-soft">{p.unit}</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-3xl font-extrabold text-plum">Free</span>{" "}
-                    <span className="text-sm font-semibold text-plum-soft">for now</span>
+                    <span className="font-display text-[52px] leading-none font-normal tracking-[-0.03em] text-accent">
+                      Free
+                    </span>{" "}
+                    <span className="text-[14px] font-semibold text-ink-soft">for now</span>
                   </>
                 )}
               </p>
-              <p className="mt-3 text-[15px] leading-relaxed text-plum-soft">{(!PAYWALL_ENABLED && p.freeBody) || p.body}</p>
+              <p className="mt-6 border-t border-ink/15 pt-5 text-[14px] leading-[1.75] text-ink-soft md:mt-auto md:min-h-[70px]">
+                {(!PAYWALL_ENABLED && p.freeBody) || p.body}
+              </p>
             </section>
           ))}
         </div>
 
-        <section className="mt-10">
-          <h2 className="text-lg font-bold text-plum">Always free</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-plum-soft">
+        <section
+          aria-labelledby="always-free"
+          className="mt-14 grid gap-6 border-t border-line pt-10 md:mt-20 md:grid-cols-[1fr_minmax(0,46ch)] md:gap-16 md:pt-14"
+        >
+          <h2
+            id="always-free"
+            className="font-display text-[clamp(30px,3.3vw,45px)] leading-[1.15] font-normal tracking-[-0.03em] text-ink"
+          >
+            Always free
+          </h2>
+          <ul className="text-[15px] leading-relaxed text-ink">
             {FREE.map((f) => (
-              <li key={f}>{f}</li>
+              <li key={f} className="flex gap-4 border-b border-line py-4 first:pt-1">
+                <span aria-hidden="true" className="text-accent">+</span>
+                {f}
+              </li>
             ))}
           </ul>
         </section>
 
         {PAYWALL_ENABLED && (
-          <p className="mt-10 text-[15px] leading-relaxed text-plum-soft">
+          <p className="mt-10 text-[14px] leading-[1.75] text-ink-soft md:ml-auto md:max-w-[46ch]">
             Charged twice, or paid and nothing unlocked? See the{" "}
-            <a href="/refunds" className="underline hover:text-plum">refund policy</a> or{" "}
-            <a href="/contact" className="underline hover:text-plum">contact us</a>.
+            <a href="/refunds" className={LINK}>refund policy</a> or{" "}
+            <a href="/contact" className={LINK}>contact us</a>.
           </p>
         )}
       </main>

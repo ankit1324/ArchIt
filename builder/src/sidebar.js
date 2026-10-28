@@ -21,7 +21,7 @@ function optionsFrom(map, cur){
     <button class="sel-item" data-v="${k}">
       ${v.hex?`<span class="dot" style="background:${v.hex}"></span>`:''}
       <span><span class="nm">${v.name}</span></span>
-      ${k===cur?'<svg style="margin-left:auto;color:#1d5bb4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+      ${k===cur?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
     </button>`).join('');
 }
 function curLabel(map, k){
@@ -31,7 +31,7 @@ function curLabel(map, k){
 function defOptions(map, cur){
   const def = `<button class="sel-item" data-v="_def">
     <span class="dot" style="background:#fff"></span><span><span class="nm">Default</span></span>
-    ${cur==null?'<svg style="margin-left:auto;color:#1d5bb4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+    ${cur==null?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
   </button>`;
   return def + optionsFrom(map, cur);
 }
@@ -88,7 +88,7 @@ function renderPanel(){
     ['interior','Interior', ()=>`
       <div class="f-label">Wall paint (house default)</div>
       ${stdSelect('paint', C.paint, 'paint')}
-      <div class="note"><svg width="14" height="14" style="flex:none" viewBox="0 0 24 24" fill="none" stroke="#8b96ab" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>
+      <div class="note"><svg width="14" height="14" style="flex:none" viewBox="0 0 24 24" fill="none" stroke="#5d665b" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>
       Rooms without their own colour use this paint</div>`],
     ['windows','Windows', ()=>{
       let rows = '';
@@ -105,7 +105,7 @@ function renderPanel(){
         rows += `<button class="itemrow" data-act="seldoor" data-b="${bl.id}" data-d="${d.id}">
           <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3.5" width="12" height="17" rx="1.2"/><circle cx="14.6" cy="12" r="1" fill="currentColor"/></svg></span>
           <span><span class="nm" style="font-size:13px;font-weight:700">${C.doors[d.type].name}</span>
-          <span style="display:block;font-size:11.5px;color:#8b96ab">${escapeMarkup(bl.name||C.rooms[bl.type].name+" "+(i+1))}</span></span></button>`;
+          <span style="display:block;font-size:11.5px;color:#5d665b">${escapeMarkup(bl.name||C.rooms[bl.type].name+" "+(i+1))}</span></span></button>`;
       }));
       return rows + `<button class="addbtn" data-act="opendoors">+ Add door</button>`;
     }],
@@ -113,7 +113,7 @@ function renderPanel(){
       let rows = '';
       state.blocks.forEach((bl,i)=>(bl.furniture||[]).forEach(f=>{
         rows += `<div class="optrow"><span class="nm">${C.furniture[f.key].name}
-          <span style="display:block;font-size:11.5px;color:#8b96ab;font-weight:600">${escapeMarkup(bl.name||C.rooms[bl.type].name+" "+(i+1))}</span></span>
+          <span style="display:block;font-size:11.5px;color:#5d665b;font-weight:600">${escapeMarkup(bl.name||C.rooms[bl.type].name+" "+(i+1))}</span></span>
           <button class="end iconbtn" data-act="delfurn" data-b="${bl.id}" data-f="${f.id}" title="Remove">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg></button></div>`;
       }));
@@ -157,12 +157,12 @@ function renderBlockPanel(b){
     <button class="sel-item" data-v="${k}">
       <span><span class="nm">${v.name}</span>
       <span class="sb">${v.w} × ${v.len} m</span></span>
-      ${k===b.type?'<svg style="margin-left:auto;color:#1d5bb4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+      ${k===b.type?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
     </button>`).join('');
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5 12 11l8-4.5M12 11v9"/></svg></span>
-      <div><h2>${escapeMarkup(b.name || spec.name+' '+i)}</h2><div class="pr" style="color:#8b96ab">${round1(b.w*b.len)} m²</div></div>
+      <div><h2>${escapeMarkup(b.name || spec.name+' '+i)}</h2><div class="pr" style="color:#5d665b">${round1(b.w*b.len)} m²</div></div>
       <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
@@ -203,18 +203,18 @@ function renderDoorPanel(b, d){
     .map(([k,v])=>`
     <button class="sel-item" data-v="${k}">
       <span><span class="nm">${v.name}</span><span class="sb">${v.grp==='EXTERIOR DOORS'?'exterior':'interior'}</span></span>
-      ${k===d.type?'<svg style="margin-left:auto;color:#1d5bb4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+      ${k===d.type?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
     </button>`).join('');
   const colorMap = {blue:{name:'Blue',hex:'#2e5296'}, white:{name:'White',hex:'#f2f4f7'}, gray:{name:'Gray',hex:'#c6cbd3'}};
   const colorOpts = Object.entries(colorMap).map(([k,v])=>`
     <button class="sel-item" data-v="${k}"><span class="dot" style="background:${v.hex}"></span>
       <span><span class="nm">${v.name}</span></span>
-      ${k===d.color?'<svg style="margin-left:auto;color:#1d5bb4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+      ${k===d.color?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
     </button>`).join('');
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3.5" width="12" height="17" rx="1.2"/><circle cx="14.6" cy="12" r="1" fill="currentColor"/></svg></span>
-      <div><h2>Door ${idx}</h2><div class="pr" style="color:#8b96ab">${Math.round(d.w*100)} × ${Math.round(d.h*100)} cm</div></div>
+      <div><h2>Door ${idx}</h2><div class="pr" style="color:#5d665b">${Math.round(d.w*100)} × ${Math.round(d.h*100)} cm</div></div>
       <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
@@ -230,7 +230,7 @@ function renderDoorPanel(b, d){
       <button class="collapse" data-act="flipdoor" style="margin-top:0">Flip hinge</button>
       <button class="collapse" data-act="swingdoor" style="margin-top:0">Swing ${d.out?'in':'out'}</button>
     </div>
-    <button class="collapse" data-act="deldoor" style="color:#e5476f;border-color:#f3c8d4">
+    <button class="collapse" data-act="deldoor" style="color:#ad4a31;border-color:#dcb3a6">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg> Remove door
     </button>
     <button class="collapse" data-act="close">
@@ -246,18 +246,18 @@ function renderWinPanel(b, w){
   const cur = w.kind||'std';
   const kindOpts = Object.entries(kinds).map(([k,v])=>`
     <button class="sel-item" data-v="${k}"><span><span class="nm">${v.name}</span></span>
-      ${k===cur?'<svg style="margin-left:auto;color:#1d5bb4" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+      ${k===cur?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
     </button>`).join('');
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 4v16M4 12h16"/></svg></span>
-      <div><h2>Window</h2><div class="pr" style="color:#8b96ab">${cur==='pano'?'2.2 m · full height':'1.3 × 1.06 m'}</div></div>
+      <div><h2>Window</h2><div class="pr" style="color:#5d665b">${cur==='pano'?'2.2 m · full height':'1.3 × 1.06 m'}</div></div>
       <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Type</div>
     ${selectHTML('wkind', kindOpts, `<span>${kinds[cur].name}</span>`)}
-    <button class="collapse" data-act="delwin" data-b="${b.id}" data-w="${w.id}" style="color:#e5476f;border-color:#f3c8d4;margin-top:14px">
+    <button class="collapse" data-act="delwin" data-b="${b.id}" data-w="${w.id}" style="color:#ad4a31;border-color:#dcb3a6;margin-top:14px">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg> Remove window
     </button>
     <button class="collapse" data-act="close">
@@ -272,12 +272,12 @@ function renderFurnPanel(b, f){
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6"/><path d="M4 11V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M6 18v2M18 18v2"/></svg></span>
-      <div><h2>${s.name}</h2><div class="pr" style="color:#8b96ab">${s.w} × ${s.d} × ${s.h} m</div></div>
+      <div><h2>${s.name}</h2><div class="pr" style="color:#5d665b">${s.w} × ${s.d} × ${s.h} m</div></div>
       <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="note">Drag it in the 3D or 2D view to move it inside the room. Use the chips above it to duplicate, rotate or delete.</div>
-    <button class="collapse" data-act="delfurn" data-b="${b.id}" data-f="${f.id}" style="color:#e5476f;border-color:#f3c8d4">
+    <button class="collapse" data-act="delfurn" data-b="${b.id}" data-f="${f.id}" style="color:#ad4a31;border-color:#dcb3a6">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg> Remove
     </button>
     <button class="collapse" data-act="close">

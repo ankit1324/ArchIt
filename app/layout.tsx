@@ -7,15 +7,26 @@ import "./globals.css";
 
 // Self-hosted rather than next/font/google: a build that has to reach Google
 // Fonts is a build that can fail offline. See assets/fonts/README.md.
-// One variable file replaces the 400–800 static cuts this used to request.
-// preload: false — the landing page sets its own type (Fraunces/Manrope) and
-// never paints Jakarta, so a root-level preload was 27KB of wasted bandwidth on
-// the most-visited page. App and legal pages still get it via the CSS below.
-const jakarta = localFont({
-  src: "../assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2",
-  weight: "200 800", // the file's own wght range; 400–800 is what we actually use
+// The suite's type, from the landing page: Manrope for text, Fraunces for
+// display headings (class `font-display`, see globals.css). Both are variable
+// files, so one request per family covers every weight.
+const manrope = localFont({
+  src: "../assets/fonts/manrope-latin-wght-normal.woff2",
+  weight: "200 800",
   style: "normal",
-  variable: "--font-jakarta",
+  variable: "--font-manrope",
+});
+
+// preload: false. Most pages paint a Fraunces heading, but not every one does,
+// and the italic cut is only used for emphasis; adjustFontFallback keeps the
+// swap from shifting layout.
+const fraunces = localFont({
+  src: [
+    { path: "../assets/fonts/fraunces-latin-wght-normal.woff2", weight: "100 900", style: "normal" },
+    { path: "../assets/fonts/fraunces-latin-wght-italic.woff2", weight: "100 900", style: "italic" },
+  ],
+  variable: "--font-fraunces",
+  adjustFontFallback: "Times New Roman",
   preload: false,
 });
 
@@ -51,7 +62,7 @@ export const metadata: Metadata = {
 // viewport-fit=cover lets env(safe-area-inset-*) report the notch / home
 // indicator insets that /find's bottom sheet and the dashboard tab bar pad by
 export const viewport: Viewport = {
-  themeColor: "#f5f1ea", // --color-cream
+  themeColor: "#f8f7f2", // --color-paper
   viewportFit: "cover",
 };
 
@@ -64,7 +75,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="h-full">
         {children}
         {/* Both report for signed-out landing traffic too. Their scripts and

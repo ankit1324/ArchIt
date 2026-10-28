@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { FEES } from "@/lib/fees";
@@ -15,6 +16,44 @@ export const metadata: Metadata = {
   description: "The terms that govern your use of ArchIt.",
 };
 
+// Shared shape of the three legal pages: a sticky index of the policies beside
+// a ~68ch reading column. Restyle only; the policy wording below is unchanged.
+const EYEBROW =
+  "flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
+const LINK =
+  "rounded-[2px] text-accent underline underline-offset-4 hover:text-accent-deep focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const LEGAL_DOCS: Array<{ href: string; label: string }> = [
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/terms", label: "Terms & Conditions" },
+  { href: "/refunds", label: "Refunds & Cancellation" },
+  { href: "/contact", label: "Contact" },
+];
+
+function LegalNav({ current }: { current: string }) {
+  return (
+    <nav aria-label="Legal documents" className="hidden self-start lg:sticky lg:top-8 lg:block">
+      <p className={EYEBROW}>Policies</p>
+      <ul className="mt-4 border-t border-line text-[14px]">
+        {LEGAL_DOCS.map((d) => (
+          <li key={d.href} className="border-b border-line">
+            <Link
+              href={d.href}
+              prefetch={false}
+              aria-current={d.href === current ? "page" : undefined}
+              className="group flex min-h-11 items-center justify-between gap-3 py-2 text-ink-soft transition-colors hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+            >
+              {d.label}
+              <span aria-hidden="true" className="text-accent opacity-0 transition-opacity group-hover:opacity-100 group-aria-[current=page]:opacity-100">
+                &rarr;
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 // Every business detail comes from lib/business.ts. Until a value is filled
 // in there, the sentence that needs it is omitted or reworded neutrally, so the
 // page never shows a raw "[PLACEHOLDER]".
@@ -26,7 +65,7 @@ function SupportEmail() {
   return (
     <a
       href={`mailto:${BUSINESS.supportEmail}`}
-      className="font-semibold text-plum underline hover:text-plum"
+      className={`font-semibold ${LINK}`}
     >
       {BUSINESS.supportEmail}
     </a>
@@ -35,7 +74,7 @@ function SupportEmail() {
 
 function ContactPage() {
   return (
-    <a href="/contact" className="underline hover:text-plum">
+    <a href="/contact" className={LINK}>
       Contact page
     </a>
   );
@@ -43,32 +82,39 @@ function ContactPage() {
 
 export default function TermsPage() {
   return (
-    <div className="h-full overflow-y-auto bg-cream text-plum">
+    <div className="flex min-h-full flex-col bg-paper text-ink">
       <Navbar />
-      <main className="mx-auto max-w-3xl px-6 py-14">
-        <h1 className="text-3xl font-extrabold tracking-wide text-plum">
+      <main id="main-content" className="mx-auto w-full max-w-[1400px] px-[clamp(20px,5.5vw,84px)] pb-20 md:pb-28">
+        <header className="border-b border-line pt-12 pb-10 md:pt-20 md:pb-14">
+          <p className={EYEBROW}>
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> Legal
+          </p>
+        <h1 className="mt-5 max-w-[16ch] font-display text-[clamp(40px,5.6vw,72px)] leading-[1.05] font-normal tracking-[-0.035em] text-ink">
           Terms &amp; Conditions
         </h1>
-        <p className="mt-2 text-sm text-plum-soft">
+        <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft tabular-nums">
           Last updated: {BUSINESS.lastUpdated}
         </p>
+        </header>
 
-        <div className="mt-8 space-y-8 text-[15px] leading-relaxed text-plum-soft">
+        <div className="grid gap-10 pt-10 md:pt-14 lg:grid-cols-[200px_minmax(0,68ch)] lg:gap-[clamp(48px,7vw,112px)]">
+          <LegalNav current="/terms" />
+        <article className="max-w-[68ch] space-y-8 text-[15px] leading-[1.8] text-ink-soft md:text-[16px] [&>p:first-child]:text-[17px] [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-ink [&>section]:border-t [&>section]:border-line [&>section]:pt-8">
           <p>
             These Terms &amp; Conditions (&ldquo;Terms&rdquo;) form a legally
             binding agreement between you and{" "}
-            <strong className="text-plum">{legalEntityName}</strong>{" "}
+            <strong className="font-semibold text-ink">{legalEntityName}</strong>{" "}
             (&ldquo;ArchIt&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;)
             {address && (
               <>
                 , a company/entity registered in India with its registered
-                office at <strong className="text-plum">{address}</strong>
+                office at <strong className="font-semibold text-ink">{address}</strong>
               </>
             )}
             {gstin && (
               <>
                 {" "}
-                (GSTIN: <strong className="text-plum">{gstin}</strong>)
+                (GSTIN: <strong className="font-semibold text-ink">{gstin}</strong>)
               </>
             )}
             , governing your access to and use of ArchIt&rsquo;s 3D map,
@@ -78,7 +124,7 @@ export default function TermsPage() {
           </p>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">1. Eligibility</h2>
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">1. Eligibility</h2>
             <p className="mt-3">
               You must be at least 18 years old and capable of entering into
               a binding contract under the Indian Contract Act, 1872 to use
@@ -88,7 +134,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               2. Accounts &amp; Authentication
             </h2>
             <p className="mt-3">
@@ -110,7 +156,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               3. User-Generated Content
             </h2>
             <p className="mt-3">
@@ -128,7 +174,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               4. Paid Features &amp; Payments
             </h2>
             <p className="mt-3">
@@ -141,24 +187,24 @@ export default function TermsPage() {
                 and no payment is taken while that is the case.
               </p>
             )}
-            <ul className="mt-3 list-disc space-y-2 pl-5">
+            <ul className="mt-4 list-disc space-y-2.5 pl-5 marker:text-accent">
               <li>
-                <strong className="text-plum">Contact Unlock</strong> — ₹
+                <strong className="font-semibold text-ink">Contact Unlock</strong> — ₹
                 {FEES.contact_owner / 100} to reveal a listing owner&rsquo;s
                 contact details.
               </li>
               <li>
-                <strong className="text-plum">Featured Listing</strong> — ₹
+                <strong className="font-semibold text-ink">Featured Listing</strong> — ₹
                 {FEES.featured_property / 100} to boost and highlight a
                 single listing on the map for a limited period.
               </li>
               <li>
-                <strong className="text-plum">Builder Unlock</strong> — ₹
+                <strong className="font-semibold text-ink">Builder Unlock</strong> — ₹
                 {FEES.builder_unlock / 100} one-time, per-account access to
                 the full house-design/builder suite.
               </li>
               <li>
-                <strong className="text-plum">Template Unlock</strong> — ₹
+                <strong className="font-semibold text-ink">Template Unlock</strong> — ₹
                 {FEES.template_unlock / 100} one-time, per template, for each
                 premium floor-plan layout in the builder. Indian house layouts
                 are free. Template unlocks are sold separately from the
@@ -170,7 +216,7 @@ export default function TermsPage() {
               of applicable taxes unless stated otherwise. Payments are made
               directly from your UPI app to our account; we never store your
               card, UPI PIN, or bank details. See our{" "}
-              <a href="/refunds" className="underline hover:text-plum">
+              <a href="/refunds" className={LINK}>
                 Refund &amp; Cancellation Policy
               </a>{" "}
               for eligibility for refunds.
@@ -178,11 +224,11 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               5. Acceptable Use
             </h2>
             <p className="mt-3">You agree not to:</p>
-            <ul className="mt-3 list-disc space-y-2 pl-5">
+            <ul className="mt-4 list-disc space-y-2.5 pl-5 marker:text-accent">
               <li>
                 Post listings for properties you do not own, represent, or
                 have authority to list;
@@ -206,13 +252,13 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               6. Intellectual Property
             </h2>
             <p className="mt-3">
               The ArchIt name, logo, software, map rendering, and design
               tools are the property of{" "}
-              <strong className="text-plum">{legalEntityName}</strong> and
+              <strong className="font-semibold text-ink">{legalEntityName}</strong> and
               are protected by applicable intellectual property laws. Except
               for your own User Content, nothing in these Terms grants you
               any right to use our trademarks, branding, or proprietary
@@ -221,7 +267,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               7. Third-Party Services
             </h2>
             <p className="mt-3">
@@ -235,7 +281,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               8. Disclaimers &amp; Limitation of Liability
             </h2>
             <p className="mt-3">
@@ -251,7 +297,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               9. Suspension &amp; Termination
             </h2>
             <p className="mt-3">
@@ -271,7 +317,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               10. Governing Law &amp; Jurisdiction
             </h2>
             <p className="mt-3">
@@ -281,7 +327,7 @@ export default function TermsPage() {
               {jurisdictionCity ? (
                 <>
                   {" "}
-                  at <strong className="text-plum">{jurisdictionCity}</strong>,
+                  at <strong className="font-semibold text-ink">{jurisdictionCity}</strong>,
                   India
                 </>
               ) : (
@@ -292,7 +338,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">
               11. Changes to These Terms
             </h2>
             <p className="mt-3">
@@ -305,7 +351,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-plum">12. Contact Us</h2>
+            <h2 className="font-display text-[24px] leading-tight font-normal tracking-[-0.015em] text-ink md:text-[27px]">12. Contact Us</h2>
             <p className="mt-3">
               Questions about these Terms can be directed to{" "}
               {hasSupportEmail ? (
@@ -320,6 +366,7 @@ export default function TermsPage() {
               .
             </p>
           </section>
+        </article>
         </div>
       </main>
       <Footer />

@@ -130,7 +130,7 @@ function openToolPop(tool){
       <button class="itemrow" data-add-room="${k}">
         <span class="ic">${ICONS.gen}</span>
         <span><span class="nm">${v.name}</span>
-        <span style="display:block;font-size:11.5px;color:#8b96ab">${v.w} × ${v.len} m</span></span>
+        <span style="display:block;font-size:11.5px;color:#5d665b">${v.w} × ${v.len} m</span></span>
       </button>`).join('');
   } else if(tool==='doors'){
     const groups = {};

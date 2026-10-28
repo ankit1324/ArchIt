@@ -119,6 +119,6 @@ export default function MarketingLanding() {
 
       <section className={styles.finale}><p className={styles.eyebrow}>There is room for your idea.</p><h2>Let’s make a start.</h2><StartButton cta="finale">Plan your home</StartButton><p>Start small. Save your progress. Make it yours.</p></section>
     </main>
-    <footer className={styles.footer}><span>ArchIt. <span>A place for your next idea.</span></span><nav aria-label="Footer navigation"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><a href="https://archit-lit.chaudharyankit.in/" target="_blank" rel="noreferrer">Explore ArchIt Lite ↗</a></nav></footer>
+    <footer className={styles.footer}><span>ArchIt. <span>A place for your next idea.</span></span><nav aria-label="Footer navigation"><Link href="/pricing">Pricing</Link><Link href="/contact">Contact</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><a href="https://archit-lit.chaudharyankit.in/" target="_blank" rel="noreferrer">Explore ArchIt Lite ↗</a></nav></footer>
   </div>;
 }

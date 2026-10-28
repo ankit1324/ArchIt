@@ -40,12 +40,12 @@ export default function SearchBar({ value, onChange, onSearch, onShowResults, re
   };
 
   return (
-    <form onSubmit={submit} role="search" className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full bg-cream px-3 py-2 shadow-sm ring-1 ring-plum/10 focus-within:ring-2 focus-within:ring-plum/50">
-      <SearchIcon width={18} height={18} className="shrink-0 text-plum" />
-      <input ref={input} value={value} onChange={(e) => change(e.target.value)} placeholder="City, address or property name" aria-label="Search properties or places" className="min-w-0 flex-1 bg-transparent py-1 text-[13px] font-semibold text-plum outline-none placeholder:font-medium placeholder:text-plum-soft" />
-      {value && <button type="button" onClick={() => { change(""); input.current?.focus(); }} aria-label="Clear search" className="rounded-full p-2 text-plum-soft hover:bg-plum/5"><CloseIcon width={14} height={14} /></button>}
-      <button type="submit" disabled={!value.trim() || status === "searching"} aria-label={resultCount ? "Show matching properties on map" : "Search for a place on map"} className="rounded-full bg-plum px-3 py-2 text-[11px] font-bold text-cream disabled:opacity-50">{status === "searching" ? "Finding…" : "Search"}</button>
-      {value.trim() && resultCount === 0 && status !== "idle" && status !== "searching" && <p role="status" className="absolute inset-x-0 top-full z-30 mt-2 rounded-2xl bg-cream p-3 text-xs text-plum shadow-lg">{status === "found" ? "Place found on the map. No listings match this search and your filters." : status === "notfound" ? "No place found. Try a city or a more specific address." : "Place search is unavailable. Please try again."}</p>}
+    <form onSubmit={submit} role="search" className="relative flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper/95 py-1 pr-1 pl-4 text-ink shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] transition-colors focus-within:border-ink has-[input:focus-visible]:outline-3 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-accent">
+      <SearchIcon width={18} height={18} className="shrink-0 text-ink-soft" aria-hidden="true" />
+      <input ref={input} value={value} onChange={(e) => change(e.target.value)} placeholder="City, address or property name" aria-label="Search properties or places" className="min-w-0 flex-1 bg-transparent py-1.5 text-[14px] font-medium text-ink outline-none placeholder:text-ink-soft focus-visible:outline-none" />
+      {value && <button type="button" onClick={() => { change(""); input.current?.focus(); }} aria-label="Clear search" className="grid size-9 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-paper-soft hover:text-ink"><CloseIcon width={14} height={14} /></button>}
+      <button type="submit" disabled={!value.trim() || status === "searching"} aria-label={resultCount ? "Show matching properties on map" : "Search for a place on map"} className="min-h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-semibold text-paper transition-colors hover:bg-forest disabled:opacity-45">{status === "searching" ? "Finding…" : "Search"}</button>
+      {value.trim() && resultCount === 0 && status !== "idle" && status !== "searching" && <p role="status" className={`absolute inset-x-0 top-full z-30 mt-2 rounded-md border border-line bg-paper px-4 py-3 text-[14px] leading-relaxed shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] ${status === "error" ? "text-accent" : "text-ink"}`}>{status === "found" ? "Place found on the map. No listings match this search and your filters." : status === "notfound" ? "No place found. Try a city or a more specific address." : "Place search is unavailable. Please try again."}</p>}
     </form>
   );
 }

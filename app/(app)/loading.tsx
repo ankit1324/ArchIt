@@ -9,10 +9,13 @@ export default function Loading() {
     // the spin for users who asked the OS for less motion.
     <div
       role="status"
-      aria-label="Loading"
-      className="flex h-full min-h-screen items-center justify-center bg-cream"
+      className="flex min-h-full flex-col items-center justify-center gap-4 bg-paper text-ink-soft"
     >
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-plum/20 border-t-plum motion-reduce:animate-none" />
+      <div
+        aria-hidden="true"
+        className="size-7 animate-spin rounded-full border-2 border-line border-t-accent motion-reduce:animate-none"
+      />
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em]">Loading</p>
     </div>
   );
 }

@@ -14,6 +14,13 @@ import { contactLinks } from "@/lib/contact-links";
 import { safeImageUrl, thumbnailUrl } from "@/lib/url";
 import { CloseIcon } from "./icons";
 
+const focusRing =
+  "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const primaryBtn = `${focusRing} min-h-11 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep disabled:opacity-50`;
+const secondaryBtn = `${focusRing} min-h-11 rounded-[5px] border border-line-strong bg-paper px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-ink disabled:opacity-50`;
+const eyebrow = "text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft";
+const inset = "rounded-[5px] border border-line bg-paper-soft";
+
 interface PropertyDetailPanelProps {
   listing: Listing;
   onClose: () => void;
@@ -84,7 +91,7 @@ export function ReportListing({ listingId }: { listingId: string }) {
 
   if (state === "sent") {
     return (
-      <p role="status" className="text-center text-[12px] font-semibold text-plum-soft">
+      <p role="status" className="text-center text-[14px] font-semibold text-ink-soft">
         Thanks — we&rsquo;ll review this listing.
       </p>
     );
@@ -94,7 +101,7 @@ export function ReportListing({ listingId }: { listingId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-center text-[12px] font-semibold text-plum-soft underline-offset-2 hover:text-plum hover:underline"
+        className={`${focusRing} inline-flex min-h-6 items-center self-center rounded-[3px] text-[13px] font-semibold text-ink-soft underline-offset-4 hover:text-ink hover:underline`}
       >
         Report listing
       </button>
@@ -129,13 +136,13 @@ export function ReportListing({ listingId }: { listingId: string }) {
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2 rounded-2xl bg-white/55 p-3">
-      <label className="text-[11px] font-bold uppercase tracking-wide text-plum-soft">
+    <form onSubmit={submit} className={`${inset} flex flex-col gap-2 p-3`}>
+      <label className={eyebrow}>
         What&rsquo;s wrong?
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value as ReportReason)}
-          className="mt-1 w-full rounded-xl bg-white px-2 py-1.5 text-[13px] font-semibold normal-case tracking-normal text-plum"
+          className={`${focusRing} mt-1 w-full rounded-[5px] border border-line-strong bg-paper px-2 py-2 text-[14px] font-semibold normal-case tracking-normal text-ink`}
         >
           {(Object.keys(REPORT_REASONS) as ReportReason[]).map((r) => (
             <option key={r} value={r}>
@@ -152,10 +159,10 @@ export function ReportListing({ listingId }: { listingId: string }) {
         required={reason === "other"}
         placeholder={reason === "other" ? "Tell us what's wrong" : "Details (optional)"}
         aria-label="Report details"
-        className="rounded-xl bg-white px-2 py-1.5 text-[13px] text-plum"
+        className={`${focusRing} rounded-[5px] border border-line-strong bg-paper px-2 py-1.5 text-[14px] text-ink placeholder:text-ink-soft`}
       />
       {error && (
-        <p role="alert" className="text-[12px] font-semibold text-coral">
+        <p role="alert" className="text-[14px] font-semibold text-accent">
           {error}
         </p>
       )}
@@ -163,14 +170,14 @@ export function ReportListing({ listingId }: { listingId: string }) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="flex-1 rounded-full bg-plum/10 py-2 text-[12px] font-bold text-plum"
+          className={`${secondaryBtn} flex-1`}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={state === "sending"}
-          className="flex-1 rounded-full bg-coral py-2 text-[12px] font-bold text-white disabled:opacity-50"
+          className={`${primaryBtn} flex-1 px-3`}
         >
           {state === "sending" ? "Sending…" : "Send report"}
         </button>
@@ -189,11 +196,9 @@ function OwnerContact({ listing }: { listing: Listing }) {
   const name = listing.buildingName || listing.address;
   const links = contactLinks(contact, `Hi, I saw your listing “${name}” on ArchIt.`);
   return (
-    <div className="rounded-2xl bg-white/55 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-plum-soft">
-        Owner contact
-      </div>
-      <div className="break-words text-[13px] font-bold text-plum">{contact}</div>
+    <div className={`${inset} px-3 py-2`}>
+      <div className={eyebrow}>Owner contact</div>
+      <div className="break-words text-[14px] font-semibold text-ink">{contact}</div>
       {links.length > 0 && (
         <div className="mt-2 flex gap-1.5">
           {links.map((l) => (
@@ -204,12 +209,13 @@ function OwnerContact({ listing }: { listing: Listing }) {
               // hand off to the OS and must not leave a blank tab behind
               {...(l.kind === "whatsapp" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
               aria-label={`${l.label} ${l.display}`}
-              className={`flex-1 rounded-full py-2 text-center text-[12px] font-bold transition-opacity hover:opacity-90 ${
+              className={`${focusRing} flex min-h-11 flex-1 items-center justify-center rounded-[5px] px-2 text-center text-[13px] font-semibold transition-colors ${
                 l.kind === "call"
-                  ? "bg-plum text-cream"
+                  ? "bg-forest text-paper hover:bg-ink"
                   : l.kind === "whatsapp"
-                    ? "bg-[#1f7a4d] text-white"
-                    : "bg-plum/10 text-plum"
+                    ? // WhatsApp's own green: users look for it; paper on it is 4.9:1
+                      "bg-[#1f7a4d] text-paper hover:bg-[#19633f]"
+                    : "border border-line-strong bg-paper text-ink hover:border-ink"
               }`}
             >
               {l.label}
@@ -221,13 +227,11 @@ function OwnerContact({ listing }: { listing: Listing }) {
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <div className="rounded-2xl bg-white/55 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-plum-soft">
-        {label}
-      </div>
-      <div className="truncate text-[13px] font-bold text-plum">{value}</div>
+    <div className={`min-w-0 bg-paper-soft px-3 py-2 ${wide ? "col-span-2" : ""}`}>
+      <div className={eyebrow}>{label}</div>
+      <div className="truncate text-[14px] font-semibold tabular-nums text-ink">{value}</div>
     </div>
   );
 }
@@ -312,13 +316,13 @@ export default function PropertyDetailPanel({
   const showUnlock =
     PAYWALL_ENABLED && !!userId && !canManage && !listing.owner && listing.hasOwner === true;
   return (
-    <section className="glass no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-3xl p-4">
+    <section className="no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-3 overflow-y-auto rounded-md border border-line bg-paper/95 p-4 text-ink shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] backdrop-blur">
       <header className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-[15px] font-bold leading-snug text-plum">
+        <div className="min-w-0">
+          <h3 className="font-display text-[20px] font-normal leading-tight tracking-[-0.02em] text-ink">
             {listing.buildingName || listing.address}
           </h3>
-          <p className="text-[12px] font-medium text-plum-soft">
+          <p className="mt-0.5 text-[14px] text-ink-soft">
             {listing.buildingName ? `${listing.address}, ` : ""}
             {listing.city}
           </p>
@@ -326,14 +330,14 @@ export default function PropertyDetailPanel({
         <button
           onClick={onClose}
           aria-label="Close property details"
-          className="shrink-0 rounded-full p-1 text-plum-soft transition-colors hover:bg-plum/5 hover:text-plum"
+          className={`${focusRing} grid size-8 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink`}
         >
           <CloseIcon width={14} height={14} />
         </button>
       </header>
 
       {designId && (
-        <div role="tablist" aria-label="Listing view" className="grid grid-cols-2 gap-1 rounded-full bg-plum/5 p-1">
+        <div role="tablist" aria-label="Listing view" className="grid grid-cols-2 gap-1 rounded-full border border-line bg-paper-soft p-1">
           {(["photos", "3d"] as const).map((v) => (
             <button
               key={v}
@@ -341,8 +345,8 @@ export default function PropertyDetailPanel({
               role="tab"
               aria-selected={view === v}
               onClick={() => setView(v)}
-              className={`rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${
-                view === v ? "bg-plum text-cream" : "text-plum hover:bg-white/70"
+              className={`${focusRing} min-h-9 rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                view === v ? "bg-ink text-paper" : "text-ink hover:bg-paper"
               }`}
             >
               {v === "photos" ? "Photos" : "3D design"}
@@ -352,7 +356,7 @@ export default function PropertyDetailPanel({
       )}
 
       {canManage && listing.designId && listing.designPublished === false && (
-        <p className="rounded-2xl bg-coral/10 px-3 py-2 text-[11.5px] font-semibold text-plum">
+        <p className="rounded-[5px] border border-accent/30 bg-accent/10 px-3 py-2 text-[14px] leading-snug text-ink">
           The attached 3D design is unpublished, so visitors don&rsquo;t see it. Publish it in the
           Designer to show it again.
         </p>
@@ -360,7 +364,7 @@ export default function PropertyDetailPanel({
 
       {designId && view === "3d" ? (
         <div className="flex flex-col gap-2">
-          <div className="relative grid h-[140px] place-items-center overflow-hidden rounded-2xl bg-white/55 ring-2 ring-violet-500">
+          <div className={`${inset} relative grid h-[140px] place-items-center overflow-hidden`}>
             {designSnapshot ? (
               <Image
                 src={designSnapshot}
@@ -370,19 +374,19 @@ export default function PropertyDetailPanel({
                 className="object-cover"
               />
             ) : (
-              <span className="text-[13px] font-bold text-violet-700">3D</span>
+              <span className="font-display text-[20px] text-ink-soft">3D</span>
             )}
           </div>
           <button
             type="button"
             onClick={() => onOpen3D?.(designId)}
-            className="rounded-full bg-violet-600 py-2 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
+            className={`${focusRing} min-h-11 rounded-[5px] bg-forest px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-ink`}
           >
-            Open 3D
+            Open 3D <span aria-hidden="true">↗</span>
           </button>
         </div>
       ) : photo ? (
-        <div className="relative h-[140px] overflow-hidden rounded-2xl">
+        <div className="relative h-[140px] overflow-hidden rounded-[5px] border border-line">
           <Image
             src={photo}
             unoptimized={!!thumb}
@@ -393,7 +397,7 @@ export default function PropertyDetailPanel({
           />
         </div>
       ) : designId ? (
-        <p className="rounded-2xl bg-white/55 px-3 py-6 text-center text-[12px] font-medium text-plum-soft">
+        <p className={`${inset} px-3 py-6 text-center text-[14px] text-ink-soft`}>
           No photos yet
         </p>
       ) : null}
@@ -401,8 +405,10 @@ export default function PropertyDetailPanel({
       {canManage && listing.status && (
         <p
           role="status"
-          className={`rounded-2xl px-3 py-2 text-[12px] font-semibold ${
-            listing.status === "pending" ? "bg-lime/60 text-plum" : "bg-coral/15 text-plum"
+          className={`rounded-[5px] border px-3 py-2 text-[14px] leading-snug text-ink ${
+            listing.status === "pending"
+              ? "border-highlight-deep bg-highlight"
+              : "border-accent/30 bg-accent/10"
           }`}
         >
           {listing.status === "pending"
@@ -411,24 +417,26 @@ export default function PropertyDetailPanel({
         </p>
       )}
 
+      {/* category fills match the map prisms and PropertyCard: sale is
+          highlight, rent is clay, showcase is mist, all with ink text */}
       {showcase ? (
         <div className="flex items-center gap-2">
-          <span className="bg-violet-600 px-1.5 py-0.5 text-[14px] font-extrabold text-white">
+          <span className="rounded-[3px] bg-mist px-1.5 py-0.5 text-[14px] font-bold text-ink">
             Showcase · not for sale/rent
           </span>
         </div>
       ) : (
         <div className="flex items-center gap-2">
           <span
-            className={`px-1.5 py-0.5 text-[16px] font-extrabold ${
-              sale ? "bg-lime text-plum" : "bg-magenta text-white"
+            className={`rounded-[3px] px-1.5 py-0.5 text-[18px] font-bold tabular-nums text-ink ${
+              sale ? "bg-highlight" : "bg-clay"
             }`}
           >
             {formatPrice(listing)}
           </span>
           <span
-            className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-              sale ? "bg-lime text-plum" : "bg-magenta text-white"
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold text-ink ${
+              sale ? "bg-highlight" : "bg-clay"
             }`}
           >
             {sale ? "For Sale" : "For Rent"}
@@ -436,7 +444,8 @@ export default function PropertyDetailPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-1.5">
+      {/* a spec sheet: hairlines between cells come from the 1px gap */}
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[5px] border border-line bg-line">
         <Fact label="Type" value={listing.kind} />
         <Fact label="Beds" value={String(listing.beds)} />
         <Fact label="Baths" value={String(listing.baths)} />
@@ -446,6 +455,7 @@ export default function PropertyDetailPanel({
         <Fact
           label="Location"
           value={`${listing.coords[1].toFixed(4)}, ${listing.coords[0].toFixed(4)}`}
+          wide
         />
       </div>
 
@@ -457,7 +467,7 @@ export default function PropertyDetailPanel({
           href={`/property/${listing.id}`}
           target="_blank"
           rel="noopener"
-          className="text-center text-[12px] font-semibold text-plum-soft underline underline-offset-4 hover:text-plum"
+          className={`${focusRing} inline-flex min-h-6 items-center self-center rounded-[3px] text-[13px] font-semibold text-accent underline underline-offset-4 hover:text-accent-deep`}
         >
           Open shareable listing page ↗
         </a>
@@ -467,7 +477,7 @@ export default function PropertyDetailPanel({
         <button
           onClick={unlockOwner}
           disabled={unlocking}
-          className="rounded-full bg-magenta py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className={primaryBtn}
         >
           {unlocking
             ? "Opening payment…"
@@ -479,14 +489,14 @@ export default function PropertyDetailPanel({
       <div className="mt-1 flex gap-2">
         <button
           onClick={onEdit}
-          className="flex-1 rounded-full bg-plum py-2.5 text-[13px] font-bold text-cream transition-opacity hover:opacity-90"
+          className={`${primaryBtn} flex-1`}
         >
           Edit
         </button>
         <button
           onClick={onDelete}
           disabled={deleting}
-          className="flex-1 rounded-full bg-coral py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className={`${secondaryBtn} flex-1 text-accent hover:border-accent`}
         >
           {deleting ? "Deleting…" : "Delete"}
         </button>

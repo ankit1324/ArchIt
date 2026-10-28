@@ -27,8 +27,12 @@ export default function MapControls({
   layer,
   onLayerChange,
 }: MapControlsProps) {
+  // floating map controls: paper pills with a hairline, the one shadow the
+  // planner language allows (they sit over imagery)
   const btn =
-    "grid h-9 w-9 place-items-center text-plum transition-colors hover:bg-plum/5";
+    "grid h-10 w-10 place-items-center text-ink transition-colors hover:bg-paper-soft focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-accent";
+  const surface =
+    "border border-line bg-paper/95 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)]";
   return (
     <div className="flex flex-col items-end gap-2">
       {/* a compact row above the zoom stack, so the column stays short enough
@@ -37,7 +41,7 @@ export default function MapControls({
         <div
           role="radiogroup"
           aria-label="Map layers"
-          className="glass flex items-stretch gap-0.5 overflow-hidden rounded-full p-1"
+          className={`${surface} flex items-stretch gap-0.5 rounded-full p-1`}
         >
           {LAYERS.map((l) => {
             const on = layer === l.value;
@@ -49,8 +53,8 @@ export default function MapControls({
                 aria-checked={on}
                 title={l.title}
                 onClick={() => onLayerChange(l.value)}
-                className={`min-h-7 rounded-full px-2.5 text-[11px] font-bold transition-colors ${
-                  on ? "bg-plum text-cream" : "text-plum hover:bg-plum/5"
+                className={`min-h-8 rounded-full px-3 text-[12px] font-semibold transition-colors focus-visible:outline-3 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+                  on ? "bg-ink text-paper" : "text-ink hover:bg-paper-soft"
                 }`}
               >
                 {l.label}
@@ -59,15 +63,16 @@ export default function MapControls({
           })}
         </div>
       )}
-      <div className="glass flex flex-col items-stretch divide-y divide-plum/8 overflow-hidden rounded-2xl">
-        <button className={btn} onClick={onZoomIn} aria-label="Zoom in">
+      <div className={`${surface} flex flex-col items-stretch divide-y divide-line overflow-hidden rounded-full`}>
+        <button type="button" className={btn} onClick={onZoomIn} aria-label="Zoom in">
           <PlusIcon width={16} height={16} />
         </button>
-        <button className={btn} onClick={onZoomOut} aria-label="Zoom out">
+        <button type="button" className={btn} onClick={onZoomOut} aria-label="Zoom out">
           <MinusIcon width={16} height={16} />
         </button>
         <button
-          className={`${btn} text-[12px] font-bold`}
+          type="button"
+          className={`${btn} text-[12px] font-bold tracking-[0.04em]`}
           onClick={onToggleDimension}
           aria-label="Toggle 2D / 3D view"
         >

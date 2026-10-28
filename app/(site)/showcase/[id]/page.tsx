@@ -49,22 +49,31 @@ export default async function ShowcaseDesignPage({ params }: Props) {
   if (!d) notFound();
 
   return (
-    <div className="flex h-full flex-col bg-cream text-plum">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-plum/10 px-4 py-3 sm:px-6">
-        <Link href="/" aria-label="ArchIt home" className="text-plum">
-          <LogoMark width={28} height={28} />
+    // Fills the viewport rather than scrolling: the builder below owns its
+    // own gestures, so the header stays compact and the iframe takes the rest.
+    <div className="flex h-full flex-col bg-paper text-ink">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-line px-[clamp(16px,3vw,40px)] py-3">
+        <Link
+          href="/"
+          aria-label="ArchIt home"
+          className="flex items-center gap-2 text-[20px] font-extrabold tracking-[-0.05em] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <LogoMark width={24} height={24} className="text-accent" />
+          <span aria-hidden>
+            ArchIt<span className="text-accent">.</span>
+          </span>
         </Link>
         <Link
           href="/showcase"
-          className="py-1.5 text-[12.5px] font-semibold text-plum-soft transition-colors hover:text-plum"
+          className="inline-flex min-h-6 items-center text-[13px] font-semibold text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           ← Showcase
         </Link>
-        <div className="min-w-0 flex-1 basis-56">
-          <h1 className="truncate text-lg font-extrabold">{d.name}</h1>
-          <p className="truncate text-[12.5px] font-medium text-plum-soft">
+        <div className="min-w-0 flex-1 basis-56 border-line sm:border-l sm:pl-6">
+          <h1 className="truncate font-display text-[22px] font-normal leading-tight tracking-[-0.02em]">{d.name}</h1>
+          <p className="truncate text-[14px] text-ink-soft">
             by {d.authorName}
-            {d.place ? ` · ${d.place}` : ""} · Plot {round1(d.plotW)} × {round1(d.plotD)} m
+            {d.place ? ` · ${d.place}` : ""} · <span className="tabular-nums">Plot {round1(d.plotW)} × {round1(d.plotD)} m</span>
           </p>
         </div>
         {d.plotCenter && (
@@ -73,13 +82,15 @@ export default async function ShowcaseDesignPage({ params }: Props) {
           <Link
             href={`/find?design=${encodeURIComponent(d.id)}`}
             prefetch={false}
-            className="inline-flex min-h-10 items-center rounded-full bg-plum px-4 py-2 text-[13px] font-bold text-cream transition-opacity hover:opacity-90"
+            className="inline-flex min-h-11 items-center gap-4 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            See on map
+            See on map <span aria-hidden>↗</span>
           </Link>
         )}
       </header>
-      <ShowcaseViewer designId={d.id} name={d.name} />
+      <main className="flex min-h-0 flex-1 flex-col">
+        <ShowcaseViewer designId={d.id} name={d.name} />
+      </main>
     </div>
   );
 }

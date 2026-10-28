@@ -13,9 +13,11 @@ import {
 
 type Status = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "error"; message: string };
 
+// user-invalid: only flags a field after the visitor has interacted with it,
+// so an untouched form never opens covered in red.
 const field =
-  "mt-1 w-full rounded-xl border border-plum/20 bg-white px-3 py-2 text-[15px] text-plum outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 disabled:opacity-60";
-const label = "block text-[14px] font-bold text-plum";
+  "mt-2 block min-h-11 w-full rounded-[5px] border border-line-strong bg-paper px-3.5 py-2.5 text-[15px] text-ink transition-colors placeholder:text-ink-soft hover:border-ink focus-visible:border-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent user-invalid:border-accent disabled:cursor-not-allowed disabled:opacity-60";
+const label = "block text-[11px] font-bold uppercase tracking-[0.14em] text-ink";
 
 /**
  * Contact form → POST /api/contact (stored for the admin inbox). Validates
@@ -67,13 +69,18 @@ export default function ContactForm() {
 
   if (status.kind === "sent") {
     return (
-      <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-[15px] text-emerald-900">
-        <p className="font-bold">Thanks, your message has been sent.</p>
-        <p className="mt-1">We&apos;ll reply to the email address you gave us.</p>
+      <div role="status" className="rounded-[5px] border border-line bg-[#e7ece4] p-7 text-[15px] leading-[1.75] text-ink-soft md:p-9">
+        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ink">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> Sent
+        </p>
+        <p className="mt-4 font-display text-[28px] leading-[1.15] font-normal tracking-[-0.02em] text-ink">
+          Thanks, your message has been sent.
+        </p>
+        <p className="mt-3">We&apos;ll reply to the email address you gave us.</p>
         <button
           type="button"
           onClick={() => setStatus({ kind: "idle" })}
-          className="mt-3 text-[14px] font-semibold underline"
+          className="mt-6 inline-flex min-h-6 items-center rounded-[2px] text-[14px] font-semibold text-ink underline underline-offset-4 hover:text-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Send another message
         </button>
@@ -85,9 +92,9 @@ export default function ContactForm() {
     <form
       onSubmit={onSubmit}
       aria-busy={sending}
-      className="relative rounded-2xl border border-plum/10 bg-white/60 p-6"
+      className="relative rounded-[5px] border border-line bg-paper-soft p-6 md:p-9"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="contact-name" className={label}>Your name</label>
           <input
@@ -115,21 +122,38 @@ export default function ContactForm() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         <label htmlFor="contact-topic" className={label}>Topic</label>
-        <select id="contact-topic" name="topic" required defaultValue="" disabled={sending} className={field}>
-          <option value="" disabled>
-            Choose a topic
-          </option>
-          {CONTACT_TOPICS.map((t) => (
-            <option key={t} value={t}>
-              {CONTACT_TOPIC_LABELS[t]}
+        <div className="relative">
+          <select
+            id="contact-topic"
+            name="topic"
+            required
+            defaultValue=""
+            disabled={sending}
+            className={`${field} appearance-none pr-10`}
+          >
+            <option value="" disabled>
+              Choose a topic
             </option>
-          ))}
-        </select>
+            {CONTACT_TOPICS.map((t) => (
+              <option key={t} value={t}>
+                {CONTACT_TOPIC_LABELS[t]}
+              </option>
+            ))}
+          </select>
+          {/* appearance-none drops the native arrow; this replaces it */}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 12 12"
+            className="pointer-events-none absolute top-1/2 right-3.5 mt-1 size-3 -translate-y-1/2 text-ink-soft"
+          >
+            <path d="M2 4.5L6 8.5L10 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         <label htmlFor="contact-message" className={label}>Message</label>
         <textarea
           id="contact-message"
@@ -140,9 +164,9 @@ export default function ContactForm() {
           rows={6}
           aria-describedby="contact-message-hint"
           disabled={sending}
-          className={field}
+          className={`${field} resize-y leading-relaxed`}
         />
-        <p id="contact-message-hint" className="mt-1 text-[12px] text-plum-soft">
+        <p id="contact-message-hint" className="mt-2 text-[14px] leading-relaxed text-ink-soft">
           {MIN_CONTACT_MESSAGE}–{MAX_CONTACT_MESSAGE} characters. For payments include the UTR or
           payment ID; for listings include the address or link.
         </p>
@@ -155,7 +179,7 @@ export default function ContactForm() {
       </div>
 
       {status.kind === "error" && (
-        <p role="alert" className="mt-4 rounded-xl bg-coral/15 p-3 text-[14px] font-semibold text-plum">
+        <p role="alert" className="mt-5 rounded-[5px] border border-accent/40 border-l-[3px] border-l-accent bg-[#eee5d9] px-4 py-3 text-[14px] leading-relaxed font-semibold text-accent-deep">
           {status.message}
         </p>
       )}
@@ -163,9 +187,10 @@ export default function ContactForm() {
       <button
         type="submit"
         disabled={sending}
-        className="mt-5 w-full rounded-full bg-plum px-6 py-2.5 text-[15px] font-bold text-cream transition-opacity hover:opacity-90 disabled:opacity-60 sm:w-auto"
+        className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-6 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-70 sm:w-auto"
       >
         {sending ? "Sending…" : "Send message"}
+        {!sending && <span aria-hidden="true">↗</span>}
       </button>
     </form>
   );

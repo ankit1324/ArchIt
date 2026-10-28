@@ -62,11 +62,22 @@ interface AddPropertyFormProps {
   onCancel: () => void;
 }
 
+// Hairline field boxes; the focus ring sits on the box (the bare input inside
+// has no outline of its own), so keyboard users always see where they are.
 const field =
-  "flex items-baseline gap-1.5 rounded-full bg-white/55 px-3.5 py-2 text-[12.5px]";
-const fieldLabel = "shrink-0 font-medium text-plum-soft";
+  "flex min-h-11 items-baseline gap-2 rounded-[5px] border border-line-strong bg-paper px-3 py-2.5 text-[14px] transition-colors hover:border-ink focus-within:border-ink focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-accent";
+const fieldLabel = "shrink-0 text-[13px] font-semibold text-ink-soft";
 const fieldInput =
-  "w-full min-w-0 bg-transparent font-bold text-plum outline-none placeholder:font-medium placeholder:text-plum-soft/50";
+  "w-full min-w-0 bg-transparent font-semibold tabular-nums text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/70";
+const focusRing =
+  "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const hint = "px-0.5 text-[14px] leading-snug text-ink-soft";
+// a selected intent takes its map category colour (Map3D PRISM_COLORS)
+const INTENT_FILL: Record<ListingType, string> = {
+  sale: "bg-highlight",
+  rent: "bg-clay",
+  showcase: "bg-mist",
+};
 
 export default function AddPropertyForm({
   coords,
@@ -209,27 +220,27 @@ export default function AddPropertyForm({
     );
   };
 
-  const toggle = (active: boolean) =>
-    `rounded-full px-3.5 py-1.5 text-[12px] font-bold transition-colors ${
-      active ? "bg-plum text-cream" : "bg-white/55 text-plum hover:bg-white/85"
+  const toggle = (active: boolean, fill = "bg-highlight") =>
+    `${focusRing} min-h-9 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold text-ink transition-colors ${
+      active ? `border-ink ${fill}` : "border-line-strong bg-paper hover:border-ink"
     }`;
 
   return (
-    <section className="glass no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-3xl p-4">
+    <section className="no-scrollbar pointer-events-auto flex w-[300px] max-h-full flex-col gap-2.5 overflow-y-auto rounded-md border border-line bg-paper/95 p-4 text-ink shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] backdrop-blur">
       <header className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold text-plum">
+        <h3 className="font-display text-[20px] font-normal leading-tight tracking-[-0.02em] text-ink">
           {editing ? "Edit property" : "New property"}
         </h3>
         <button
           onClick={onCancel}
           aria-label="Cancel new property"
-          className="rounded-full p-1 text-plum-soft transition-colors hover:bg-plum/5 hover:text-plum"
+          className={`${focusRing} grid size-8 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink`}
         >
           <CloseIcon width={14} height={14} />
         </button>
       </header>
 
-      <p className="text-[11px] font-medium text-plum-soft">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] tabular-nums text-ink-soft">
         {coords[1].toFixed(5)}, {coords[0].toFixed(5)}
         {geocoding && " · looking up address…"}
       </p>
@@ -295,7 +306,7 @@ export default function AddPropertyForm({
             key={id}
             type="button"
             aria-pressed={type === id}
-            className={toggle(type === id)}
+            className={toggle(type === id, INTENT_FILL[id])}
             onClick={() => setType(id)}
           >
             {label}
@@ -304,7 +315,7 @@ export default function AddPropertyForm({
       </div>
 
       {type === "showcase" ? (
-        <p className="px-1 text-[11px] font-medium text-plum-soft">
+        <p className={hint}>
           Shown on the map as “not for sale/rent” — no price needed. Showcase
           listings are reviewed like any other.
         </p>
@@ -399,7 +410,7 @@ export default function AddPropertyForm({
 
       <label className={field}>
         <span className={fieldLabel}>
-          Photos <span className="font-normal opacity-60">(optional)</span>
+          Photos <span className="font-normal">(optional)</span>
         </span>
         <input
           type="file"
@@ -410,27 +421,32 @@ export default function AddPropertyForm({
             addPhotos(e.target.files);
             e.target.value = "";
           }}
-          className="w-full min-w-0 text-[11px] font-medium text-plum-soft file:mr-2 file:rounded-full file:border-0 file:bg-plum/10 file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-plum disabled:opacity-50"
+          className="w-full min-w-0 text-[13px] text-ink-soft outline-none file:mr-2 file:cursor-pointer file:rounded-[5px] file:border file:border-solid file:border-line-strong file:bg-paper-soft file:px-2.5 file:py-1 file:text-[13px] file:font-semibold file:text-ink disabled:opacity-50"
         />
       </label>
-      <p className="px-1 text-[11px] font-medium text-plum-soft">
+      <p className={`${hint} tabular-nums`}>
         {photoCount === 0
           ? "0/5 photos — you can list without images"
           : `${photoCount}/5 photos${photoCount >= 5 ? " — limit reached" : ""}`}
       </p>
       {photoCount > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {keptPhotos.map((url) => {
+          {keptPhotos.map((url, i) => {
             const safeUrl = safeImageUrl(url);
             return safeUrl ? (
-            <span key={url} className="relative h-14 w-16 overflow-hidden rounded-xl">
+            <span key={url} className="relative h-14 w-16 overflow-hidden rounded-[5px] border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={safeUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={safeUrl}
+                alt={`Saved listing photo ${i + 1}`}
+                className="h-full w-full object-cover"
+              />
               <button
                 type="button"
                 aria-label="Remove photo"
                 onClick={() => setKeptPhotos((prev) => prev.filter((u) => u !== url))}
-                className="absolute right-0.5 top-0.5 rounded-full bg-plum/70 p-0.5 text-cream"
+                // inset ring: the thumbnail clips anything drawn outside the button
+                className="absolute right-0.5 top-0.5 grid size-6 place-items-center rounded-full bg-ink/75 text-paper hover:bg-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-paper"
               >
                 <CloseIcon width={9} height={9} />
               </button>
@@ -438,16 +454,21 @@ export default function AddPropertyForm({
             ) : null;
           })}
           {previews.map((url, i) => (
-            <span key={url} className="relative h-14 w-16 overflow-hidden rounded-xl">
+            <span key={url} className="relative h-14 w-16 overflow-hidden rounded-[5px] border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <img
+                src={url}
+                alt={`New photo to upload: ${photoFiles[i]?.name ?? i + 1}`}
+                className="h-full w-full object-cover"
+              />
               <button
                 type="button"
                 aria-label="Remove photo"
                 onClick={() =>
                   setPhotoFiles((prev) => prev.filter((_, j) => j !== i))
                 }
-                className="absolute right-0.5 top-0.5 rounded-full bg-plum/70 p-0.5 text-cream"
+                // inset ring: the thumbnail clips anything drawn outside the button
+                className="absolute right-0.5 top-0.5 grid size-6 place-items-center rounded-full bg-ink/75 text-paper hover:bg-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-paper"
               >
                 <CloseIcon width={9} height={9} />
               </button>
@@ -479,17 +500,17 @@ export default function AddPropertyForm({
         </select>
       </label>
       {ownerDesigns === null && !designsFailed ? (
-        <p className="px-1 text-[11px] font-medium text-plum-soft">Loading your designs…</p>
+        <p className={hint}>Loading your designs…</p>
       ) : designsFailed ? (
-        <p className="px-1 text-[11px] font-medium text-plum-soft">
+        <p className={hint}>
           Couldn’t load your designs — the current attachment is kept.
         </p>
       ) : (
         publishedDesigns.length === 0 &&
         !storedDesignId && (
-          <p className="px-1 text-[11px] font-medium text-plum-soft">
+          <p className={hint}>
             No published designs yet —{" "}
-            <Link href="/designer" className="font-bold text-plum underline underline-offset-2">
+            <Link href="/designer" className={`${focusRing} rounded-[3px] font-semibold text-accent underline underline-offset-4 hover:text-accent-deep`}>
               publish one in the designer
             </Link>{" "}
             to attach it.
@@ -497,8 +518,8 @@ export default function AddPropertyForm({
         )
       )}
 
-      <div className="flex items-center gap-1.5" role="group" aria-label="Open first with">
-        <span className={`${fieldLabel} px-1 text-[12.5px] ${designId ? "" : "opacity-50"}`}>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Open first with">
+        <span className={`${fieldLabel} px-0.5 ${designId ? "" : "opacity-60"}`}>
           Open first with
         </span>
         {(["photos", "3d"] as const).map((v) => (
@@ -516,7 +537,7 @@ export default function AddPropertyForm({
       </div>
 
       {error && (
-        <p role="alert" className="text-[12px] font-semibold text-coral">{error}</p>
+        <p role="alert" className="text-[14px] font-semibold text-accent">{error}</p>
       )}
 
       {/* ── Featured listing upsell (paid; hidden while the paywall is off) ── */}
@@ -524,20 +545,21 @@ export default function AddPropertyForm({
         <button
           type="button"
           onClick={() => setFeatured((v) => !v)}
-          className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
+          aria-pressed={featured}
+          className={`${focusRing} flex items-center gap-2.5 rounded-[5px] border px-3.5 py-2.5 text-left text-ink transition-colors ${
             featured
-              ? "border-amber-400/60 bg-amber-50/80 text-amber-800"
-              : "border-plum/10 bg-white/40 text-plum-soft hover:bg-white/70"
+              ? "border-highlight-deep bg-highlight"
+              : "border-line-strong bg-paper hover:border-ink"
           }`}
         >
-          <span className="text-[18px]">{featured ? "⭐" : "☆"}</span>
+          <span aria-hidden="true" className="text-[18px]">{featured ? "⭐" : "☆"}</span>
           <span className="flex flex-col">
-            <span className="text-[12.5px] font-bold">
+            <span className="text-[14px] font-semibold">
               {featured
                 ? `Featured listing — ${feeLabel("featured_property")}`
                 : `Feature on map — ${feeLabel("featured_property")}`}
             </span>
-            <span className="text-[11px] font-medium opacity-70">
+            <span className="text-[14px] leading-snug text-ink-soft">
               {featured
                 ? "Your property gets a golden star on the 3D map"
                 : "Stand out with a glowing star marker on the map"}
@@ -549,7 +571,7 @@ export default function AddPropertyForm({
       <button
         onClick={submit}
         disabled={saving}
-        className="mt-1 rounded-full bg-plum py-2.5 text-[13px] font-bold text-cream transition-opacity hover:opacity-90 disabled:opacity-50"
+        className={`${focusRing} mt-1 min-h-11 rounded-[5px] bg-accent px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:bg-accent-deep disabled:opacity-50`}
       >
         {saving
           ? "Saving…"
