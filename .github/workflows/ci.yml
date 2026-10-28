@@ -42,6 +42,11 @@ jobs:
       - name: Test
         run: npm test
 
+      # Paid-template geometry against the builder engine's own rules
+      # (scripts/check-templates.mjs, scripts/audit-template-issues.mjs).
+      - name: Template checks
+        run: npm run check:templates
+
       # Placeholder values only. next build evaluates route modules to collect
       # page data, so anything constructed at module scope runs during the build:
       # lib/csp.ts reads the YouPI origins at module scope for the builder CSP
@@ -54,7 +59,6 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
           SUPABASE_SECRET_KEY: sb_secret_ci_placeholder
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_ci_placeholder

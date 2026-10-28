@@ -87,6 +87,9 @@ omni-vid
 # scratch output from scripts/gen-templates.mjs
 .templates.extracted.json
 
+# browser-automation screenshots and snapshots (Playwright MCP)
+.playwright-mcp/
+
 # bundled builder (scripts/build-builder.mjs)
 public/builder/js/
 # maplibre-gl worker copy (scripts/copy-maplibre-worker.mjs)

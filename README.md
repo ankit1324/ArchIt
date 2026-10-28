@@ -28,9 +28,10 @@ installing anything.
 | **Find** | `/find` | 3D map property search — pan, tilt, filter by type, price, beds, area. Listings render as extruded buildings on the basemap. |
 | **Designer** | `/designer` | Browser house builder. Place a plot, stack floors, cut openings, apply materials, save designs to your account. |
 
-The [live app](https://archit.chaudharyankit.in) is the fastest way to see it. Find
-and Designer sit behind a session, so they return 404 rather than a redirect when you
-are signed out — that is `auth.protect()` declining to leak which routes exist.
+The [live app](https://archit.chaudharyankit.in) is the fastest way to see it. Find,
+Designer, the dashboard and the admin area sit behind a session: signed-out visitors
+are redirected to sign-in, and the protected APIs answer `401` JSON instead (see
+[`proxy.ts`](proxy.ts)).
 
 ## How it fits together
 
@@ -167,8 +168,8 @@ real query behind a `Proxy`.
 
 ## Running it locally
 
-Node **22.18+** is required — the test files import `.ts` modules directly and rely
-on Node's native type stripping. The version is pinned in [`.nvmrc`](.nvmrc).
+Node **22.18+** is the floor — the test files import `.ts` modules directly and rely
+on Node's native type stripping. [`.nvmrc`](.nvmrc) pins the exact version CI uses.
 
 ```bash
 git clone https://github.com/ankit1324/ArchIt.git
@@ -185,7 +186,6 @@ Open [http://localhost:3000](http://localhost:3000).
 | Variable | Needed for |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase browser client |
 | `SUPABASE_SECRET_KEY` | Server routes; bypasses RLS, never expose |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser client |
 | `CLERK_SECRET_KEY` | Clerk server verification |
@@ -193,7 +193,16 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NEXT_PUBLIC_YOUPI_PORTAL_URL` | Checkout portal that serves `youpi.js` and the iframe; defaults to the API URL |
 | `YOUPI_MERCHANT_ID` | Merchant UUID (optional if the gateway has a single default merchant) |
 | `YOUPI_WEBHOOK_SECRET` | Signs webhooks; also sent as `X-Merchant-Key` so payment lookups include metadata |
-| `CRON_SECRET` | Authorizes `/api/keepalive`; the endpoint 401s without it |
+| `CRON_SECRET` | Authorizes `/api/keepalive` and `/api/cron/reconcile`; both 401 without it |
+| `SENTRY_DSN` | Error tracking for money incidents (optional) |
+| `ALERT_WEBHOOK_URL` | Slack or Discord incoming webhook pinged on every incident (optional) |
+| `ADMIN_USER_IDS` | Comma-separated Clerk user ids allowed into `/admin`; only needed to bootstrap |
+| `ADMIN_EMAILS` | Comma-separated admin emails; counts only when verified on the Clerk account |
+| `RESEND_API_KEY` | Transactional email via Resend; unset logs and skips emails |
+| `EMAIL_FROM` | Sender address, on a domain verified in Resend |
+| `EMAIL_REPLY_TO` | Where replies to transactional emails go (optional) |
+| `NEXT_PUBLIC_SITE_URL` | Base URL for links in emails; defaults to the live app |
+| `NEXT_PUBLIC_VERCEL_ANALYTICS` | `1` on Vercel to enable Web Analytics; unset makes analytics a no-op |
 
 ### Database
 
