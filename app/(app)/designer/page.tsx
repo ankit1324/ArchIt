@@ -88,11 +88,11 @@ const focusRing =
 const field = `flex items-baseline gap-1.5 rounded-[5px] border border-line bg-paper-soft/60 px-3.5 py-2.5 text-[14px] focus-within:border-ink`;
 const fieldLabel = "shrink-0 text-[13px] font-medium text-ink-soft";
 const fieldInput =
-  "w-full min-w-0 bg-transparent font-semibold text-ink outline-none placeholder:font-medium placeholder:text-ink-soft/70";
+  "w-full min-w-0 bg-transparent font-semibold text-ink outline-none placeholder:font-medium placeholder:text-ink-soft";
 const rowLabel = "text-[13px] font-semibold text-ink-soft";
 /** small pill toggle (unit, floors, facing) */
 const chip = (on: boolean) =>
-  `min-h-8 rounded-full px-3 text-[12px] font-bold transition-colors ${focusRing} ${
+  `min-h-10 rounded-full px-3 text-[12px] font-bold transition-colors ${focusRing} ${
     on
       ? "bg-forest text-paper"
       : "border border-line-strong text-ink hover:border-ink"
@@ -305,7 +305,7 @@ function SetupDialog({
           Start designing <span aria-hidden>↗</span>
         </button>
         <button type="button" onClick={onBack} className={textLink}>
-          ← Back to map
+          ← Back to dashboard
         </button>
       </section>
     </Backdrop>
@@ -601,7 +601,7 @@ export default function DesignerPage() {
               onClick={() => router.push("/")}
               className={textLink}
             >
-              ← Back to map
+              ← Back to dashboard
             </button>
           </section>
         )}
@@ -658,7 +658,7 @@ export default function DesignerPage() {
                   !(listOpen ?? !window.matchMedia("(max-width: 760px)").matches),
                 )
               }
-              className={`inline-flex min-h-6 items-center rounded-full px-2 text-[12px] font-semibold text-ink-soft hover:bg-ink/5 hover:text-ink max-[760px]:min-h-8 max-[760px]:text-ink ${focusRing}`}
+              className={`inline-flex min-h-8 items-center rounded-full px-2 text-[12px] font-semibold text-ink-soft hover:bg-ink/5 hover:text-ink max-[760px]:min-h-10 max-[760px]:text-ink ${focusRing}`}
             >
               <span className="max-[760px]:hidden">
                 {listOpen === false ? "Show" : "Hide"}
@@ -677,7 +677,7 @@ export default function DesignerPage() {
                 type="button"
                 onClick={newDesign}
                 aria-pressed={currentId === null}
-                className={`min-h-9 rounded-[5px] text-[13px] font-semibold transition-colors ${focusRing} ${
+                className={`min-h-10 rounded-[5px] text-[13px] font-semibold transition-colors ${focusRing} ${
                   currentId === null
                     ? "bg-forest text-paper"
                     : "border border-line-strong text-ink hover:border-ink"
@@ -695,6 +695,7 @@ export default function DesignerPage() {
                 {designs.map((d) => (
                   <div
                     key={d.id}
+                    data-design-row
                     className={`flex flex-col gap-1 rounded-[5px] p-1.5 transition-colors ${
                       d.id === currentId
                         ? "bg-paper-soft shadow-[inset_2px_0_0_var(--color-accent)]"
@@ -704,6 +705,7 @@ export default function DesignerPage() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
+                        data-design-focus
                         onClick={() => openDesign(d)}
                         aria-current={d.id === currentId || undefined}
                         className={`flex min-w-0 flex-1 items-center gap-2 rounded-[4px] text-left ${focusRing}`}
@@ -734,7 +736,7 @@ export default function DesignerPage() {
                         type="button"
                         onClick={() => deleteDesign(d.id)}
                         aria-label={`Delete ${d.name}`}
-                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-accent/10 hover:text-accent ${focusRing}`}
+                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-accent/10 hover:text-accent ${focusRing}`}
                       >
                         <CloseIcon width={12} height={12} />
                       </button>
@@ -742,13 +744,13 @@ export default function DesignerPage() {
                     <div className="flex flex-wrap items-center gap-1 pl-14">
                       {d.publishedAt ? (
                         <>
-                          <span className="rounded-full bg-highlight px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-ink">
+                          <span className="rounded-full bg-highlight px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink">
                             Published
                           </span>
                           <button
                             type="button"
                             onClick={() => setPublishing(d)}
-                            className={`inline-flex min-h-6 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink ${focusRing}`}
+                            className={`inline-flex min-h-8 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink ${focusRing}`}
                           >
                             {hasLocation(d.plotCenter[0], d.plotCenter[1]) ? "Move pin" : "Add pin"}
                           </button>
@@ -756,7 +758,7 @@ export default function DesignerPage() {
                             <button
                               onClick={() => removePin(d)}
                               disabled={unpublishingId === d.id}
-                              className={`inline-flex min-h-6 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50 ${focusRing}`}
+                              className={`inline-flex min-h-8 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50 ${focusRing}`}
                             >
                               Remove pin
                             </button>
@@ -765,7 +767,7 @@ export default function DesignerPage() {
                             type="button"
                             onClick={() => unpublishDesign(d)}
                             disabled={unpublishingId === d.id}
-                            className={`inline-flex min-h-6 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 ${focusRing}`}
+                            className={`inline-flex min-h-8 items-center rounded-full px-1.5 text-[11px] font-bold text-ink-soft transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 ${focusRing}`}
                           >
                             {unpublishingId === d.id ? "Saving…" : "Unpublish"}
                           </button>
@@ -774,7 +776,7 @@ export default function DesignerPage() {
                         <button
                           type="button"
                           onClick={() => setPublishing(d)}
-                          className={`inline-flex min-h-6 items-center rounded-full border border-line-strong px-2 text-[11px] font-bold text-ink transition-colors hover:border-ink ${focusRing}`}
+                          className={`inline-flex min-h-8 items-center rounded-full border border-line-strong px-2 text-[11px] font-bold text-ink transition-colors hover:border-ink ${focusRing}`}
                         >
                           Publish
                         </button>

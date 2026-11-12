@@ -31,6 +31,7 @@ import { celebrate, notify } from "@/components/Celebration";
 import BottomSheet from "@/components/BottomSheet";
 import DesignPinCard from "@/components/DesignPinCard";
 import DesignViewer from "@/components/DesignViewer";
+import { motionDuration } from "@/lib/motion";
 
 // maplibre (~1MB) stays out of the page chunk; the listings it shows arrive
 // with the HTML, so the map is the only thing still loading after hydration
@@ -254,7 +255,7 @@ export default function FindClient({
     const lats = filtered.map((l) => l.coords[1]);
     map.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: { top: Math.min(140, height * 0.2), bottom: Math.min(260, height * 0.4), left: window.innerWidth >= 1024 ? 300 : 40, right: 60 }, maxZoom: 16, duration: 1000 },
+      { padding: { top: Math.min(140, height * 0.2), bottom: Math.min(260, height * 0.4), left: window.innerWidth >= 1024 ? 300 : 40, right: 60 }, maxZoom: 16, duration: motionDuration(1000) },
     );
   }, [filtered]);
 
@@ -289,7 +290,7 @@ export default function FindClient({
     // map: land the pin in the strip above it instead of dead centre
     const sheet = window.innerWidth < 1024;
     const offsetY = sheet ? -map.getContainer().clientHeight * 0.28 : 0;
-    map.flyTo({ center: l.coords, zoom: 16.4, duration: 1600, offset: [0, offsetY] });
+    map.flyTo({ center: l.coords, zoom: 16.4, duration: motionDuration(1600), offset: [0, offsetY] });
   }, [source]);
 
   const flyToDesignAt = useCallback((center: [number, number]) => {
@@ -297,7 +298,7 @@ export default function FindClient({
     if (!map) return false;
     const sheet = window.innerWidth < 1024;
     const offsetY = sheet ? -map.getContainer().clientHeight * 0.28 : 0;
-    map.flyTo({ center, zoom: 16.4, duration: 1600, offset: [0, offsetY] });
+    map.flyTo({ center, zoom: 16.4, duration: motionDuration(1600), offset: [0, offsetY] });
     return true;
   }, []);
 
@@ -343,7 +344,7 @@ export default function FindClient({
         center: cam?.center ?? [Number(hit.lon), Number(hit.lat)],
         zoom: Math.min(cam?.zoom ?? 13, 16),
         pitch: is3D ? 58 : 0,
-        duration: 3000,
+        duration: motionDuration(3000),
         essential: false,
       });
       return true;
@@ -539,7 +540,7 @@ export default function FindClient({
       resetSearch();
       cancelAdd();
       setSelectedId(saved.id);
-      mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: 1600 });
+      mapRef.current?.flyTo({ center: saved.coords, zoom: 16.4, duration: motionDuration(1600) });
       // new listings, and edits to an approved listing's text/photos/contact,
       // wait for review (the server says so via `status`)
       celebrate(
@@ -588,7 +589,7 @@ export default function FindClient({
   const toggleDimension = () => {
     const next = !is3D;
     setIs3D(next);
-    mapRef.current?.easeTo({ pitch: next ? 58 : 0, duration: 900 });
+    mapRef.current?.easeTo({ pitch: next ? 58 : 0, duration: motionDuration(900) });
   };
 
   return (
@@ -596,6 +597,7 @@ export default function FindClient({
       <Navbar variant="app" />
 
       <main className={`${styles.canvas} relative mx-[max(0.5rem,env(safe-area-inset-left))] mt-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-paper-soft sm:mx-3 sm:mt-3 sm:mb-[max(0.75rem,env(safe-area-inset-bottom))]`}>
+        <h1 className="sr-only">Find a property on a 3D map</h1>
         <Map3D
           listings={mapListings}
           designs={deferredDesigns}
@@ -613,8 +615,16 @@ export default function FindClient({
 
         {/* overlay chrome */}
         <div className="pointer-events-none absolute inset-0 z-10 p-3.5">
+          {filtersOpen && (
+            <button
+              type="button"
+              aria-label="Close filters"
+              className={styles.filterScrim}
+              onClick={() => setFiltersOpen(false)}
+            />
+          )}
           <div id="find-filters" onKeyDown={(event) => { if (event.key === "Escape") setFiltersOpen(false); }} className={`${styles.filters} ${filtersOpen ? styles.filtersOpen : ""}`}>
-            <div className={styles.filterHeading}><div><span className={styles.eyebrow}>Make it yours</span><h1>Find a property</h1></div><button type="button" onClick={() => setFiltersOpen(false)} className={styles.closeFilters} aria-label="Close filters"><span aria-hidden="true">✕</span></button></div>
+            <div className={styles.filterHeading}><div><span className={styles.eyebrow}>Make it yours</span><h2>Find a property</h2></div><button type="button" onClick={() => setFiltersOpen(false)} className={styles.closeFilters} aria-label="Close filters"><span aria-hidden="true">✕</span></button></div>
             <FilterSidebar
               filters={filters}
               onChange={setFilters}
@@ -672,7 +682,10 @@ export default function FindClient({
                   <span className={styles.areaLong}>Search as I move</span>
                   <span className={styles.areaShort}>Map area</span>
                 </label>
-                <button type="button" onClick={showResults} disabled={!filtered.length}>Show on map <span aria-hidden="true">↗</span></button>
+                <button type="button" className={styles.showMapButton} onClick={showResults} disabled={!filtered.length} aria-label="Fit matching results on the map">
+                  <span className={styles.showMapLabel}>Fit results</span>
+                  <span aria-hidden="true">↗</span>
+                </button>
                 <select aria-label="Sort properties" value={sort} onChange={(e) => setSort(e.target.value as ListingSort)}>
                   <option value="recommended">Featured first</option>
                   <option value="price-asc">Price: low to high</option>
@@ -717,7 +730,11 @@ export default function FindClient({
           )}
 
           {addStage === "idle" && selected && (
-            <BottomSheet className={styles.detailPanel} onDismiss={() => setSelectedId(null)}>
+            <BottomSheet
+              className={styles.detailPanel}
+              dismissLabel="Close property details"
+              onDismiss={() => setSelectedId(null)}
+            >
               <PropertyDetailPanel
                 listing={selected}
                 onClose={() => setSelectedId(null)}
@@ -730,7 +747,11 @@ export default function FindClient({
           )}
 
           {addStage === "idle" && !selected && selectedDesign && (
-            <BottomSheet className={styles.detailPanel} onDismiss={() => setSelectedDesignId(null)}>
+            <BottomSheet
+              className={styles.detailPanel}
+              dismissLabel="Close design details"
+              onDismiss={() => setSelectedDesignId(null)}
+            >
               <DesignPinCard
                 design={selectedDesign}
                 onClose={() => setSelectedDesignId(null)}

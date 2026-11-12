@@ -10,10 +10,12 @@ import { useRef, useState, type ReactNode } from "react";
  */
 export default function BottomSheet({
   className,
+  dismissLabel = "Close details",
   onDismiss,
   children,
 }: {
   className?: string;
+  dismissLabel?: string;
   onDismiss: () => void;
   children: ReactNode;
 }) {
@@ -28,7 +30,7 @@ export default function BottomSheet({
     >
       <button
         type="button"
-        aria-label="Close property details"
+        aria-label={dismissLabel}
         className="sheet-handle"
         onPointerDown={(e) => {
           start.current = e.clientY;
