@@ -306,6 +306,16 @@ function pointInLoop(pt, loop){
   return inside;
 }
 const FLH = () => C.H + .12;   // floor-to-floor height
+// rebuild3D keeps the ACTIVE floor at y 0 (every drag, hotspot and camera path
+// assumes it), so the floors under it sit at negative y. The ground has to drop
+// with them, or it hides every floor below the one being edited.
+function groundY(activeFloor){ return (0 - activeFloor) * FLH(); }   // floor 0's y in rebuild3D
+// Whole-house totals for the stats bar: every floor, not just the active one.
+function houseTotals(floors){
+  let area = 0, rooms = 0;
+  floors.forEach(f=>f.blocks.forEach(b=>{ area += b.w*b.len; rooms++; }));
+  return {area, rooms};
+}
 
 /* -------- snapping -------- */
 function snapBlock(b, cx, cz){
@@ -393,4 +403,4 @@ function resolveWalk(prevX, prevZ, nextX, nextZ, radius, rects) {
   return { x: rx, z: rz };
 }
 
-export {FLH, boundsOf, clampFurn, designIssues, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};
+export {FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};

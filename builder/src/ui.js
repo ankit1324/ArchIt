@@ -3,7 +3,7 @@ import {closeToolPop, syncToolCursor} from './tools.js';
 import {C} from './catalog.js';
 import {$, VIEW, chips, round1, stage, toast} from './dom.js';
 import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, undo, undoStack} from './state.js';
-import {FLH, boundsOf, clampFurn, designIssues, overlaps} from './geometry.js';
+import {FLH, boundsOf, clampFurn, designIssues, houseTotals, overlaps} from './geometry.js';
 import {camera, controls, requestRender, requestShadows, selOutline, wallMats} from './scene.js';
 import {partMat} from './materials.js';
 import {blockGroups, rebuild3D, toggleRoofs, updateSelection} from './house3d.js';
@@ -16,9 +16,10 @@ import {showTemplatePicker} from './templates.js';
 import {newProject} from './main.js';
 
 function updateChip(){
-  let area = 0; state.blocks.forEach(b=>area += b.w*b.len);
+  // "Total area" and "Rooms" are the whole house; the sidebar has the per-floor figures
+  const {area, rooms} = houseTotals(state.floors);
   document.getElementById('areaV').textContent = round1(area) + ' m²';
-  document.getElementById('roomsV').textContent = state.blocks.length;
+  document.getElementById('roomsV').textContent = rooms;
   const iss = designIssues();
   const wv = document.getElementById('warnV');
   wv.textContent = iss.length ? iss.length + ' issue' + (iss.length>1?'s':'') : 'OK';

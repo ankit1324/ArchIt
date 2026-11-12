@@ -139,8 +139,9 @@ function blockSvg(b, ox, oy){
   s += '</g>';
   if(seld){
     // side dimension pills + corner handles
-    s += chip2D(x0+W2/2-24, y0-9, `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
-    s += chip2D(x0-14, y0+D2/2-9, `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
+    const [topPill, leftPill] = dimPillCentres(x0, y0, W2, D2);
+    s += chip2D(topPill[0], topPill[1], `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
+    s += chip2D(leftPill[0], leftPill[1], `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
     [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
      [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
       const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
@@ -308,11 +309,21 @@ planSvg.addEventListener('pointerup', ()=>{
     renderAll();
   }
 });
-function chip2D(x,y,label,color,vert){
+// Where a selected room's two dimension pills go: just INSIDE the top and left
+// edges, centred on them. On the edge itself they sat under the mid-edge resize
+// handle ("3.6 m" read "3 ■ m"); outside it they collide with the action chips
+// and the "+" hotspots.
+function dimPillCentres(x0, y0, W2, D2){
+  const inset = 17;   // half the 18px pill + 8px clear of the handle
+  return [[x0+W2/2, y0+inset], [x0+inset, y0+D2/2]];
+}
+// A dimension pill centred on (cx, cy); `vert` turns it to read along a vertical
+// edge. Never a pointer target: it sits over the room, which must stay draggable.
+function chip2D(cx,cy,label,color,vert){
   const w = label.length*6.4+18;
-  const t = vert ? ` transform="rotate(-90 ${x} ${y})"` : '';
-  return `<g${t}><rect x="${x-(vert?w/2:0)}" y="${y}" width="${w}" height="18" rx="9" fill="${color}"/>
-    <text class="dimchip" x="${x-(vert?w/2:0)+w/2}" y="${y+12.5}" text-anchor="middle">${label}</text></g>`;
+  const t = vert ? ` transform="rotate(-90 ${cx} ${cy})"` : '';
+  return `<g${t} pointer-events="none"><rect x="${cx-w/2}" y="${cy-9}" width="${w}" height="18" rx="9" fill="${color}"/>
+    <text class="dimchip" x="${cx}" y="${cy+3.5}" text-anchor="middle">${label}</text></g>`;
 }
 function openSeg2D(b, wall, t, len, ox, oy){
   const L = wallLen(b,wall), dir = wallDir(wall);
