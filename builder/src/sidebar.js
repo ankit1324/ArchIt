@@ -140,8 +140,8 @@ function renderPanel(){
     <div class="stats">
       ${sumRows.map(([k,v])=>`<div class="row"><span>${k}</span><b>${v}</b></div>`).join('')}
       <div class="row"><span>Size</span><b>${fmtSize(bb.w, bb.d)}</b></div>
-      <div class="row"><span>Units</span><span class="unitseg" role="group" aria-label="Units">
-        <button type="button" data-act="unit" data-u="m" aria-pressed="${!isFt()}">m</button><button type="button" data-act="unit" data-u="ft" aria-pressed="${isFt()}">ft</button></span></div>
+      ${VIEW ? '' : `<div class="row"><span>Units</span><span class="unitseg" role="group" aria-label="Units">
+        <button type="button" data-act="unit" data-u="m" aria-pressed="${!isFt()}">m</button><button type="button" data-act="unit" data-u="ft" aria-pressed="${isFt()}">ft</button></span></div>`}
     </div>
     ${ui.view==='2d' && !VIEW ? '<div class="plan-hint"><b>Plan room by room</b><br>Select a room to edit its dimensions. Drag to move; use corner handles to resize. The fit button brings the full plan back into view.</div>' : ''}
     ${VIEW ? '' : `<div class="acc">

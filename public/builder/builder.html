@@ -245,6 +245,8 @@ textarea.cmt:focus{border-color:var(--ink)}
 /* modals */
 #dim{position:fixed;inset:0;background:rgb(41 55 44/.42);display:none;place-items:center;z-index:100;backdrop-filter:blur(2px)}
 #dim.show{display:grid}
+.modal:has(.elev-img){width:820px}
+.elev-img{display:block;width:100%;height:auto;border:1px solid var(--line2);border-radius:6px;background:var(--canvas)}
 .modal{width:400px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh);padding:26px;max-height:86vh;overflow:auto}
 .modal h3{font-size:18px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center}
 .modal h3 .x{margin-left:auto;color:var(--ink3)}

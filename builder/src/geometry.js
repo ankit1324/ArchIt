@@ -340,6 +340,28 @@ const FLH = () => C.H + .12;   // floor-to-floor height
 // assumes it), so the floors under it sit at negative y. The ground has to drop
 // with them, or it hides every floor below the one being edited.
 function groundY(activeFloor){ return (0 - activeFloor) * FLH(); }   // floor 0's y in rebuild3D
+// Orthographic frame for an elevation of one side of the house.
+// side: the face being looked at — 'S' is the +z face (the bottom edge of the 2D
+// plan), 'N' the -z face, 'E' +x, 'W' -x. Heights are in scene space, where
+// rebuild3D keeps the ACTIVE floor at y 0. `aspect` is picture width / height.
+function elevationFrame(bb, side, floors, active, aspect){
+  const span = side==='N' || side==='S' ? bb.w : bb.d;          // width of the face
+  const y0 = groundY(active);                                    // ground
+  const wallTop = (floors-1-active)*FLH() + C.H;                 // top of the top floor's walls
+  const cy = (y0 + wallTop + 1.3)/2;                             // 1.3 m of headroom for a pitched roof
+  // room around the house for the ground line and the two dimension rows
+  let halfW = span/2 + 2.2, halfH = (wallTop + 1.3 - y0)/2 + 1.4;
+  if(halfW/halfH < aspect) halfW = halfH*aspect; else halfH = halfW/aspect;
+  const [dx, dz] = {S:[0,1], N:[0,-1], E:[1,0], W:[-1,0]}[side];
+  // stand just outside the far corner: close enough that the scene fog (30 m+) stays out
+  const R = Math.max(bb.w, bb.d)/2 + 8;
+  return {pos:[bb.cx+dx*R, cy, bb.cz+dz*R], target:[bb.cx, cy, bb.cz], halfW, halfH, span, y0, wallTop};
+}
+// Which side is which, for someone standing outside looking at the front.
+function elevationSides(front){
+  const order = ['N','E','S','W'], i = Math.max(0, order.indexOf(front));
+  return {front:order[i], left:order[(i+1)%4], rear:order[(i+2)%4], right:order[(i+3)%4]};
+}
 // Whole-house totals for the stats bar: every floor, not just the active one.
 function houseTotals(floors){
   let area = 0, rooms = 0;
@@ -433,4 +455,4 @@ function resolveWalk(prevX, prevZ, nextX, nextZ, radius, rects) {
   return { x: rx, z: rz };
 }
 
-export {winKinds, winSpec, FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};
+export {elevationFrame, elevationSides, winKinds, winSpec, FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};

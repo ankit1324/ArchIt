@@ -477,6 +477,9 @@ function ghostify(g){
 // rooms it actually touched: resizing a room rebuilds it and the neighbours whose
 // shared walls moved, recolouring one room rebuilds that room alone.
 let built = new Map();   // key -> {sig, groups:[Group]}
+// Elevations show the whole house: every floor solid, not the usual faded ghosts.
+let solidAll = false;
+export function setSolidAll(v){ solidAll = !!v; }
 function rebuild3D(){
   // build the new scene graph first, then swap — a throw mid-build leaves the
   // old house on screen instead of an empty stage
@@ -491,16 +494,16 @@ function rebuild3D(){
   };
   try{
     state.floors.forEach((fl, fi)=>{
-      const active = fi === state.floor;
+      const active = fi === state.floor, solid = active || solidAll;
       const y = (fi - state.floor) * FLH();     // active floor always sits at ground level
       // wallNeighbors/sharedWall read state.blocks — point them at the floor being
       // built, or ghost floors get adjacency from the active floor's plan
       state.blocks = fl.blocks;
       fl.blocks.forEach(b=>{
         const ctx = blockContext(b);
-        const [g] = reuse(`${fi}|${active}|${b.id}`, blockSignature(b, ctx), ()=>{
+        const [g] = reuse(`${fi}|${solid}|${b.id}`, blockSignature(b, ctx), ()=>{
           const g = buildBlockGroup(b, ctx);
-          if(!active) ghostify(g);
+          if(!solid) ghostify(g);
           return [g];
         });
         // placement is not part of the signature: (re)apply it every time, which
@@ -513,9 +516,9 @@ function rebuild3D(){
       if(fi === topIdx){
         const sig = JSON.stringify([state.roofStyle, state.roofCol, state.facade, state.facadeMat,
           fl.blocks.map(b=>[b.type, b.cx, b.cz, ...footprint(b)])]);
-        reuse(`${fi}|${active}|roof`, sig, ()=>{
+        reuse(`${fi}|${solid}|roof`, sig, ()=>{
           const rgs = buildRoofGroups(fl.blocks);
-          if(!active) rgs.forEach(ghostify);
+          if(!solid) rgs.forEach(ghostify);
           return rgs;
         }).forEach(rg=>{ rg.position.y = y; });
       }

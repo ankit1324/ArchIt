@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import {hideModal, modal, renderAll, resetCam, showModal} from './ui.js';
 import {C} from './catalog.js';
-import {$, VIEW, escapeMarkup, toast} from './dom.js';
+import {$, EMBED, VIEW, escapeMarkup, toast} from './dom.js';
 import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
-import {FLH, boundsOf, houseTotals, winKinds, winSpec} from './geometry.js';
-import {camera, controls, renderer, requestShadows, scene, wallMats} from './scene.js';
+import {FLH, boundsOf, elevationFrame, elevationSides, houseTotals, winKinds, winSpec} from './geometry.js';
+import {camera, controls, renderer, requestShadows, scene, setContextVisible, wallMats} from './scene.js';
+import {rebuild3D, setSolidAll, toggleRoofs} from './house3d.js';
 import {renderHotspots} from './interact3d.js';
 import {S, dimOffsets, planOff, planSvg, render2D} from './plan2d.js';
 import {shareLink} from './persistence.js';
-import {fmtArea, fmtOpening, fmtSize} from './units.js';
+import {fmtArea, fmtLen, fmtOpening, fmtSize} from './units.js';
 
 /* -------- export: 3D image, 2D plan, full design sheet -------- */
 // Pose the camera, render synchronously and read the pixels in the same task
@@ -100,6 +101,85 @@ function save2D(){
   };
   img.src = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(planSVGDoc(p, `width="${p.w}" height="${p.h}"`));
 }
+/* -------- elevations: straight-on views of each side -------- */
+// Which side of the plan is the front: the bottom edge (+z) unless the plot's
+// facing, sent by the designer, says otherwise.
+let frontSide = 'S';
+export function setFrontSide(f){ frontSide = ['N','E','S','W'].includes(f) ? f : 'S'; }
+const ELEV_NAMES = {front:'Front', rear:'Rear', left:'Left side', right:'Right side'};
+// Put the scene in "drawing" state for any number of shots, then put it back:
+// every floor solid, roofs on, walls opaque, no selection outline, no plot context.
+function withElevationScene(fn){
+  const prevSel = sel; setSel(null);
+  setSolidAll(true); rebuild3D(); toggleRoofs(true);
+  wallMats.forEach(m=>{ m.opacity = 1; m.depthWrite = true; });
+  setContextVisible(false);
+  const size = renderer.getSize(new THREE.Vector2()), pr = renderer.getPixelRatio();
+  try{ return fn(); }
+  finally{
+    renderer.setPixelRatio(pr); renderer.setSize(size.x, size.y, false);
+    setContextVisible(true);
+    wallMats.forEach(m=>{ m.opacity = ui.wallOpacity; m.depthWrite = ui.wallOpacity>0.9; });
+    setSolidAll(false); setSel(prevSel); rebuild3D();
+    if((ui.interior && ui.view==='3d') || ui.walk) toggleRoofs(false);
+    requestShadows();
+  }
+}
+// One side, 1600x900, with the ground line, overall width and wall height drawn on.
+// Call inside withElevationScene().
+function shootElevation(side, title){
+  const W = 1600, H = 900;
+  const fr = elevationFrame(boundsOf(state.floors.flatMap(f=>f.blocks)), side, state.floors.length, state.floor, W/H);
+  const cam = new THREE.OrthographicCamera(-fr.halfW, fr.halfW, fr.halfH, -fr.halfH, 0.1, 200);
+  cam.position.set(fr.pos[0], fr.pos[1], fr.pos[2]);
+  cam.lookAt(fr.target[0], fr.target[1], fr.target[2]);
+  renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+  renderer.shadowMap.needsUpdate = true;
+  renderer.render(scene, cam);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.drawImage(renderer.domElement, 0, 0, W, H);
+  drawElevationDims(g, fr, W, H, title);
+  return c.toDataURL('image/png');
+}
+function drawElevationDims(g, fr, W, H, title){
+  const pxm = H/(2*fr.halfH), cy = fr.target[1];
+  const X = m=>W/2 + m*pxm, Y = y=>H/2 - (y-cy)*pxm;
+  const ink = '#29372c', soft = '#5d665b';
+  const line = (x1,y1,x2,y2,col=soft,w=1.5)=>{ g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); };
+  const tick = (x,y)=>line(x-7, y+7, x+7, y-7, ink, 1.5);
+  const text = (t,x,y,size=28,weight=700,col=ink,align='center')=>{ g.font = `${weight} ${size}px Manrope, system-ui, sans-serif`; g.fillStyle = col; g.textAlign = align; g.fillText(t, x, y); };
+  const gy = Y(fr.y0), xl = X(-fr.span/2), xr = X(fr.span/2), ty = Y(fr.wallTop);
+  line(0, gy, W, gy, ink, 2.5);                                   // ground
+  // overall width, under the ground line
+  const wy = gy + 64;
+  line(xl, wy, xr, wy); line(xl, gy+8, xl, wy+8); line(xr, gy+8, xr, wy+8); tick(xl, wy); tick(xr, wy);
+  text(fmtLen(fr.span), (xl+xr)/2, wy-12);
+  // wall height, right of the house
+  const hx = xr + 84;
+  line(hx, gy, hx, ty); line(xr+10, ty, hx+8, ty); tick(hx, gy); tick(hx, ty);
+  g.save(); g.translate(hx-12, (gy+ty)/2); g.rotate(-Math.PI/2); text(fmtLen(fr.wallTop-fr.y0), 0, 0); g.restore();
+  // each upper floor's level, left of the house
+  for(let i=1; i<state.floors.length; i++){
+    const fy = Y(fr.y0 + i*FLH());
+    g.setLineDash([6,6]); line(xl-90, fy, xl-8, fy); g.setLineDash([]);
+    text('Floor '+(i+1), xl-90, fy-10, 22, 700, soft, 'left');
+  }
+  text(title, 40, 66, 40, 800, ink, 'left');
+  text('ArchIt', W-40, 66, 24, 800, soft, 'right');
+}
+function showElevations(which = 'front'){
+  if(!ELEV_NAMES[which]) which = 'front';
+  const sides = elevationSides(frontSide);
+  const url = withElevationScene(()=>shootElevation(sides[which], ELEV_NAMES[which]+' elevation'));
+  showModal(`<h3>Elevations</h3>
+    <p class="hint">Straight-on views of each side with the overall width and wall height. The front is the side ${EMBED ? 'your plot faces' : 'along the bottom of the 2D plan'}.</p>
+    <div class="tpl-tabs">${Object.entries(ELEV_NAMES).map(([k,n])=>
+      `<button type="button" class="tpl-tab${k===which?' active':''}" data-elev="${k}" aria-pressed="${k===which}">${n}</button>`).join('')}</div>
+    <img class="elev-img" src="${url}" alt="${ELEV_NAMES[which]} elevation of the house">
+    <button class="mbtn" data-elev-save="${which}">Save this elevation</button>
+    <button class="mbtn ghost" data-close>Close</button>`);
+}
 // Report data for the whole house: every floor, not just the active one.
 function reportFloors(floors){
   return floors.map((f,fi)=>({fi, label: fi===0 ? 'Ground floor' : 'Floor '+(fi+1), blocks:f.blocks}));
@@ -113,6 +193,8 @@ function designSheet(){
   const back  = shoot3D([bb.cx,       R*.45, bb.cz-R*1.15],[bb.cx, 1,  bb.cz], false);
   const top   = shoot3D([bb.cx+.01,   R*1.5, bb.cz],       [bb.cx, 0,  bb.cz], true);
   const plan  = planSVGDoc(planShot(), 'style="width:100%;height:auto"');
+  const sides = elevationSides(frontSide);
+  const elevs = withElevationScene(()=>Object.entries(ELEV_NAMES).map(([k,n])=>[n, shootElevation(sides[k], n+' elevation')]));
   const tot = houseTotals(state.floors), multi = state.floors.length>1;
   let roomCards = '';
   reportFloors(state.floors).forEach(fl=>{
@@ -176,6 +258,8 @@ function designSheet(){
       <div class="card"><img src="${top}"><div class="cap">Top (walls transparent)</div></div>
       <div class="card"><div class="plan">${plan}</div><div class="cap">2D floor plan</div></div>
     </div>
+    <h2>Elevations</h2>
+    <div class="grid">${elevs.map(([n,src])=>`<div class="card"><img src="${src}" alt="${n} elevation"><div class="cap">${n} elevation</div></div>`).join('')}</div>
     <h2>Rooms</h2>
     <div class="rooms">${roomCards}</div>
   </div></body></html>`;
@@ -215,6 +299,7 @@ $('#shotB').addEventListener('click', ()=>{
     <h3>Save &amp; export</h3>
     <p class="hint">Save images, a full design sheet, or the project file to continue later on any device.</p>
     <button class="mbtn" data-export="sheet">Design sheet — all previews</button>
+    <button class="mbtn" data-export="elev" style="background:#3f5a47">Front elevation &amp; side views</button>
     <button class="mbtn" data-export="3d" style="background:#ad4a31">Save 3D image</button>
     <button class="mbtn" data-export="2d" style="background:#293c31">Save 2D plan</button>
     <button class="mbtn" data-export="savep" style="background:#29372c">Save project (.json)</button>
@@ -223,10 +308,20 @@ $('#shotB').addEventListener('click', ()=>{
     <button class="mbtn ghost" data-close>Cancel</button>`);
 });
 modal.addEventListener('click', e=>{
+  if(VIEW) return;
+  const tab = e.target.closest('[data-elev]');
+  if(tab){ showElevations(tab.dataset.elev); return; }
+  const sv = e.target.closest('[data-elev-save]');
+  if(sv){
+    const a = document.createElement('a');
+    a.href = modal.querySelector('.elev-img').src; a.download = `archit-${sv.dataset.elevSave}-elevation.png`; a.click();
+    return;
+  }
   const ex = e.target.closest('[data-export]');
-  if(!ex || VIEW) return;
+  if(!ex) return;
   hideModal();
-  if(ex.dataset.export==='3d') save3D();
+  if(ex.dataset.export==='elev') showElevations('front');
+  else if(ex.dataset.export==='3d') save3D();
   else if(ex.dataset.export==='2d') save2D();
   else if(ex.dataset.export==='savep') saveProjectFile();
   else if(ex.dataset.export==='openp') openProjectFile();
