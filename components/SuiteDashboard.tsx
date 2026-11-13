@@ -187,12 +187,15 @@ export default function SuiteDashboard({ me }: { me?: MeSummary | null } = {}) {
               </span>
               Data on Supabase
             </li>
-            <li>
-              <span aria-hidden="true" className="mr-5 text-line-strong">
-                +
-              </span>
-              UPI payments via YouPI
-            </li>
+            {/* nothing is charged while the paywall is off: don't advertise a gateway */}
+            {PAYWALL_ENABLED && (
+              <li>
+                <span aria-hidden="true" className="mr-5 text-line-strong">
+                  +
+                </span>
+                UPI payments via YouPI
+              </li>
+            )}
           </ul>
         </footer>
       </main>
