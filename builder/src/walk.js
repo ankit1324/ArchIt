@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {updateOverlay3D} from './interact3d.js';
-import {$, setPressed, stage} from './dom.js';
+import {$, stage} from './dom.js';
 import {shellWalls} from './catalog.js';
 import {getBlock, state, ui} from './state.js';
 import {resolveWalk, sharedWall, wallSegWorld} from './geometry.js';
 import {camera, canvas, controls, needsRender, renderer, scene, setNeedsRender} from './scene.js';
 import {toggleRoofs} from './house3d.js';
-import {setView} from './ui.js';
+import {setInterior, setView, syncModeButtons} from './ui.js';
 
 /* ===== first-person walkthrough (Walk mode) ===== */
 function createWalkController(camera, domElement, opts) {
@@ -131,7 +131,14 @@ function createWalkController(camera, domElement, opts) {
     pressed.forward = pressed.back = pressed.left = pressed.right = false;
   }
 
-  var api = { update: update, lock: lock, unlock: unlock, dispose: dispose };
+  // Face a new heading (used on every Walk entry so a stale yaw from the last
+  // session cannot snap the view on the first update).
+  function look(newYaw, newPitch) {
+    yaw = newYaw; pitch = newPitch || 0;
+    camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  }
+
+  var api = { update: update, lock: lock, unlock: unlock, dispose: dispose, look: look };
   // Live boolean, matching three.js PointerLockControls.isLocked convention.
   Object.defineProperty(api, 'isLocked', {
     get: function () { return locked; },
@@ -252,17 +259,26 @@ function buildWalkRects(){
 function enterWalk(){
   const b = getBlock(ui.focusRoomId) || (state.blocks && state.blocks[0]); if(!b) return;
   walkActive=true; ui.walk=true; walkRoom=b;
+  if(ui.interior) setInterior(false);   // one mode at a time
   if(ui.view!=='3d') setView('3d');
   controls.enabled=false;
   toggleRoofs(false);
   walkRects=buildWalkRects();
   camera.position.set(b.cx, WALK_EYE, b.cz);
-  camera.rotation.set(0,0,0,'YXZ');
   if(!walkCtl) walkCtl=createWalkController(camera, canvas, {eyeHeight:WALK_EYE, speed:3.2,
     onLockChange:l=>{ walkOverlay&&walkOverlay.setLocked(l); }});
+  // Look toward the rest of the house (centre of all rooms); a bare -z default
+  // stares at the nearest wall and renders as a flat grey screen.
+  let yaw=0;
+  const all=state.blocks||[];
+  if(all.length>1){
+    const mx=all.reduce((a,k)=>a+k.cx,0)/all.length, mz=all.reduce((a,k)=>a+k.cz,0)/all.length;
+    if(Math.hypot(mx-b.cx,mz-b.cz)>.3) yaw=Math.atan2(-(mx-b.cx), -(mz-b.cz));
+  }
+  walkCtl.look(yaw,0);
   if(!walkOverlay){ walkOverlay=createWalkOverlay(); stage.appendChild(walkOverlay.el); }
   walkOverlay.setLocked(false); walkOverlay.show();
-  setPressed($('#btnWalk'), true); setWalkChrome(true);
+  syncModeButtons(); setWalkChrome(true);
   _walkLastT=performance.now();
 }
 // the walk hint pill sits where the stats bar does: hide the bar while walking
@@ -273,7 +289,7 @@ function exitWalk(){
   walkCtl&&walkCtl.unlock();
   walkOverlay&&walkOverlay.hide();
   controls.enabled=true;
-  setPressed($('#btnWalk'), false); setWalkChrome(false);
+  syncModeButtons(); setWalkChrome(false);
   const b=walkRoom||(state.blocks&&state.blocks[0]);
   if(b){ controls.target.set(b.cx,1.1,b.cz); camera.position.set(b.cx+6,5.5,b.cz+7); controls.update(); }
   if(!ui.interior) toggleRoofs(true);

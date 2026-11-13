@@ -87,6 +87,7 @@ const focusRing =
   "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const field = `flex items-baseline gap-1.5 rounded-[5px] border border-line bg-paper-soft/60 px-3.5 py-2.5 text-[14px] focus-within:border-ink`;
 const fieldLabel = "shrink-0 text-[13px] font-medium text-ink-soft";
+const selectAll = (e: React.FocusEvent<HTMLInputElement>) => e.currentTarget.select();
 const fieldInput =
   "w-full min-w-0 bg-transparent font-semibold text-ink outline-none placeholder:font-medium placeholder:text-ink-soft";
 const rowLabel = "text-[13px] font-semibold text-ink-soft";
@@ -119,6 +120,7 @@ function SetupDialog({
 
   const wM = toM(Number(w) || 0, unit);
   const dM = toM(Number(d) || 0, unit);
+  const sizeValid = wM >= 6 && dM >= 6 && wM <= 120 && dM <= 120;
 
   const switchUnit = (u: "m" | "ft") => {
     if (u === unit) return;
@@ -182,6 +184,7 @@ function SetupDialog({
             className={fieldInput}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onFocus={selectAll}
             placeholder="My home"
             autoFocus
           />
@@ -212,6 +215,7 @@ function SetupDialog({
               type="number"
               value={w}
               onChange={(e) => setW(e.target.value)}
+              onFocus={selectAll}
             />
           </label>
           <label className={field}>
@@ -221,6 +225,7 @@ function SetupDialog({
               type="number"
               value={d}
               onChange={(e) => setD(e.target.value)}
+              onFocus={selectAll}
             />
           </label>
         </div>
@@ -228,7 +233,7 @@ function SetupDialog({
         <p className="px-1 text-[14px] leading-relaxed text-ink-soft">
           Plot area:{" "}
           <span className="font-bold tabular-nums text-ink">
-            {wM > 0 && dM > 0
+            {sizeValid
               ? `${Math.round(wM * dM)} m²${
                   unit === "ft"
                     ? ` (${Math.round(wM * dM * FT_PER_M * FT_PER_M)} ft²)`
@@ -326,9 +331,12 @@ export default function DesignerPage() {
   // and bumping `session` hands it the next design without a reload.
   const [builderSetup, setBuilderSetup] = useState<Setup | null>(null);
   const [session, setSession] = useState(0);
-  // null = never toggled: open on desktop, collapsed to a pill on phones, where
-  // the open drawer would sit on top of the builder's own controls
-  const [listOpen, setListOpen] = useState<boolean | null>(null);
+  // collapsed by default so it never covers the builder's toolbar or modals
+  const [listOpen, setListOpen] = useState(false);
+  const [savedNote, setSavedNote] = useState("");
+  // the latest saved id, readable from a stale closure (a late /api/designs
+  // response must not make the next save look like a first save)
+  const currentIdRef = useRef<string | null>(null);
   // the publish / move-pin dialog is open for this design
   const [publishing, setPublishing] = useState<Design | null>(null);
   const [unpublishingId, setUnpublishingId] = useState<string | null>(null);
@@ -353,7 +361,12 @@ export default function DesignerPage() {
     if (!unlocked) return;
     fetch("/api/designs")
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: Design[]) => setDesigns(data))
+      .then((data: Design[]) =>
+        setDesigns((prev) => [
+          ...data,
+          ...prev.filter((p) => !data.some((x) => x.id === p.id)),
+        ]),
+      )
       .catch(() => {});
   }, [unlocked]);
 
@@ -368,6 +381,12 @@ export default function DesignerPage() {
       setPaying(false);
     }
   };
+
+  useEffect(() => {
+    if (!savedNote) return;
+    const t = setTimeout(() => setSavedNote(""), 3000);
+    return () => clearTimeout(t);
+  }, [savedNote]);
 
   const current = designs.find((d) => d.id === currentId) ?? null;
 
@@ -415,8 +434,9 @@ export default function DesignerPage() {
             }
           : current?.meta,
       };
-      const res = current
-        ? await fetch(`/api/designs/${current.id}`, {
+      const existingId = currentIdRef.current ?? current?.id;
+      const res = existingId
+        ? await fetch(`/api/designs/${existingId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -433,12 +453,14 @@ export default function DesignerPage() {
       }
       const saved = (await res.json()) as Design;
       setDesigns((prev) =>
-        current
+        prev.some((d) => d.id === saved.id)
           ? prev.map((d) => (d.id === saved.id ? saved : d))
           : [...prev, saved],
       );
+      currentIdRef.current = saved.id;
       setCurrentId(saved.id);
-      celebrate(current ? "Design saved!" : "Design created!");
+      setSavedNote(`Saved “${saved.name}”`);
+      celebrate(existingId ? "Design saved!" : "Design created!");
       return { ok: true };
     } catch (err) {
       console.warn("Design save failed", err);
@@ -455,6 +477,7 @@ export default function DesignerPage() {
   };
 
   const openDesign = (d: Design) => {
+    currentIdRef.current = d.id;
     setCurrentId(d.id);
     openBuilder({
       name: d.name,
@@ -469,6 +492,7 @@ export default function DesignerPage() {
   };
 
   const newDesign = () => {
+    currentIdRef.current = null;
     setCurrentId(null);
     setSetup(null); // back to the setup questions
   };
@@ -632,48 +656,44 @@ export default function DesignerPage() {
         <SetupDialog onStart={openBuilder} onBack={() => router.push("/")} />
       )}
 
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed bottom-16 left-1/2 z-[90] -translate-x-1/2"
+      >
+        {savedNote && (
+          <p className="rounded-full bg-forest px-4 py-2 text-[13px] font-semibold text-paper shadow-lg">
+            {savedNote}
+          </p>
+        )}
+      </div>
+
       {/* saved designs drawer, floats above the builder; on desktop it sits
           right of the builder's undo/redo buttons, which it used to cover */}
-      <div
-        className={`fixed left-[118px] top-[76px] z-[80] w-[230px] max-[760px]:left-12 max-[760px]:top-2 ${listOpen ? "" : "max-[760px]:w-auto"}`}
-      >
-        <div className="flex flex-col gap-2 rounded-md border border-line bg-paper p-3 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)] max-[760px]:p-1.5">
+      <div className="fixed bottom-3 left-3 z-[80] w-[230px] max-w-[calc(100vw-24px)] max-[760px]:w-auto">
+        <div className="flex flex-col gap-2 rounded-md border border-line bg-paper p-1.5 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)]">
           <div className="flex items-center justify-between gap-1">
-            <span
-              className={`text-[11px] font-bold uppercase tracking-[0.14em] text-ink-soft ${listOpen ? "" : "max-[760px]:hidden"}`}
-            >
-              My designs
-            </span>
-            <Link
-              href="/showcase"
-              className={`ml-auto inline-flex min-h-6 items-center rounded-[4px] px-1.5 text-[12px] font-semibold text-ink-soft underline-offset-4 hover:text-ink hover:underline ${focusRing} ${listOpen ? "" : "max-[760px]:hidden"}`}
-            >
-              Showcase
-            </Link>
+            {listOpen && (
+              <Link
+                href="/showcase"
+                className={`inline-flex min-h-6 items-center rounded-[4px] px-1.5 text-[12px] font-semibold text-ink-soft underline-offset-4 hover:text-ink hover:underline ${focusRing}`}
+              >
+                Showcase
+              </Link>
+            )}
             <button
               type="button"
-              // null until the visitor toggles: CSS decides (open on desktop,
-              // collapsed on phones), so claim no state rather than a wrong one
-              aria-expanded={listOpen ?? undefined}
-              onClick={() =>
-                setListOpen(
-                  !(listOpen ?? !window.matchMedia("(max-width: 760px)").matches),
-                )
-              }
-              className={`inline-flex min-h-8 items-center rounded-full px-2 text-[12px] font-semibold text-ink-soft hover:bg-ink/5 hover:text-ink max-[760px]:min-h-10 max-[760px]:text-ink ${focusRing}`}
+              aria-expanded={listOpen}
+              onClick={() => setListOpen(!listOpen)}
+              className={`ml-auto inline-flex min-h-10 items-center rounded-full px-3 text-[12px] font-semibold text-ink hover:bg-ink/5 ${focusRing}`}
             >
-              <span className="max-[760px]:hidden">
-                {listOpen === false ? "Show" : "Hide"}
-              </span>
-              <span className="hidden max-[760px]:inline">
-                {listOpen ? "Hide" : "My designs"}
-              </span>
+              {listOpen ? "Hide" : "My designs"}
             </button>
           </div>
 
-          {listOpen !== false && (
+          {listOpen && (
             <div
-              className={`flex flex-col gap-2 ${listOpen === null ? "max-[760px]:hidden" : ""}`}
+              className="flex flex-col gap-2 px-1.5 pb-1.5"
             >
               <button
                 type="button"

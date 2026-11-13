@@ -122,6 +122,15 @@ function apply2DInterior(){   // auto-zoom plan to focused room
   const r = stage.getBoundingClientRect();
   setPlanScale(Math.min(170, Math.max(16, Math.min(r.width/(w+1.6), r.height/(d+1.6)))));
 }
+// 3D | 2D | Interior | Walk is one switch: highlight exactly one mode
+// (Walk beats Interior beats the 3D/2D view underneath).
+function syncModeButtons(){
+  const m = ui.walk ? 'walk' : ui.interior ? 'in' : ui.view;
+  setPressed($('#btn3d'), m==='3d');
+  setPressed($('#btn2d'), m==='2d');
+  setPressed($('#btnIn'), m==='in');
+  setPressed($('#btnWalk'), m==='walk');
+}
 function setInterior(on){
   if(on){
     const b = selBlock() || getBlock(ui.focusRoomId) || state.blocks[0];
@@ -137,20 +146,19 @@ function setInterior(on){
     if(ui.view==='2d'){ setPlanScale(54); render2D(); }
     else renderHotspots();
   }
-  setPressed($('#btnIn'), ui.interior);
+  syncModeButtons();
 }
 function setView(v){
   ui.view = v;
-  setPressed($('#btn3d'), v==='3d');
-  setPressed($('#btn2d'), v==='2d');
+  syncModeButtons();
   stage.classList.toggle('mode2d', v==='2d');
   if(v==='2d'){ chips.style.display='none'; if(ui.interior) apply2DInterior(); else fitPlan(); render2D(); }
   else { planSvg.innerHTML=''; renderHotspots(); if(ui.interior) enterInterior(); }
   renderSidebar();
   requestRender();
 }
-$('#btn3d').addEventListener('click', ()=>{ if(walkActive) exitWalk(); setView('3d'); });
-$('#btn2d').addEventListener('click', ()=>{ if(walkActive) exitWalk(); setView('2d'); });
+$('#btn3d').addEventListener('click', ()=>{ if(walkActive) exitWalk(); if(ui.interior) setInterior(false); setView('3d'); });
+$('#btn2d').addEventListener('click', ()=>{ if(walkActive) exitWalk(); if(ui.interior) setInterior(false); setView('2d'); });
 $('#btnWalk').addEventListener('click', ()=>{ walkActive ? exitWalk() : enterWalk(); });
 $('#btnIn').addEventListener('click', ()=>{
   if(walkActive) exitWalk();
@@ -315,4 +323,4 @@ function renderAll(){
   syncToolCursor();
 }
 
-export {dim, hideModal, modal, renderAll, renderSelection, resetCam, setView, showModal};
+export {dim, hideModal, modal, renderAll, renderSelection, resetCam, setInterior, setView, showModal, syncModeButtons};

@@ -9,7 +9,7 @@ import {buildRoofGroups, rebuild3D, toggleRoofs} from './house3d.js';
 import {resize} from './interact3d.js';
 import {exitWalk, walkActive} from './walk.js';
 import {closeToolPop, releaseThumbRenderer} from './tools.js';
-import {hideModal, renderAll, resetCam, setView} from './ui.js';
+import {hideModal, renderAll, resetCam, setView, syncModeButtons} from './ui.js';
 import {snapshotBlob} from './export.js';
 import {setEmbedPlot} from './plot.js';
 import {loadProject, tryHashLoad} from './persistence.js';
@@ -58,7 +58,7 @@ async function newProject(tpl='empty'){
   centreBlocks(state.blocks);
   setUndoStack([]); setRedoStack([]); setSel(null);
   ui.interior = false; ui.focusRoomId = null; ui.tool = null;
-  setPressed($('#btnIn'), false);
+  syncModeButtons();
   closeToolPop();
   toggleRoofs(true);
   resetCam();
