@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {buildFurn} from './furniture.js';
-import {C} from './catalog.js';
+import {C, roomShell, shellWalls} from './catalog.js';
 import {footprint, localToWorld, sel, selBlock, selDoor, selFurn, state, ui, wallLen, wallPoint} from './state.js';
 import {FLH, boundsOf, groundY, loopArea, pointInLoop, roofComponents, roofRects, sharedWall, tint, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
 import {beam, blocksRoot, fitShadows, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setGroundLevel, setSelOutline} from './scene.js';
@@ -18,7 +18,7 @@ function doorPlacement(b, d){
 // neighbour's on a shared wall) and whether each door sits on a shared wall. Being
 // room-local, it is unchanged by moving or rotating the room as a whole.
 function blockContext(b){
-  const walls = (b.type==='balcony' ? [] : b.type==='veranda' ? [1,2,3] : [0,1,2,3]).map(wall=>{
+  const walls = shellWalls(b.type).map(wall=>{
     const wl = wallLen(b, wall);
     const nbs = wallNeighbors(b, wall);
     return {
@@ -105,10 +105,12 @@ function buildBlockGroup(b, ctx = blockContext(b)){
     if(wall%2) shell.add((wall===1?L/2-.05:-L/2+.05),1.12,0, .07,.06,wl-.04, trimMat);
     else       shell.add(0,1.12,(wall===0?W/2-.05:-W/2+.05), wl-.04,.06,.07, trimMat);
   };
-  if(b.type==='balcony') [0,1,2,3].forEach(addRail);
-  if(b.type==='veranda') addRail(0);
+  const shellKind = roomShell(b.type);
+  if(shellKind==='balcony') [0,1,2,3].forEach(addRail);
+  if(shellKind==='veranda') addRail(0);
 
-  if(b.type==='veranda'){
+  // corner posts carry the roof over a veranda or a car porch
+  if(shellKind==='veranda' || shellKind==='porch'){
     [[-L/2+.06,-W/2+.06],[L/2-.06,-W/2+.06],[-L/2+.06,W/2-.06],[L/2-.06,W/2-.06]].forEach(([x,z])=>
       shell.add(x,H/2,z, .09,H,.09, trimMat));
   }
@@ -213,7 +215,7 @@ function buildBlockGroup(b, ctx = blockContext(b)){
   });
 
   // room border — subtle outline so each room reads separately in 3D
-  if(b.type!=='balcony'){
+  if(shellKind!=='balcony'){
     const bh = H;         // wall height only — the roof is now one unified group
     const edge = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(L+.03, bh, W+.03)), edgeMat);
@@ -424,7 +426,7 @@ function buildPitchedRoof(g, L, W, H){
   g.traverse(o=>{ o.userData.roof = true; o.userData.pick = null; });
 }
 function buildRoofGroups(blocks){
-  const eligible = blocks.filter(b=>b.type!=='balcony');
+  const eligible = blocks.filter(b=>roomShell(b.type)!=='balcony');   // balconies and terraces stay open to the sky
   if(!eligible.length) return [];
   const out = [];
   roofComponents(eligible).forEach(comp=>{

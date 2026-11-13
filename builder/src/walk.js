@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {updateOverlay3D} from './interact3d.js';
 import {$, setPressed, stage} from './dom.js';
+import {shellWalls} from './catalog.js';
 import {getBlock, state, ui} from './state.js';
 import {resolveWalk, sharedWall, wallSegWorld} from './geometry.js';
 import {camera, canvas, controls, needsRender, renderer, scene, setNeedsRender} from './scene.js';
@@ -239,9 +240,7 @@ const WALK_RADIUS=.28, WALK_EYE=1.6, WALK_WALLT=.12;
 function buildWalkRects(){
   const rects=[];
   (state.blocks||[]).forEach(b=>{
-    if(b.type==='balcony') return;
-    const walls = b.type==='veranda' ? [1,2,3] : [0,1,2,3];
-    walls.forEach(wall=>{
+    shellWalls(b.type).forEach(wall=>{
       if(sharedWall(b,wall)) return;
       const s=wallSegWorld(b,wall);
       rects.push({x0:Math.min(s.ax,s.bx)-WALK_WALLT, x1:Math.max(s.ax,s.bx)+WALK_WALLT,

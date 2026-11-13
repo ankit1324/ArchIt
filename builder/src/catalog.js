@@ -2,15 +2,27 @@
 
 /* ============================== catalog ============================== */
 const C = {
+  // shell: how the room is built in 3D (default: four walls and a ceiling).
+  //   balcony — no walls, railing all round, no roof    veranda — open front, posts, roof
+  //   porch   — no walls, corner posts, roof (car porch)
+  // Keep each entry on one line: scripts/check-plans.mjs and audit-template-issues.mjs parse it.
   rooms:{
     bedroom:{name:'Bedroom', w:3.0, len:3.6, fill:'#f6ede0', floor:'#e8d9c3'},
     hall:   {name:'Hall',    w:3.6, len:4.8, fill:'#e9eff8', floor:'#dfe6ef'},
-    hallway:{name:'Hallway', w:1.4, len:3.6, fill:'#f1eee8', floor:'#e2ddd2'},
+    dining: {name:'Dining',  w:3.0, len:3.6, fill:'#f4ece2', floor:'#e5d8c6'},
     kitchen:{name:'Kitchen', w:2.4, len:3.0, fill:'#fdeef2', floor:'#f0d9c9'},
     bath:   {name:'Bathroom',w:1.8, len:2.4, fill:'#e4f1ef', floor:'#cfe4e6'},
-    balcony:{name:'Balcony', w:1.5, len:3.0, fill:'#eef4e7', floor:'#d9e4cf', open:true},
-    veranda:{name:'Veranda', w:2.4, len:3.6, fill:'#f7f1e3', floor:'#e6dcc4', open:true},
+    toilet: {name:'Toilet (WC)', w:1.2, len:1.5, fill:'#e1eeee', floor:'#cfe2e4'},
+    puja:   {name:'Puja room', w:1.5, len:1.8, fill:'#fcf1d8', floor:'#f0deb3'},
+    study:  {name:'Study',   w:2.7, len:3.0, fill:'#eef0f6', floor:'#dde1ea'},
+    store:  {name:'Store',   w:1.5, len:1.8, fill:'#efece4', floor:'#ddd8cb'},
+    utility:{name:'Utility / wash area', w:1.5, len:2.4, fill:'#e6eef2', floor:'#d3dfe4'},
+    hallway:{name:'Hallway', w:1.4, len:3.6, fill:'#f1eee8', floor:'#e2ddd2'},
     stairs: {name:'Stairs',  w:1.2, len:3.0, fill:'#ececf4', floor:'#dcdce8'},
+    balcony:{name:'Balcony', w:1.5, len:3.0, fill:'#eef4e7', floor:'#d9e4cf', open:true, shell:'balcony'},
+    veranda:{name:'Veranda', w:2.4, len:3.6, fill:'#f7f1e3', floor:'#e6dcc4', open:true, shell:'veranda'},
+    parking:{name:'Car parking', w:3.0, len:5.4, fill:'#eceae4', floor:'#cfccc4', open:true, shell:'porch'},
+    terrace:{name:'Open terrace', w:3.0, len:4.2, fill:'#eef2e8', floor:'#d8dccd', open:true, shell:'balcony'},
   },
   paint:{
     white:{name:'White', hex:'#f4f2ec'},
@@ -168,4 +180,9 @@ function assertModernExteriorCatalog(){
 }
 assertModernExteriorCatalog();
 
-export {C, MODERN_PRESETS};
+// How a room type is built in 3D: 'closed' unless the catalog says otherwise.
+function roomShell(type){ return C.rooms[type]?.shell || 'closed'; }
+// Walls the shell actually has (wall 0 is the open front of a veranda).
+function shellWalls(type){ const s = roomShell(type); return s==='closed' ? [0,1,2,3] : s==='veranda' ? [1,2,3] : []; }
+
+export {C, MODERN_PRESETS, roomShell, shellWalls};
