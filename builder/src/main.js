@@ -137,9 +137,11 @@ addEventListener('pagehide', e=>{
       }
       initialized = true;
       if(p.design?.v === 3 && p.design.state){ setState(p.design.state); linkFloor(); }
-      else if(p.floors > 1){
+      else {
+        // new designs start in the units picked in the setup dialog
+        if(p.unit === 'ft' || p.unit === 'm') state.unit = p.unit;
         // pre-create the floors chosen in the setup dialog (new designs only)
-        while(state.floors.length < Math.min(p.floors, 3)) state.floors.push({blocks:[]});
+        if(p.floors > 1) while(state.floors.length < Math.min(p.floors, 3)) state.floors.push({blocks:[]});
       }
       setContext(p.plot, p.neighbors, p.facing);
       setUndoStack([]); setRedoStack([]); setSel(null); setDirty(false);

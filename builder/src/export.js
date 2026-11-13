@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import {hideModal, modal, renderAll, resetCam, showModal} from './ui.js';
 import {C} from './catalog.js';
-import {$, VIEW, escapeMarkup, round1, toast} from './dom.js';
+import {$, VIEW, escapeMarkup, toast} from './dom.js';
 import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
 import {FLH, boundsOf, houseTotals} from './geometry.js';
 import {camera, controls, renderer, requestShadows, scene, wallMats} from './scene.js';
 import {renderHotspots} from './interact3d.js';
 import {S, planOff, planSvg, render2D} from './plan2d.js';
 import {shareLink} from './persistence.js';
+import {fmtArea, fmtSize} from './units.js';
 
 /* -------- export: 3D image, 2D plan, full design sheet -------- */
 // Pose the camera, render synchronously and read the pixels in the same task
@@ -126,7 +127,7 @@ function designSheet(){
     roomCards += `<div class="card room">
       <img src="${shot}" alt="">
       <div class="rb"><h3>${i+1}. ${escapeMarkup(b.name || spec.name)}</h3><table>
-        <tr><td>Size</td><td>${b.len} × ${b.w} m — ${round1(b.w*b.len)} m²</td></tr>
+        <tr><td>Size</td><td>${fmtSize(w, d)} — ${fmtArea(b.w*b.len)}</td></tr>
         <tr><td>Walls</td><td>${wallN}</td></tr>
         <tr><td>Floor</td><td>${floorN}</td></tr>
         <tr><td>Doors</td><td>${doors}</td></tr>
@@ -157,12 +158,12 @@ function designSheet(){
   <button class="printbtn">Print / PDF</button>
   <div class="wrap">
     <h1>ArchIt — Design Sheet</h1>
-    <div class="meta">${new Date().toLocaleDateString()} — ${tot.rooms} rooms — ${round1(tot.area)} m² total</div>
+    <div class="meta">${new Date().toLocaleDateString()} — ${tot.rooms} rooms — ${fmtArea(tot.area)} total</div>
     <div class="card summary"><table>
       <tr><td>Facade</td><td>${C.facade[state.facade].name}, ${C.facadeMat[state.facadeMat].name}</td></tr>
       <tr><td>Roof</td><td>${C.roofStyle[state.roofStyle].name}, ${C.roofCol[state.roofCol].name}</td></tr>
       <tr><td>Interior</td><td>${C.paint[state.paint].name} walls</td></tr>
-      <tr><td>Total area</td><td>${round1(tot.area)} m² across ${tot.rooms} rooms${multi ? ' on '+state.floors.length+' floors' : ''}</td></tr>
+      <tr><td>Total area</td><td>${fmtArea(tot.area)} across ${tot.rooms} rooms${multi ? ' on '+state.floors.length+' floors' : ''}</td></tr>
     </table></div>
     <h2>3D previews</h2>
     <div class="card"><img src="${hero}"><div class="cap">Overview</div></div>

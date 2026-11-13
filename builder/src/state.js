@@ -17,6 +17,7 @@ function freshState(){
     paint:'white', facade:'white', facadeMat:'paint', roofStyle:'flat', roofCol:'light',
     seq:{block:0, door:0, win:0, part:0, furn:0},
     blocks:[], floors:null, floor:0,
+    unit: state?.unit === 'ft' ? 'ft' : 'm',   // Start over / templates keep the user's units
   };
   s.floors = [{blocks:s.blocks}];   // state.blocks always aliases the active floor's array
   return s;
@@ -53,6 +54,7 @@ function sanitizeState(){
   const floors = arr(state.floors).length ? arr(state.floors) : [{blocks:state.blocks}];
   state.floors = floors.slice(0, 3).map(fl=>({...fl, blocks:arr(fl.blocks).filter(b=>key(C.rooms, b.type)).map(block)}));
   state.floor = Math.max(0, int(state.floor));
+  state.unit = state.unit === 'ft' ? 'ft' : 'm';
   const seq = state.seq && typeof state.seq === 'object' ? state.seq : {};
   state.seq = {block:int(seq.block), door:int(seq.door), win:int(seq.win), part:int(seq.part), furn:int(seq.furn)};
 }

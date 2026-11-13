@@ -1,9 +1,10 @@
 import './walk.js';
 import {C} from './catalog.js';
-import {$, VIEW, chips, escapeMarkup, ov, round1, stage, toast} from './dom.js';
+import {$, VIEW, chips, escapeMarkup, ov, stage, toast} from './dom.js';
 import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setDirty, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
 import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
+import {fmtLen, fmtSize, isFt, snapLen} from './units.js';
 import {renderAll, renderSelection} from './ui.js';
 import {placeFurniture} from './tools.js';
 
@@ -51,6 +52,7 @@ function render2D(){
 
   blks.forEach(b=>{ s += blockSvg(b, ox, oy); });
   planSvg.innerHTML = s;
+  syncScaleBar();
 
   // hotspots (+) around blocks — html overlay (hidden in interior focus mode)
   ov.querySelectorAll('.hs').forEach(e=>e.remove());
@@ -140,8 +142,8 @@ function blockSvg(b, ox, oy){
   if(seld){
     // side dimension pills + corner handles
     const [topPill, leftPill] = dimPillCentres(x0, y0, W2, D2);
-    s += chip2D(topPill[0], topPill[1], `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
-    s += chip2D(leftPill[0], leftPill[1], `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
+    s += chip2D(topPill[0], topPill[1], fmtLen(b.rot%2? b.w : b.len), '#ad4a31');
+    s += chip2D(leftPill[0], leftPill[1], fmtLen(b.rot%2? b.len : b.w), '#ad4a31', true);
     [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
      [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
       const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
@@ -234,7 +236,7 @@ planSvg.addEventListener('pointermove', e=>{
     if(drag2.sx>0) R = Math.max(L+mn, Math.min(L+mx, wx));
     if(drag2.sz<0) T = Math.min(B-mn, Math.max(B-mx, wz));
     if(drag2.sz>0) B = Math.max(T+mn, Math.min(T+mx, wz));
-    const rw = Math.round((R-L)*10)/10, rd = Math.round((B-T)*10)/10;  // snap 0.1 m
+    const rw = snapLen(R-L), rd = snapLen(B-T);   // 0.1 m, or 6 in when planning in feet
     if(drag2.sx<0) L = R-rw; else R = L+rw;
     if(drag2.sz<0) T = B-rd; else B = T+rd;
     b.cx = (L+R)/2; b.cz = (T+B)/2;
@@ -434,8 +436,15 @@ function placeDoorByClick(blockId, e){
   });
 }
 
+// The corner scale bar: 1 m, or 3 ft, at the current zoom (it was a fixed "1 m").
+function syncScaleBar(){
+  const sb = $('#scalebar'); if(!sb) return;
+  const ft = isFt(), len = ft ? 3/3.280839895 : 1;
+  const bar = sb.querySelector('.bar'); if(bar) bar.style.width = Math.round(len*S)+'px';
+  sb.firstChild.textContent = ft ? '3 ft' : '1 m';
+}
 // Width-as-drawn x depth-as-drawn, so the label matches the pills and the picture.
-function roomSizeLabel(b){ const [w,d] = footprint(b); return `${round1(w)} × ${round1(d)} m`; }
+function roomSizeLabel(b){ const [w,d] = footprint(b); return fmtSize(w, d); }
 export function setPlanScale(v){ return S = v; }
 
 export {S, fitPlan, planOff, planSvg, render2D, roomSizeLabel};
