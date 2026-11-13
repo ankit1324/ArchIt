@@ -12,7 +12,6 @@ const LINKS: Array<{ label: string; href: string }> = [
   { label: "Find", href: "/find" },
   { label: "Designer", href: "/designer" },
   { label: "Showcase", href: "/showcase" },
-  { label: "ArchIt Lite", href: "https://archit-lit.chaudharyankit.in/" },
 ];
 
 const FOCUS =
@@ -48,7 +47,7 @@ export default function Navbar({ variant = "site" }: { variant?: "site" | "app" 
 
   const link = (l: (typeof LINKS)[number], cls: string) => {
     const current = isCurrent(pathname, l.href);
-    // ArchIt Lite is a separate deployment: plain anchor, no prefetch
+    // an off-site link (none today) gets a plain anchor, no prefetch
     return l.href.startsWith("/") ? (
       <Link
         key={l.label}

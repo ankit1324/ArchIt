@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import Navbar from "@/components/Navbar";
 import MobileTabBar from "@/components/MobileTabBar";
-import { ApartmentsIcon, HouseIcon, SearchIcon } from "@/components/icons";
+import { ApartmentsIcon, SearchIcon } from "@/components/icons";
 import { feeLabel } from "@/lib/fees";
 import { PAYWALL_ENABLED } from "@/lib/paywall";
 import type { MeSummary } from "@/lib/me";
@@ -16,19 +16,6 @@ const GUTTER = "mx-auto w-full max-w-[1400px] px-[clamp(20px,5.5vw,84px)]";
 const EYEBROW = "text-[11px] font-bold uppercase leading-[1.8] tracking-[0.14em]";
 
 const PRODUCTS = [
-  {
-    name: "ArchIt Lite",
-    tagline: "A taste of the atelier",
-    body: "Explore a crafted 3D showcase home in your browser. No account, no cost — just walk in.",
-    badge: "Free",
-    badgeClass: "bg-highlight text-ink",
-    // the landing's starter-card tints, in the same order
-    tint: "bg-[#f0f0e7]",
-    cta: "Try it free",
-    href: "https://archit-lit.chaudharyankit.in/",
-    external: true,
-    Icon: HouseIcon,
-  },
   {
     name: "ArchIt Find",
     tagline: "Every home, on a living map",
@@ -134,7 +121,7 @@ export default function SuiteDashboard({ me }: { me?: MeSummary | null } = {}) {
             Pick a tool.
           </h2>
 
-          <div className="mt-8 grid gap-[18px] lg:grid-cols-3">
+          <div className="mt-8 grid gap-[18px] lg:grid-cols-2">
             {PRODUCTS.map((p, i) => (
               <article
                 key={p.name}

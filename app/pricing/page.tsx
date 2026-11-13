@@ -52,7 +52,6 @@ const PLANS: Array<{
 const FREE = [
   "Browsing the 3D property map and every listing's details",
   "Listing your own property",
-  "ArchIt Lite",
 ];
 
 // The landing's starter-card tints, cycled so neighbouring cards differ.
