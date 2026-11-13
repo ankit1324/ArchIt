@@ -670,7 +670,7 @@ export default function DesignerPage() {
 
       {/* saved designs drawer, floats above the builder; on desktop it sits
           right of the builder's undo/redo buttons, which it used to cover */}
-      <div className="fixed bottom-3 left-3 z-[80] w-[230px] max-w-[calc(100vw-24px)] max-[760px]:w-auto">
+      <div className={`fixed bottom-3 left-3 z-[80] max-w-[calc(100vw-24px)] ${listOpen ? "w-[230px] max-[760px]:w-auto" : "w-auto"}`}>
         <div className="flex flex-col gap-2 rounded-md border border-line bg-paper p-1.5 shadow-[0_18px_35px_-24px_rgb(41_55_44/0.45)]">
           <div className="flex items-center justify-between gap-1">
             {listOpen && (

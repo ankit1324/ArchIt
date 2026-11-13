@@ -10,6 +10,7 @@ import {resize} from './interact3d.js';
 import {exitWalk, walkActive} from './walk.js';
 import {closeToolPop, releaseThumbRenderer} from './tools.js';
 import {hideModal, renderAll, resetCam, setView, syncModeButtons} from './ui.js';
+import {fitPlan} from './plan2d.js';
 import {snapshotBlob} from './export.js';
 import {setEmbedPlot} from './plot.js';
 import {loadProject, tryHashLoad} from './persistence.js';
@@ -151,6 +152,9 @@ addEventListener('pagehide', e=>{
       resetCam(); renderAll();
       // a viewer wants the house, not the editing plan newProject() opened
       if(VIEW) setView('3d');
+      // the 2D zoom was fitted to the empty slate; refit it to the loaded design
+      // (next frame, so the stage has its final size)
+      else if(ui.view === '2d') requestAnimationFrame(fitPlan);
     });
     // Parent replies once the design row is written (after the thumbnail
     // upload); only then is the design really saved.
