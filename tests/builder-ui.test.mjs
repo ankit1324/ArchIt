@@ -68,8 +68,10 @@ test('mode buttons start with aria-pressed and every on-toggle syncs it', () => 
   for (const id of ['btn3d', 'btn2d', 'btnIn', 'btnWalk']) {
     assert.match(html, new RegExp(`id="${id}"[^>]*aria-pressed="(true|false)"`), id);
   }
-  assert.match(src, /setPressed\(\$\('#btnWalk'\), true\)/);
-  assert.match(src, /setPressed\(\$\('#btnWalk'\), false\)/);
+  // all four buttons are driven from one function so only one mode looks active
+  for (const id of ['btn3d', 'btn2d', 'btnIn', 'btnWalk']) {
+    assert.match(src, new RegExp(`setPressed\\(\\$\\('#${id}'\\), m===`), id);
+  }
 });
 
 test('icon-only buttons all have an aria-label', () => {

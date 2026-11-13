@@ -5,6 +5,7 @@ import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, set
 import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, winSpec, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
 import {fmtLen, fmtSize, isFt, snapLen} from './units.js';
+import {currentPlot} from './plot.js';
 import {renderAll, renderSelection} from './ui.js';
 import {placeFurniture} from './tools.js';
 
@@ -14,7 +15,7 @@ let S = 54;                 // px per metre (2D zoom changes it)
 const DIM_ROOM = 112;       // px the two dimension rows need beyond the plan edge
 function fitPlan(){
   if(!state?.blocks.length) return;
-  const bb = boundsOf(state.blocks), r = stage.getBoundingClientRect();
+  const bb = viewBounds(state.blocks), r = stage.getBoundingClientRect();
   // leave room under and right of the plan for the dimension rows
   S = Math.max(8, Math.min(70, (r.width-150-DIM_ROOM)/Math.max(bb.w,1), (r.height-180-DIM_ROOM)/Math.max(bb.d,1)));
   if(ui.view==='2d') render2D();
@@ -27,7 +28,7 @@ function render2D(){
   const r = stage.getBoundingClientRect();
   const focus = ui.interior ? getBlock(ui.focusRoomId) : null;   // interior mode: single-room plan
   const blks = focus ? [focus] : state.blocks;
-  const bb = blks.length ? boundsOf(blks) : {cx:0,cz:0};
+  const bb = !blks.length ? {cx:0,cz:0} : focus ? boundsOf(blks) : viewBounds(blks);
   // whole-floor view: nudge the plan up-left by half the dimension rows' depth so
   // plan + rows sit centred together
   const nudge = focus ? 0 : DIM_ROOM/2;
@@ -55,13 +56,16 @@ function render2D(){
     });
   }
 
+  const plot = focus ? null : currentPlot();
+  if(plot) s += plotSvg(plot, ox, oy);
   blks.forEach(b=>{ s += blockSvg(b, ox, oy); });
-  if(!focus && blks.length) s += dimLinesSvg(blks, ox, oy);
+  if(!focus && blks.length) s += dimLinesSvg(blks, ox, oy) + northSvg(bb, ox, oy);
   planSvg.innerHTML = s;
   syncScaleBar();
 
   // hotspots (+) around blocks — html overlay (hidden in interior focus mode)
   ov.querySelectorAll('.hs').forEach(e=>e.remove());
+  let topHsY = Infinity;   // y of a "+" above the selected room: the chips must clear it
   if(!focus && !VIEW){
   computeHotspots();
   hotspots.filter(h=>state.blocks.length===1 || (sel?.kind==='block' && h.blockId===sel.blockId)).forEach(h=>{
@@ -70,6 +74,7 @@ function render2D(){
     const el = document.createElement('button');
     el.className='hs'; el.setAttribute('aria-label', 'Add a room on this side');
     el.style.left = px+'px'; el.style.top = py+'px';
+    if(h.sz < 0 && h.blockId === sel?.blockId) topHsY = Math.min(topHsY, py);
     el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>';
     el.addEventListener('click', e=>{ e.stopPropagation(); addRoomAt(h.blockId, h.sx, h.sz); });
     ov.appendChild(el);
@@ -80,7 +85,9 @@ function render2D(){
   if(b && (sel.kind==='block' || sel.kind==='furn')){
     const [w,d] = footprint(b);
     const [px,py] = P(b.cx, b.cz-d/2, ox, oy);
-    chips.style.display='flex'; chips.style.left=px+'px'; chips.style.top=(py-58)+'px';
+    // sit above the top "+" (centred, ~36 px tall) instead of on it
+    const top = Math.min(py-58, topHsY - 22 - 44);
+    chips.style.display='flex'; chips.style.left=px+'px'; chips.style.top=top+'px';
   } else chips.style.display='none';
 
   planSvg.onclick = ()=>{ if(justDragged2) return; setSel(null); renderSelection(); };
@@ -222,7 +229,7 @@ planSvg.addEventListener('pointermove', e=>{
   if(!drag2.moved){
     // hotspots and chips are placed for the old layout: hide them until drop
     ov.style.visibility = 'hidden'; chips.style.display = 'none';
-    planSvg.querySelector('.dims')?.setAttribute('visibility', 'hidden');
+    planSvg.querySelectorAll('.dims, .north').forEach(g=>g.setAttribute('visibility', 'hidden'));
     drag2.el = planSvg.querySelector(`.blk[data-id="${drag2.b.id}"]`);
     drag2.el?.querySelector('rect')?.removeAttribute('filter');
   }
@@ -451,6 +458,38 @@ function placeDoorByClick(blockId, e){
   });
 }
 
+/* -------- plot outline and north arrow -------- */
+// What the 2D view frames: the rooms, plus the plot when there is one.
+function viewBounds(blocks){
+  const bb = boundsOf(blocks), p = currentPlot();
+  if(!p) return bb;
+  const x0 = Math.min(bb.x0, -p.w/2), x1 = Math.max(bb.x1, p.w/2), z0 = Math.min(bb.z0, -p.d/2), z1 = Math.max(bb.z1, p.d/2);
+  return {x0, x1, z0, z1, w:x1-x0, d:z1-z0, cx:(x0+x1)/2, cz:(z0+z1)/2};
+}
+// The plot line, its size, and which edge is the front (the road side).
+function plotSvg(p, ox, oy){
+  const [x0,y0] = P(-p.w/2, -p.d/2, ox, oy), [x1,y1] = P(p.w/2, p.d/2, ox, oy);
+  const mx = (x0+x1)/2, my = (y0+y1)/2, f = p.facing;
+  // the front edge is drawn solid and named just outside the plot
+  const edge = f==='N' ? [x0,y0,x1,y0] : f==='S' ? [x0,y1,x1,y1] : f==='E' ? [x1,y0,x1,y1] : f==='W' ? [x0,y0,x0,y1] : null;
+  const at = f==='N' ? [mx, y0-8, 0] : f==='S' ? [mx, y1+15, 0] : f==='E' ? [x1+15, my, -90] : f==='W' ? [x0-8, my, -90] : null;
+  // the size sits above the top-left corner, or below it when the front label is up there
+  const sizeY = f==='N' ? y1+15 : y0-8;
+  return `<g class="plot" pointer-events="none">
+    <rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="#eee5d9" fill-opacity=".35" stroke="#ad4a31" stroke-width="1.5" stroke-dasharray="9 6"/>
+    ${edge ? `<line x1="${edge[0]}" y1="${edge[1]}" x2="${edge[2]}" y2="${edge[3]}" stroke="#ad4a31" stroke-width="4"/>` : ''}
+    <text class="plottxt" x="${x0+2}" y="${sizeY}">Plot ${fmtSize(p.w, p.d)}</text>
+    ${at ? `<text class="plottxt" x="${at[0]}" y="${at[1]}" text-anchor="middle"${at[2] ? ` transform="rotate(${at[2]} ${at[0]} ${at[1]})"` : ''}>FRONT · ROAD SIDE</text>` : ''}
+  </g>`;
+}
+// North is always up the page (-z): Vastu and the plot's facing both read off it.
+function northSvg(bb, ox, oy){
+  const [x1,y0] = P(bb.x1, bb.z0, ox, oy), x = x1+26, y = y0-30;
+  return `<g class="north" pointer-events="none"><title>North</title>
+    <circle cx="${x}" cy="${y}" r="13" fill="#f8f7f2" stroke="#5d665b" stroke-width="1"/>
+    <path d="M ${x} ${y-9} L ${x+5} ${y+6} L ${x} ${y+3} L ${x-5} ${y+6} Z" fill="#29372c"/>
+    <text class="plottxt" x="${x}" y="${y-17}" text-anchor="middle" style="fill:#29372c">N</text></g>`;
+}
 /* -------- dimension lines -------- */
 // Every distinct room edge along one axis, merged within 2 cm, low to high.
 // The gaps between them are the room-by-room chain a builder measures off.
@@ -514,4 +553,4 @@ function syncScaleBar(){
 function roomSizeLabel(b){ const [w,d] = footprint(b); return fmtSize(w, d); }
 export function setPlanScale(v){ return S = v; }
 
-export {S, dimOffsets, fitPlan, planOff, planSvg, render2D, roomSizeLabel};
+export {S, dimOffsets, fitPlan, planOff, planSvg, render2D, roomSizeLabel, viewBounds};

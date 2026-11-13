@@ -21,6 +21,8 @@ interface DesignerOverlayProps {
   floors?: number;
   /** units a new design starts in (saved designs keep their own); new designs only */
   unit?: "m" | "ft";
+  /** the owner's budget in rupees, shown against the builder's cost estimate */
+  budget?: number;
   facing?: DesignMeta["facing"];
   /** present when reopening a saved design */
   existingDesign?: DesignStateV3;
@@ -52,7 +54,7 @@ type BuilderMessage =
 
 function sendInit(
   frame: HTMLIFrameElement | null,
-  p: Pick<DesignerOverlayProps, "plot" | "neighbors" | "floors" | "unit" | "facing" | "existingDesign">,
+  p: Pick<DesignerOverlayProps, "plot" | "neighbors" | "floors" | "unit" | "budget" | "facing" | "existingDesign">,
 ) {
   frame?.contentWindow?.postMessage(
     {
@@ -62,6 +64,7 @@ function sendInit(
         neighbors: p.neighbors,
         floors: p.floors,
         unit: p.unit,
+        budget: p.budget,
         facing: p.facing,
         design: p.existingDesign,
       },
@@ -77,6 +80,7 @@ export default function DesignerOverlay({
   neighbors,
   floors,
   unit,
+  budget,
   facing,
   existingDesign,
   onSave,
@@ -90,6 +94,7 @@ export default function DesignerOverlay({
     neighbors,
     floors,
     unit,
+    budget,
     facing,
     existingDesign,
     onSave,
@@ -103,6 +108,7 @@ export default function DesignerOverlay({
       neighbors,
       floors,
       unit,
+      budget,
       facing,
       existingDesign,
       onSave,

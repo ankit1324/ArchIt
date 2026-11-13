@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { ApartmentsIcon, HouseIcon, LogoMark, SearchIcon } from "./icons";
+import { ApartmentsIcon, LogoMark, SearchIcon } from "./icons";
 
 const TABS = [
   { label: "Home", href: "/", Icon: LogoMark },
   { label: "Find", href: "/find", Icon: SearchIcon },
   { label: "Builder", href: "/designer", Icon: ApartmentsIcon },
-  // separate deployment — plain anchor, no prefetch
-  { label: "Lite", href: "https://archit-lit.chaudharyankit.in/", Icon: HouseIcon },
 ];
 
 /**

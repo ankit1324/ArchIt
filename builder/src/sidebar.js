@@ -1,6 +1,9 @@
 import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
-import {$, VIEW, escapeMarkup, side, toast} from './dom.js';
+import {$, EMBED, VIEW, escapeMarkup, side, toast} from './dom.js';
+import {currentPlot, frontSide, plotReport, suggestPlot} from './plot.js';
+import {vastuReport} from './vastu.js';
+import {costEstimate, costTiers, fmtINR, fmtQty} from './cost.js';
 import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, wallLen} from './state.js';
 import {boundsOf, freeT, houseTotals, overlaps, refitFurniture, sharedWall, winKinds, winSpec} from './geometry.js';
 import {openToolPop} from './tools.js';
@@ -15,6 +18,85 @@ function summaryRows(floors, fi){
     rows.push(['Floor '+(fi+1), bl.length+(bl.length===1?' room':' rooms')+' · '+fmtArea(a)]);
   }
   return rows;
+}
+
+/* -------- plot: size, setbacks, ground coverage, FAR -------- */
+const COMPASS = {N:'North', E:'East', S:'South', W:'West'};
+function plotSection(){
+  const p = currentPlot();
+  if(!p) return EMBED ? '<div class="note">This design has no plot size.</div>'
+    : `<div class="note">Add your plot to see setbacks, ground coverage and FAR, and to catch rooms that cross the plot line.</div>
+       <button class="addbtn" data-act="addplot">+ Add plot size</button>`;
+  const field = (act, lbl, v)=>`<div><div class="f-label" style="margin-top:0">${lbl}, ${isFt()?'ft':'m'}</div>
+    ${isFt()
+      ? `<input class="inp" data-act="${act}" type="text" inputmode="decimal" autocomplete="off" value="${escapeMarkup(lenInputValue(v))}" aria-label="Plot ${lbl.toLowerCase()} in feet and inches">`
+      : `<input class="inp" data-act="${act}" type="number" step="0.5" min="3" max="200" value="${lenInputValue(v)}">`}</div>`;
+  let h = EMBED
+    ? `<div class="dimrow"><span>Plot</span><b>${fmtSize(p.w, p.d)}</b></div>
+       <div class="dimrow"><span>Front faces</span><b>${p.facing ? COMPASS[p.facing] : 'Not set'}</b></div>`
+    : `<div class="grid2">${field('pw', 'Width', p.w)}${field('pd', 'Depth', p.d)}</div>
+       <div class="f-label">Front faces</div>
+       <span class="unitseg" role="group" aria-label="Side the plot faces">${Object.entries(COMPASS).map(([k,n])=>
+         `<button type="button" data-act="pface" data-f="${k}" aria-pressed="${p.facing===k}" title="${n}">${k}</button>`).join('')}</span>`;
+  const r = plotReport(p, state.floors, frontSide());
+  if(r){
+    const gapRow = (lbl, side, v)=>`<div class="dimrow"><span>${lbl} <span style="color:#8a9186">(${COMPASS[side].toLowerCase()})</span></span>
+      <b${v < -0.011 ? ' style="color:#ad4a31"' : ''}>${v < -0.011 ? 'over by '+fmtLen(-v) : fmtLen(Math.max(0, v))}</b></div>`;
+    h += `<div class="hr" style="margin:12px 0 4px"></div>
+      <div class="dimrow"><span>Plot area</span><b>${fmtArea(r.plotArea)}</b></div>
+      <div class="dimrow"><span>Ground coverage</span><b>${Math.round(r.coverage*100)}%</b></div>
+      <div class="dimrow"><span>FAR / FSI</span><b>${r.far.toFixed(2)}</b></div>
+      <div class="f-label">Setbacks — space left to the plot line</div>
+      ${gapRow('Front', r.sides.front, r.setbacks.front)}${gapRow('Rear', r.sides.rear, r.setbacks.rear)}
+      ${gapRow('Left', r.sides.left, r.setbacks.left)}${gapRow('Right', r.sides.right, r.setbacks.right)}
+      ${r.notes.map(n=>`<div class="note" style="color:${n.level==='bad' ? '#ad4a31' : '#7a5a12'};font-weight:700">${n.text}</div>`).join('')}
+      <div class="note">Bye-laws differ by city and plot size. Check these figures against your local rules.</div>`;
+  }
+  if(!EMBED) h += '<button class="collapse" data-act="delplot" style="color:#ad4a31;border-color:#dcb3a6">Remove plot</button>';
+  return h;
+}
+
+/* -------- cost estimate -------- */
+function costSection(){
+  const tiers = costTiers(), e = costEstimate(state.floors, state.cost);
+  if(!e.sqft) return '<div class="note">Add rooms to estimate the building cost.</div>';
+  SEL_H['ctier'] = v=>commit(()=>{ state.cost = {...state.cost, tier:v, rate:undefined}; });   // a new finish starts at its own rate
+  const tierOpts = Object.entries(tiers).map(([k,t])=>`
+    <button class="sel-item" data-v="${k}"><span><span class="nm">${t.name} — \u20b9${t.rate.toLocaleString('en-IN')} / sq ft</span><span class="sb">${t.note}</span></span>
+      ${k===e.tier?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
+    </button>`).join('');
+  const sqft = Math.round(e.sqft).toLocaleString('en-IN') + ' sq ft';
+  return `<div class="f-label" style="margin-top:0">Finish</div>
+    ${selectHTML('ctier', tierOpts, `<span>${tiers[e.tier].name}</span>`)}
+    <div class="grid2" style="margin-top:12px">
+      <div><div class="f-label" style="margin-top:0">Rate, \u20b9 / sq ft</div>
+        <input class="inp" data-act="crate" type="number" step="50" min="500" max="20000" value="${e.rate}" aria-label="Construction rate in rupees per square foot"></div>
+      <div><div class="f-label" style="margin-top:0">Your budget, \u20b9</div>
+        <input class="inp" data-act="cbudget" type="number" step="50000" min="0" value="${e.budget ?? ''}" placeholder="Optional" aria-label="Your budget in rupees"></div>
+    </div>
+    <div class="costbig"><span>Estimated building cost</span><b>${fmtINR(e.total)}</b>
+      <i>${fmtINR(e.low)} – ${fmtINR(e.high)} · ${sqft} built-up</i></div>
+    ${e.budget == null ? '' : `<div class="note" style="font-weight:700;color:${e.diff >= 0 ? '#547548' : '#ad4a31'}">${e.diff >= 0
+      ? 'Within your budget, with '+fmtINR(e.diff)+' to spare.' : 'Over your budget by '+fmtINR(-e.diff)+'. A smaller plan or a simpler finish closes the gap.'}</div>`}
+    <div class="f-label">Materials, roughly</div>
+    ${e.materials.map(m=>`<div class="dimrow"><span>${m.name}</span><b>${fmtQty(m.qty, m.unit)}</b></div>`).join('')}
+    <div class="note">Building work and finishes only, from per-square-foot thumb rules. Land, approvals, architect fees, compound wall, borewell and furniture are extra. Rates vary by city — get two local quotes.</div>`;
+}
+
+/* -------- Vastu guide -------- */
+const VASTU_DOT = {good:'#547548', ok:'#b8892b', avoid:'#ad4a31'};
+const VASTU_WORD = {good:'Good', ok:'Fine', avoid:'Avoid'};
+function vastuSection(){
+  const r = vastuReport(state.floors);
+  if(!r || !r.items.length) return '<div class="note">Add rooms to see how the plan sits with Vastu.</div>';
+  const multi = state.floors.length > 1;
+  return `<div class="dimrow"><span>Vastu match</span><b>${r.score}%</b></div>
+    <div class="vbar" role="img" aria-label="${r.score} percent"><i style="width:${r.score}%"></i></div>
+    ${r.items.map(x=>`<div class="vrow">
+      <span class="vdot" style="background:${VASTU_DOT[x.verdict]}" aria-hidden="true"></span>
+      <span><span class="nm">${escapeMarkup(x.name)}${multi && x.name!=='Main entrance' ? ' <span class="vfl">F'+(x.floor+1)+'</span>' : ''}</span>
+        <span class="sb">${VASTU_WORD[x.verdict]} · ${x.whereText}${x.tip ? '. '+x.tip : ''}</span></span></div>`).join('')}
+    <div class="note">North is up the plan. Zones are thirds of the whole house. Vastu is traditional guidance, not a building rule.</div>`;
 }
 
 /* ============================== sidebar ============================== */
@@ -130,6 +212,9 @@ function renderPanel(){
       }));
       return (rows || `<div class="note">Pick a piece in the toolbar catalog, then tap a room to place it.</div>`);
     }],
+    ['plot','Plot &amp; setbacks', plotSection],
+    ['vastu','Vastu guide', vastuSection],
+    ['cost','Cost estimate', costSection],
   ];
   const sumRows = summaryRows(state.floors, state.floor);
   side.innerHTML = `
@@ -343,6 +428,13 @@ side.addEventListener('click', e=>{
   if(!act) return;
   const a = act.dataset.act;
   if(a==='close'){ setSel(null); renderSelection(); }
+  if(a==='addplot'){
+    const all = state.floors.flatMap(f=>f.blocks); if(!all.length) return;
+    commit(()=>{ state.plot = suggestPlot(boundsOf(all)); });
+    toast('Plot added — type your real plot size');
+  }
+  if(a==='delplot') commit(()=>{ state.plot = undefined; });
+  if(a==='pface' && state.plot) commit(()=>{ state.plot.facing = act.dataset.f; });
   if(a==='unit'){
     const u = act.dataset.u === 'ft' ? 'ft' : 'm';
     if(u !== state.unit) commit(()=>{ state.unit = u; });
@@ -386,6 +478,24 @@ side.addEventListener('change', e=>{
     const d = selDoor(); if(!d) return;
     const v = Math.max(+el.min, Math.min(+el.max, +el.value||0));
     commit(()=>{ d[el.dataset.act==='dw'?'w':'h'] = fromOpening(v); });
+  }
+  if(el.dataset.act==='crate'){
+    const v = Math.max(500, Math.min(20000, Math.round(+el.value||0)));
+    commit(()=>{ state.cost = {...state.cost, rate:v}; });
+    return;
+  }
+  if(el.dataset.act==='cbudget'){
+    const v = Math.max(0, Math.round(+el.value||0));
+    commit(()=>{ state.cost = {...state.cost, budget: v || undefined}; });
+    return;
+  }
+  if(el.dataset.act==='pw'||el.dataset.act==='pd'){
+    if(!state.plot) return;
+    const raw = parseLen(el.value);
+    if(raw == null){ toast(isFt() ? "Type feet and inches, like 30' or 30' 6\"" : 'Type a size in metres'); renderSidebar(); return; }
+    const v = Math.max(3, Math.min(200, raw));
+    commit(()=>{ state.plot[el.dataset.act==='pw' ? 'w' : 'd'] = Math.round(v*1000)/1000; });
+    return;
   }
   if(['ww','wh','ws'].includes(el.dataset.act)){
     const b = selBlock(), w = selWin(); if(!b||!w) return;
