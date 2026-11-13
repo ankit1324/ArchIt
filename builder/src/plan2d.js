@@ -65,6 +65,7 @@ function render2D(){
 
   // hotspots (+) around blocks — html overlay (hidden in interior focus mode)
   ov.querySelectorAll('.hs').forEach(e=>e.remove());
+  let topHsY = Infinity;   // y of a "+" above the selected room: the chips must clear it
   if(!focus && !VIEW){
   computeHotspots();
   hotspots.filter(h=>state.blocks.length===1 || (sel?.kind==='block' && h.blockId===sel.blockId)).forEach(h=>{
@@ -73,6 +74,7 @@ function render2D(){
     const el = document.createElement('button');
     el.className='hs'; el.setAttribute('aria-label', 'Add a room on this side');
     el.style.left = px+'px'; el.style.top = py+'px';
+    if(h.sz < 0 && h.blockId === sel?.blockId) topHsY = Math.min(topHsY, py);
     el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>';
     el.addEventListener('click', e=>{ e.stopPropagation(); addRoomAt(h.blockId, h.sx, h.sz); });
     ov.appendChild(el);
@@ -83,7 +85,9 @@ function render2D(){
   if(b && (sel.kind==='block' || sel.kind==='furn')){
     const [w,d] = footprint(b);
     const [px,py] = P(b.cx, b.cz-d/2, ox, oy);
-    chips.style.display='flex'; chips.style.left=px+'px'; chips.style.top=(py-58)+'px';
+    // sit above the top "+" (centred, ~36 px tall) instead of on it
+    const top = Math.min(py-58, topHsY - 22 - 44);
+    chips.style.display='flex'; chips.style.left=px+'px'; chips.style.top=top+'px';
   } else chips.style.display='none';
 
   planSvg.onclick = ()=>{ if(justDragged2) return; setSel(null); renderSelection(); };
