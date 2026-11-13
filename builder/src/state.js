@@ -19,6 +19,7 @@ function freshState(){
     blocks:[], floors:null, floor:0,
     unit: state?.unit === 'ft' ? 'ft' : 'm',   // Start over / templates keep the user's units
     plot: state?.plot,                           // ...and the plot they typed
+    cost: state?.cost,                           // ...and their rate and budget
   };
   s.floors = [{blocks:s.blocks}];   // state.blocks always aliases the active floor's array
   return s;
@@ -58,6 +59,9 @@ function sanitizeState(){
   state.floors = floors.slice(0, 3).map(fl=>({...fl, blocks:arr(fl.blocks).filter(b=>key(C.rooms, b.type)).map(block)}));
   state.floor = Math.max(0, int(state.floor));
   state.unit = state.unit === 'ft' ? 'ft' : 'm';
+  const co = state.cost && typeof state.cost === 'object' ? state.cost : {}, cr = num(co.rate), cb = num(co.budget);
+  state.cost = {tier:['basic','standard','premium'].includes(co.tier) ? co.tier : 'standard',
+    rate: cr >= 500 && cr <= 20000 ? cr : undefined, budget: cb > 0 ? cb : undefined};
   const pl = state.plot, pw = num(pl?.w), pd = num(pl?.d);
   state.plot = pl && pw >= 3 && pw <= 200 && pd >= 3 && pd <= 200
     ? {w:pw, d:pd, facing:['N','E','S','W'].includes(pl.facing) ? pl.facing : 'S'} : undefined;

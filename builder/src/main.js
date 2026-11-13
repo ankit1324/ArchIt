@@ -146,6 +146,7 @@ addEventListener('pagehide', e=>{
       }
       setContext(p.plot, p.neighbors, p.facing);
       setEmbedPlot(p.plot, p.facing);
+      if(p.budget > 0 && !state.cost?.budget) state.cost = {...state.cost, budget:Number(p.budget)};
       setUndoStack([]); setRedoStack([]); setSel(null); setDirty(false);
       resetCam(); renderAll();
       // a viewer wants the house, not the editing plan newProject() opened

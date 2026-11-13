@@ -11,6 +11,8 @@ import {S, dimOffsets, planOff, planSvg, render2D, viewBounds} from './plan2d.js
 import {shareLink} from './persistence.js';
 import {fmtArea, fmtLen, fmtOpening, fmtSize} from './units.js';
 import {frontSide} from './plot.js';
+import {vastuReport} from './vastu.js';
+import {costEstimate, costTiers, fmtINR, fmtQty} from './cost.js';
 
 /* -------- export: 3D image, 2D plan, full design sheet -------- */
 // Pose the camera, render synchronously and read the pixels in the same task
@@ -191,6 +193,7 @@ function designSheet(){
   const back  = shoot3D([bb.cx,       R*.45, bb.cz-R*1.15],[bb.cx, 1,  bb.cz], false);
   const top   = shoot3D([bb.cx+.01,   R*1.5, bb.cz],       [bb.cx, 0,  bb.cz], true);
   const plan  = planSVGDoc(planShot(), 'style="width:100%;height:auto"');
+  const vastu = vastuReport(state.floors), est = costEstimate(state.floors, state.cost);
   const sides = elevationSides(frontSide());
   const elevs = withElevationScene(()=>Object.entries(ELEV_NAMES).map(([k,n])=>[n, shootElevation(sides[k], n+' elevation')]));
   const tot = houseTotals(state.floors), multi = state.floors.length>1;
@@ -258,6 +261,18 @@ function designSheet(){
     </div>
     <h2>Elevations</h2>
     <div class="grid">${elevs.map(([n,src])=>`<div class="card"><img src="${src}" alt="${n} elevation"><div class="cap">${n} elevation</div></div>`).join('')}</div>
+    <h2>Cost estimate</h2>
+    <div class="card summary"><table>
+      <tr><td>Estimate</td><td><b>${fmtINR(est.total)}</b> (${fmtINR(est.low)} – ${fmtINR(est.high)})</td></tr>
+      <tr><td>Basis</td><td>${Math.round(est.sqft).toLocaleString('en-IN')} sq ft built-up × ₹${est.rate.toLocaleString('en-IN')} / sq ft — ${costTiers()[est.tier].name} finish</td></tr>
+      ${est.budget == null ? '' : `<tr><td>Budget</td><td>${fmtINR(est.budget)} — ${est.diff >= 0 ? fmtINR(est.diff)+' to spare' : 'over by '+fmtINR(-est.diff)}</td></tr>`}
+      <tr><td>Materials</td><td>${est.materials.map(m=>m.name+' '+fmtQty(m.qty, m.unit)).join(' · ')}</td></tr>
+      <tr><td>Note</td><td>Building work and finishes only, from thumb rules. Land, approvals, fees, compound wall and furniture are extra.</td></tr>
+    </table></div>
+    ${vastu && vastu.items.length ? `<h2>Vastu guide — ${vastu.score}% match</h2>
+    <div class="card summary"><table>${vastu.items.map(x=>
+      `<tr><td>${escapeMarkup(x.name)}</td><td>${{good:'Good', ok:'Fine', avoid:'Avoid'}[x.verdict]} · ${x.whereText}${x.tip ? '. '+x.tip : ''}</td></tr>`).join('')}
+    </table></div>` : ''}
     <h2>Rooms</h2>
     <div class="rooms">${roomCards}</div>
   </div></body></html>`;
