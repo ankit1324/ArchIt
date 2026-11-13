@@ -1,19 +1,22 @@
 import './walk.js';
 import {C} from './catalog.js';
-import {$, VIEW, chips, escapeMarkup, ov, round1, stage, toast} from './dom.js';
+import {$, VIEW, chips, escapeMarkup, ov, stage, toast} from './dom.js';
 import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setDirty, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
-import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
+import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, winSpec, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
+import {fmtLen, fmtSize, isFt, snapLen} from './units.js';
 import {renderAll, renderSelection} from './ui.js';
 import {placeFurniture} from './tools.js';
 
 /* ============================== 2D plan ============================== */
 const planSvg = $('#plan');
 let S = 54;                 // px per metre (2D zoom changes it)
+const DIM_ROOM = 112;       // px the two dimension rows need beyond the plan edge
 function fitPlan(){
   if(!state?.blocks.length) return;
   const bb = boundsOf(state.blocks), r = stage.getBoundingClientRect();
-  S = Math.max(8, Math.min(70, (r.width-150)/Math.max(bb.w,1), (r.height-180)/Math.max(bb.d,1)));
+  // leave room under and right of the plan for the dimension rows
+  S = Math.max(8, Math.min(70, (r.width-150-DIM_ROOM)/Math.max(bb.w,1), (r.height-180-DIM_ROOM)/Math.max(bb.d,1)));
   if(ui.view==='2d') render2D();
 }
 $('#fitPlan').addEventListener('click', fitPlan);
@@ -25,7 +28,10 @@ function render2D(){
   const focus = ui.interior ? getBlock(ui.focusRoomId) : null;   // interior mode: single-room plan
   const blks = focus ? [focus] : state.blocks;
   const bb = blks.length ? boundsOf(blks) : {cx:0,cz:0};
-  let ox = r.width/2 - bb.cx*S, oy = r.height/2 - bb.cz*S;
+  // whole-floor view: nudge the plan up-left by half the dimension rows' depth so
+  // plan + rows sit centred together
+  const nudge = focus ? 0 : DIM_ROOM/2;
+  let ox = r.width/2 - bb.cx*S - nudge, oy = r.height/2 - bb.cz*S - nudge;
   if(drag2){ ox = drag2.ox; oy = drag2.oy; }        // freeze origin while dragging
   planOff = {ox, oy};
   let s = `<defs>
@@ -50,7 +56,9 @@ function render2D(){
   }
 
   blks.forEach(b=>{ s += blockSvg(b, ox, oy); });
+  if(!focus && blks.length) s += dimLinesSvg(blks, ox, oy);
   planSvg.innerHTML = s;
+  syncScaleBar();
 
   // hotspots (+) around blocks — html overlay (hidden in interior focus mode)
   ov.querySelectorAll('.hs').forEach(e=>e.remove());
@@ -93,7 +101,7 @@ function blockSvg(b, ox, oy){
   s += wallLines2D(b, ox, oy, col);
   // windows
   b.windows.forEach(wd=>{
-    const seg = openSeg2D(b, wd.wall, wd.t, wd.kind==='pano' ? 2.2 : 1.2, ox, oy);
+    const seg = openSeg2D(b, wd.wall, wd.t, winSpec(wd).fw-.1, ox, oy);
     s += `<g data-win="${wd.id}" data-blk="${b.id}" style="cursor:grab">
           <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#b8c6c4" stroke-width="7" stroke-linecap="butt"/>
           <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#f8f7f2" stroke-width="2.5"/>
@@ -140,8 +148,8 @@ function blockSvg(b, ox, oy){
   if(seld){
     // side dimension pills + corner handles
     const [topPill, leftPill] = dimPillCentres(x0, y0, W2, D2);
-    s += chip2D(topPill[0], topPill[1], `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
-    s += chip2D(leftPill[0], leftPill[1], `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
+    s += chip2D(topPill[0], topPill[1], fmtLen(b.rot%2? b.w : b.len), '#ad4a31');
+    s += chip2D(leftPill[0], leftPill[1], fmtLen(b.rot%2? b.len : b.w), '#ad4a31', true);
     [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
      [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
       const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
@@ -214,6 +222,7 @@ planSvg.addEventListener('pointermove', e=>{
   if(!drag2.moved){
     // hotspots and chips are placed for the old layout: hide them until drop
     ov.style.visibility = 'hidden'; chips.style.display = 'none';
+    planSvg.querySelector('.dims')?.setAttribute('visibility', 'hidden');
     drag2.el = planSvg.querySelector(`.blk[data-id="${drag2.b.id}"]`);
     drag2.el?.querySelector('rect')?.removeAttribute('filter');
   }
@@ -234,7 +243,7 @@ planSvg.addEventListener('pointermove', e=>{
     if(drag2.sx>0) R = Math.max(L+mn, Math.min(L+mx, wx));
     if(drag2.sz<0) T = Math.min(B-mn, Math.max(B-mx, wz));
     if(drag2.sz>0) B = Math.max(T+mn, Math.min(T+mx, wz));
-    const rw = Math.round((R-L)*10)/10, rd = Math.round((B-T)*10)/10;  // snap 0.1 m
+    const rw = snapLen(R-L), rd = snapLen(B-T);   // 0.1 m, or 6 in when planning in feet
     if(drag2.sx<0) L = R-rw; else R = L+rw;
     if(drag2.sz<0) T = B-rd; else B = T+rd;
     b.cx = (L+R)/2; b.cz = (T+B)/2;
@@ -250,7 +259,7 @@ planSvg.addEventListener('pointermove', e=>{
   } else {
     const b = drag2.b, o = drag2.o;
     const [lx,lz] = worldToLocal(b, wx, wz);
-    const cand = nearestWallT(b, lx, lz, drag2.kind==='door' ? o.w : 1.2);
+    const cand = nearestWallT(b, lx, lz, drag2.kind==='door' ? o.w : winSpec(o).fw);
     o.wall = cand.wall; o.t = cand.t;
   }
   redrawBlock2D(drag2.b);
@@ -303,7 +312,7 @@ planSvg.addEventListener('pointerup', ()=>{
       const nowShared = !!sharedWall(d2.b, d2.o.wall);
       const wasExt = d2.o.type.startsWith('ext');
       if(nowShared && wasExt) d2.o.type = 'int_hard';
-      if(!nowShared && !wasExt) d2.o.type = 'ext_hard';
+      if(!nowShared && !wasExt){ d2.o.type = 'ext_hard'; d2.o.w = Math.min(d2.o.w, 1.2); }   // an open doorway may be wider than a door
     }
     if(changed){ undoStack.push(d2.snap); redoStack.length = 0; setDirty(true); }
     renderAll();
@@ -369,6 +378,11 @@ function door2D(b, d, ox, oy, col){
   const [t1x,t1z] = localToWorld(b, tip[0], tip[1]);
   const [e1x,e1z] = localToWorld(b, cx-dir[0]*hw*hs, cz-dir[1]*hw*hs);
   const [px1,py1] = P(h1x,h1z,ox,oy), [px2,py2] = P(t1x,t1z,ox,oy), [px3,py3] = P(e1x,e1z,ox,oy);
+  // open doorway: no leaf, no swing — a dashed threshold across the gap
+  if(d.type==='int_open') return `<g data-door="${d.id}" data-blk="${b.id}" style="cursor:grab">
+    <line x1="${px1}" y1="${py1}" x2="${px3}" y2="${py3}" stroke="${col}" stroke-width="1.4" stroke-dasharray="3 4"/>
+    <line x1="${px1}" y1="${py1}" x2="${px3}" y2="${py3}" stroke="transparent" stroke-width="18"/>
+  </g>`;
   return `<g data-door="${d.id}" data-blk="${b.id}" style="cursor:grab">
     <line x1="${px1}" y1="${py1}" x2="${px2}" y2="${py2}" stroke="${col}" stroke-width="2.5"/>
     <path d="M ${px2} ${py2} A ${d.w*S} ${d.w*S} 0 0 ${arcSweep(px1,py1,px2,py2,px3,py3)} ${px3} ${py3}" fill="none" stroke="${col}" stroke-width="1.4" stroke-dasharray="1 4"/>
@@ -425,17 +439,79 @@ function placeDoorByClick(blockId, e){
   ].sort((p,q)=>p.dist-q.dist)[0];
   const t = Math.min(.88, Math.max(.12, cand.t));
   commit(()=>{
-    const type = sharedWall(b, cand.wall) ? 'int_hard' : (ui.pendingDoorType||'ext_hard');
+    // keep the type picked in the Doors panel when it suits the wall (an interior
+    // pick used to be dropped for a hardboard door)
+    const want = ui.pendingDoorType || '', shared = !!sharedWall(b, cand.wall);
+    const type = shared ? (want.startsWith('int') ? want : 'int_hard') : (want.startsWith('ext') ? want : 'ext_hard');
     const d = {id:++state.seq.door, wall:cand.wall, t, type,
-      w: type==='ext_glass' ? 1.6 : 0.8, h:2.0, color:'blue'};
+      w: type==='ext_glass' ? 1.6 : type==='int_open' ? 1.2 : 0.8, h:2.0, color:'blue'};
     b.doors.push(d);
     setSel({kind:'door', blockId:b.id, doorId:d.id});
     ui.tool = null;
   });
 }
 
+/* -------- dimension lines -------- */
+// Every distinct room edge along one axis, merged within 2 cm, low to high.
+// The gaps between them are the room-by-room chain a builder measures off.
+function edgeStops(blocks, axis){
+  const vals = [];
+  blocks.forEach(b=>{
+    const [w,d] = footprint(b), [c, h] = axis==='x' ? [b.cx, w/2] : [b.cz, d/2];
+    vals.push(c-h, c+h);
+  });
+  vals.sort((a,b)=>a-b);
+  return vals.reduce((out,v)=>{ if(!out.length || v-out[out.length-1] > 0.02) out.push(v); return out; }, []);
+}
+// How far outside the plan the two dimension rows sit, in px: clear of the "+"
+// add-room buttons (0.62 m out, up to 40 px wide), which grow with the zoom.
+function dimOffsets(scale){ const a = Math.max(64, 0.62*scale + 30); return [a, a + 28]; }
+// Room-by-room chain plus the overall size, under the plan and down its right
+// side (the top and left belong to the action chips and the size pills).
+function dimLinesSvg(blocks, ox, oy){
+  const bb = boundsOf(blocks), [o1, o2] = dimOffsets(S);
+  const [x1,y1] = P(bb.x1, bb.z1, ox, oy);   // rows hang off the bottom-right corner
+  const label = (x, y, txt, vert)=>`<text class="dimtxt" x="${x}" y="${y}" text-anchor="middle"${vert ? ` transform="rotate(-90 ${x} ${y})"` : ''}>${txt}</text>`;
+  const tick = (x, y)=>`<line x1="${x-5}" y1="${y+5}" x2="${x+5}" y2="${y-5}"/>`;   // architect's 45° slash
+  let s = '<g class="dims" pointer-events="none">';
+  const row = (stops, axis, off, segLabels)=>{
+    const horiz = axis==='x';
+    const at = v=>horiz ? P(v, 0, ox, oy)[0] : P(0, v, ox, oy)[1];
+    const a = at(stops[0]), b = at(stops[stops.length-1]);
+    if(horiz){
+      const y = y1 + off;
+      s += `<line x1="${a}" y1="${y}" x2="${b}" y2="${y}"/>`;
+      stops.forEach(v=>{ const x = at(v); s += `<line x1="${x}" y1="${y1+8}" x2="${x}" y2="${y+4}" class="ext"/>` + tick(x, y); });
+      if(segLabels) for(let i=1;i<stops.length;i++){
+        const p = at(stops[i-1]), q = at(stops[i]);
+        if(q-p >= 34) s += label((p+q)/2, y-5, fmtLen(stops[i]-stops[i-1]));
+      } else s += label((a+b)/2, y-5, fmtLen(stops[stops.length-1]-stops[0]));
+    } else {
+      const x = x1 + off;
+      s += `<line x1="${x}" y1="${a}" x2="${x}" y2="${b}"/>`;
+      stops.forEach(v=>{ const y = at(v); s += `<line x1="${x1+8}" y1="${y}" x2="${x+4}" y2="${y}" class="ext"/>` + tick(x, y); });
+      if(segLabels) for(let i=1;i<stops.length;i++){
+        const p = at(stops[i-1]), q = at(stops[i]);
+        if(q-p >= 34) s += label(x-5, (p+q)/2, fmtLen(stops[i]-stops[i-1]), true);
+      } else s += label(x-5, (a+b)/2, fmtLen(stops[stops.length-1]-stops[0]), true);
+    }
+  };
+  ['x','z'].forEach(axis=>{
+    const stops = edgeStops(blocks, axis);
+    if(stops.length > 2){ row(stops, axis, o1, true); row([stops[0], stops[stops.length-1]], axis, o2, false); }
+    else row(stops, axis, o1, false);
+  });
+  return s + '</g>';
+}
+// The corner scale bar: 1 m, or 3 ft, at the current zoom (it was a fixed "1 m").
+function syncScaleBar(){
+  const sb = $('#scalebar'); if(!sb) return;
+  const ft = isFt(), len = ft ? 3/3.280839895 : 1;
+  const bar = sb.querySelector('.bar'); if(bar) bar.style.width = Math.round(len*S)+'px';
+  sb.firstChild.textContent = ft ? '3 ft' : '1 m';
+}
 // Width-as-drawn x depth-as-drawn, so the label matches the pills and the picture.
-function roomSizeLabel(b){ const [w,d] = footprint(b); return `${round1(w)} × ${round1(d)} m`; }
+function roomSizeLabel(b){ const [w,d] = footprint(b); return fmtSize(w, d); }
 export function setPlanScale(v){ return S = v; }
 
-export {S, fitPlan, planOff, planSvg, render2D, roomSizeLabel};
+export {S, dimOffsets, fitPlan, planOff, planSvg, render2D, roomSizeLabel};

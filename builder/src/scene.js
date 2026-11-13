@@ -113,6 +113,7 @@ scene.add(contextRoot);
 // Everything that stands for "the ground" moves together. rebuild3D calls this
 // with groundY(state.floor): the active floor stays at y 0, so on an upper floor
 // the ground sinks to the lowest floor instead of burying the ones below.
+function setContextVisible(v){ contextRoot.visible = !!v; }
 function setGroundLevel(y){
   ground.position.y = y;
   shadowCatcher.position.y = y + 0.001;
@@ -194,4 +195,4 @@ function beam(sx,sy,sz, x,y,z, mat){
 export function setNeedsRender(v){ return needsRender = v; }
 export function setSelOutline(v){ return selOutline = v; }
 
-export {beam, blocksRoot, camera, canvas, controls, fitShadows, needsRender, pmrem, renderer, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setContext, setGroundLevel, wallMats};
+export {beam, blocksRoot, camera, canvas, controls, fitShadows, needsRender, pmrem, renderer, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setContext, setContextVisible, setGroundLevel, wallMats};

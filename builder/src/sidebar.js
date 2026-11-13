@@ -1,17 +1,18 @@
 import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
-import {$, VIEW, escapeMarkup, round1, side, toast} from './dom.js';
-import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui} from './state.js';
-import {boundsOf, freeT, houseTotals, overlaps, refitFurniture, sharedWall} from './geometry.js';
+import {$, VIEW, escapeMarkup, side, toast} from './dom.js';
+import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, wallLen} from './state.js';
+import {boundsOf, freeT, houseTotals, overlaps, refitFurniture, sharedWall, winKinds, winSpec} from './geometry.js';
 import {openToolPop} from './tools.js';
 import {renderSelection} from './ui.js';
+import {fmtArea, fmtLen, fmtOpening, fmtSize, fromOpening, isFt, lenInputValue, openingUnit, parseLen, toOpening} from './units.js';
 
 // whole-house Rooms/Area (matches the stats bar); multi-floor adds a labelled current-floor line
 function summaryRows(floors, fi){
-  const t = houseTotals(floors), rows = [['Rooms', String(t.rooms)], ['Floors', String(floors.length)], ['Area', round1(t.area)+' m²']];
+  const t = houseTotals(floors), rows = [['Rooms', String(t.rooms)], ['Floors', String(floors.length)], ['Area', fmtArea(t.area)]];
   if(floors.length>1){
     const bl = floors[fi].blocks; let a = 0; bl.forEach(b=>a += b.w*b.len);
-    rows.push(['Floor '+(fi+1), bl.length+(bl.length===1?' room':' rooms')+' · '+round1(a)+' m²']);
+    rows.push(['Floor '+(fi+1), bl.length+(bl.length===1?' room':' rooms')+' · '+fmtArea(a)]);
   }
   return rows;
 }
@@ -138,7 +139,9 @@ function renderPanel(){
     </div>
     <div class="stats">
       ${sumRows.map(([k,v])=>`<div class="row"><span>${k}</span><b>${v}</b></div>`).join('')}
-      <div class="row"><span>Size</span><b>${round1(bb.w)} m × ${round1(bb.d)} m</b></div>
+      <div class="row"><span>Size</span><b>${fmtSize(bb.w, bb.d)}</b></div>
+      ${VIEW ? '' : `<div class="row"><span>Units</span><span class="unitseg" role="group" aria-label="Units">
+        <button type="button" data-act="unit" data-u="m" aria-pressed="${!isFt()}">m</button><button type="button" data-act="unit" data-u="ft" aria-pressed="${isFt()}">ft</button></span></div>`}
     </div>
     ${ui.view==='2d' && !VIEW ? '<div class="plan-hint"><b>Plan room by room</b><br>Select a room to edit its dimensions. Drag to move; use corner handles to resize. The fit button brings the full plan back into view.</div>' : ''}
     ${VIEW ? '' : `<div class="acc">
@@ -156,6 +159,9 @@ function renderPanel(){
 function renderBlockPanel(b){
   const i = state.blocks.indexOf(b)+1;
   const spec = C.rooms[b.type];
+  // Width/Depth as drawn on the plan (b.len/b.w swap with a quarter turn), so the
+  // fields read the same way as the plan label and the size pills
+  const [fw, fd] = b.rot%2 ? [b.w, b.len] : [b.len, b.w];
   SEL_H['rtype'] = v=>commit(()=>{ b.type = v; });
   SEL_H['rpaint'] = v=>commit(()=>{ b.paint = v==='_def' ? null : v; });
   SEL_H['rfloor'] = v=>commit(()=>{ b.floorCol = v==='_def' ? null : v; });
@@ -164,13 +170,13 @@ function renderBlockPanel(b){
   const typeOpts = Object.entries(C.rooms).map(([k,v])=>`
     <button class="sel-item" data-v="${k}">
       <span><span class="nm">${v.name}</span>
-      <span class="sb">${v.w} × ${v.len} m</span></span>
+      <span class="sb">${fmtSize(v.len, v.w)}</span></span>
       ${k===b.type?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
     </button>`).join('');
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5 12 11l8-4.5M12 11v9"/></svg></span>
-      <div><h2>${escapeMarkup(b.name || spec.name+' '+i)}</h2><div class="pr" style="color:#5d665b">${round1(b.w*b.len)} m²</div></div>
+      <div><h2>${escapeMarkup(b.name || spec.name+' '+i)}</h2><div class="pr" style="color:#5d665b">${fmtArea(b.w*b.len)}</div></div>
       <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
@@ -179,13 +185,13 @@ function renderBlockPanel(b){
     <div class="f-label">Room type</div>
     ${selectHTML('rtype', typeOpts, `<span>${spec.name}</span>`)}
     <div class="grid2" style="margin-top:12px">
-      <div><div class="f-label" style="margin-top:0">Width, m</div>
-        <input class="inp" data-act="rw" type="number" step="0.1" min="${C.roomMin}" max="${C.roomMax}" value="${b.w}"></div>
-      <div><div class="f-label" style="margin-top:0">Length, m</div>
-        <input class="inp" data-act="rl" type="number" step="0.1" min="${C.roomMin}" max="${C.roomMax}" value="${b.len}"></div>
+      ${[['rx','Width',fw],['rz','Depth',fd]].map(([act,lbl,v])=>`<div><div class="f-label" style="margin-top:0">${lbl}, ${isFt()?'ft':'m'}</div>
+        ${isFt()
+          ? `<input class="inp" data-act="${act}" type="text" inputmode="decimal" autocomplete="off" value="${escapeMarkup(lenInputValue(v))}" aria-label="${lbl} in feet and inches">`
+          : `<input class="inp" data-act="${act}" type="number" step="0.1" min="${C.roomMin}" max="${C.roomMax}" value="${lenInputValue(v)}">`}</div>`).join('')}
     </div>
-    <div class="dimrow" style="margin-top:8px"><span>Height</span><b>${C.H} m</b></div>
-    <div class="dimrow"><span>Area</span><b>${round1(b.w*b.len)} m²</b></div>
+    <div class="dimrow" style="margin-top:8px"><span>Height</span><b>${fmtLen(C.H)}</b></div>
+    <div class="dimrow"><span>Area</span><b>${fmtArea(b.w*b.len)}</b></div>
     <div class="f-label">Wall colour</div>
     ${selectHTML('rpaint', defOptions(C.paint, b.paint), roomColLabel(C.paint, b.paint, 'House default'))}
     <div class="f-label">Floor colour</div>
@@ -203,7 +209,8 @@ function renderBlockPanel(b){
 function renderDoorPanel(b, d){
   if(!d){ setSel(null); return renderSidebar(); }
   const idx = b.doors.indexOf(d)+1;
-  SEL_H['dtype'] = v=>commit(()=>{ d.type = v; });
+  SEL_H['dtype'] = v=>commit(()=>{ d.type = v; if(v!=='int_open') d.w = Math.min(d.w, 1.2); });
+  const open = d.type==='int_open', maxW = open ? Math.min(3, wallLen(b, d.wall)-.3) : 1.2;
   SEL_H['dcolor'] = v=>commit(()=>{ d.color = v; });
   const interior = !!sharedWall(b, d.wall);
   const typeOpts = Object.entries(C.doors)
@@ -222,22 +229,22 @@ function renderDoorPanel(b, d){
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3.5" width="12" height="17" rx="1.2"/><circle cx="14.6" cy="12" r="1" fill="currentColor"/></svg></span>
-      <div><h2>Door ${idx}</h2><div class="pr" style="color:#5d665b">${Math.round(d.w*100)} × ${Math.round(d.h*100)} cm</div></div>
+      <div><h2>Door ${idx}</h2><div class="pr" style="color:#5d665b">${fmtOpening(d.w, d.h)}</div></div>
       <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Type</div>
     ${selectHTML('dtype', typeOpts, `<span>${C.doors[d.type].name}</span>`)}
     <div class="grid2" style="margin-top:12px">
-      <div><div class="f-label" style="margin-top:0">Width</div><input class="inp" data-act="dw" type="number" step="5" min="60" max="120" value="${Math.round(d.w*100)}"> </div>
-      <div><div class="f-label" style="margin-top:0">Height</div><input class="inp" data-act="dh" type="number" step="5" min="180" max="220" value="${Math.round(d.h*100)}"></div>
+      <div><div class="f-label" style="margin-top:0">Width, ${openingUnit()}</div><input class="inp" data-act="dw" type="number" step="${isFt()?1:5}" min="${toOpening(.6)}" max="${toOpening(maxW)}" value="${toOpening(d.w)}"> </div>
+      <div><div class="f-label" style="margin-top:0">Height, ${openingUnit()}</div><input class="inp" data-act="dh" type="number" step="${isFt()?1:5}" min="${toOpening(1.8)}" max="${toOpening(2.2)}" value="${toOpening(d.h)}"></div>
     </div>
-    <div class="f-label">Colour</div>
+    ${open ? '<div class="note" style="margin-top:12px">An opening with no door leaf, like the arch between a hall and a dining room.</div>' : `<div class="f-label">Colour</div>
     ${selectHTML('dcolor', colorOpts, curLabel(colorMap, d.color))}
     <div class="grid2" style="margin-top:12px">
       <button class="collapse" data-act="flipdoor" style="margin-top:0">Flip hinge</button>
       <button class="collapse" data-act="swingdoor" style="margin-top:0">Swing ${d.out?'in':'out'}</button>
-    </div>
+    </div>`}
     <button class="collapse" data-act="deldoor" style="color:#ad4a31;border-color:#dcb3a6">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg> Remove door
     </button>
@@ -249,9 +256,12 @@ function renderDoorPanel(b, d){
 
 function renderWinPanel(b, w){
   if(!w){ setSel({kind:'block', blockId:b.id}); return renderSidebar(); }
-  const kinds = {std:{name:'Standard'}, pano:{name:'Panoramic (floor-to-ceiling)'}};
-  SEL_H['wkind'] = v=>commit(()=>{ w.kind = v==='std' ? undefined : v; });
-  const cur = w.kind||'std';
+  const kinds = winKinds(), sp = winSpec(w);
+  // a new kind starts from that kind's own size
+  SEL_H['wkind'] = v=>commit(()=>{ w.kind = v==='std' ? undefined : v; delete w.w; delete w.h; delete w.sill; });
+  const cur = sp.kind;
+  const num = (act, lbl, v, lo, hi)=>`<div><div class="f-label" style="margin-top:0">${lbl}, ${openingUnit()}</div>
+    <input class="inp" data-act="${act}" type="number" step="${isFt()?1:5}" min="${toOpening(lo)}" max="${toOpening(hi)}" value="${toOpening(v)}"></div>`;
   const kindOpts = Object.entries(kinds).map(([k,v])=>`
     <button class="sel-item" data-v="${k}"><span><span class="nm">${v.name}</span></span>
       ${k===cur?'<svg style="margin-left:auto;color:#293c31" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m5 13 4 4L19 7"/></svg>':''}
@@ -259,12 +269,20 @@ function renderWinPanel(b, w){
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 4v16M4 12h16"/></svg></span>
-      <div><h2>Window</h2><div class="pr" style="color:#5d665b">${cur==='pano'?'2.2 m · full height':'1.3 × 1.06 m'}</div></div>
+      <div><h2>Window</h2><div class="pr" style="color:#5d665b">${fmtOpening(sp.fw, sp.fh)}</div></div>
       <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Type</div>
     ${selectHTML('wkind', kindOpts, `<span>${kinds[cur].name}</span>`)}
+    <div class="grid2" style="margin-top:12px">
+      ${num('ww', 'Width', sp.fw, .4, Math.min(3, wallLen(b, w.wall)-.3))}
+      ${num('wh', 'Height', sp.fh, .3, C.H-.08)}
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      ${num('ws', 'Sill height', sp.sill, 0, C.H-.4)}
+      <div class="dimrow" style="align-self:end;padding-bottom:10px"><span>Top</span><b>${fmtLen(sp.sill+sp.fh)}</b></div>
+    </div>
     <button class="collapse" data-act="delwin" data-b="${b.id}" data-w="${w.id}" style="color:#ad4a31;border-color:#dcb3a6;margin-top:14px">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg> Remove window
     </button>
@@ -280,7 +298,7 @@ function renderFurnPanel(b, f){
   side.innerHTML = `<div class="selpanel">
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6"/><path d="M4 11V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M6 18v2M18 18v2"/></svg></span>
-      <div><h2>${s.name}</h2><div class="pr" style="color:#5d665b">${s.w} × ${s.d} × ${s.h} m</div></div>
+      <div><h2>${s.name}</h2><div class="pr" style="color:#5d665b">${isFt() ? fmtLen(s.w)+' × '+fmtLen(s.d)+' × '+fmtLen(s.h) : s.w+' × '+s.d+' × '+s.h+' m'}</div></div>
       <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
@@ -325,6 +343,10 @@ side.addEventListener('click', e=>{
   if(!act) return;
   const a = act.dataset.act;
   if(a==='close'){ setSel(null); renderSelection(); }
+  if(a==='unit'){
+    const u = act.dataset.u === 'ft' ? 'ft' : 'm';
+    if(u !== state.unit) commit(()=>{ state.unit = u; });
+  }
   if(a==='deldoor'){
     const b = selBlock(), d = selDoor(); if(!b||!d) return;
     commit(()=>{ b.doors = b.doors.filter(x=>x.id!==d.id); setSel({kind:'block', blockId:b.id}); });
@@ -337,7 +359,9 @@ side.addEventListener('click', e=>{
     const b = selBlock() || state.blocks[0]; if(!b) return;
     commit(()=>{
       const t = freeT([...b.windows.filter(w=>w.wall===0), ...b.doors.filter(d=>d.wall===0)], b.len, 1.5);
-      b.windows.push({id:++state.seq.win, wall:0, t});
+      const win = {id:++state.seq.win, wall:0, t};
+      if(b.type==='bath' || b.type==='toilet') win.kind = 'vent';
+      b.windows.push(win);
     });
   }
   if(a==='delwin'){
@@ -361,13 +385,30 @@ side.addEventListener('change', e=>{
   if(el.dataset.act==='dw'||el.dataset.act==='dh'){
     const d = selDoor(); if(!d) return;
     const v = Math.max(+el.min, Math.min(+el.max, +el.value||0));
-    commit(()=>{ d[el.dataset.act==='dw'?'w':'h'] = v/100; });
+    commit(()=>{ d[el.dataset.act==='dw'?'w':'h'] = fromOpening(v); });
   }
-  if(el.dataset.act==='rw'||el.dataset.act==='rl'){
+  if(['ww','wh','ws'].includes(el.dataset.act)){
+    const b = selBlock(), w = selWin(); if(!b||!w) return;
+    const v = fromOpening(Math.max(+el.min, Math.min(+el.max, +el.value||0)));
+    commit(()=>{
+      w[{ww:'w', wh:'h', ws:'sill'}[el.dataset.act]] = v;
+      // store what winSpec will actually draw, so the fields never disagree with the wall
+      const sp = winSpec(w), r = x=>Math.round(x*1000)/1000;
+      w.w = r(sp.fw); w.h = r(sp.fh); w.sill = r(sp.sill);
+    });
+    return;
+  }
+  if(el.dataset.act==='rx'||el.dataset.act==='rz'){
     const b = selBlock(); if(!b) return;
-    const v = Math.round(Math.max(C.roomMin, Math.min(C.roomMax, +el.value||0))*10)/10;
-    const nw = el.dataset.act==='rw' ? v : b.w;
-    const nl = el.dataset.act==='rl' ? v : b.len;
+    const raw = parseLen(el.value);
+    if(raw == null){ toast(isFt() ? "Type feet and inches, like 12' 6\"" : 'Type a size in metres'); renderSidebar(); return; }
+    const c = Math.max(C.roomMin, Math.min(C.roomMax, raw));
+    const v = isFt() ? c : Math.round(c*10)/10;   // feet keep the inch the user typed
+    if(c !== raw) toast(`Rooms are ${fmtLen(C.roomMin)} to ${fmtLen(C.roomMax)}`);
+    // rx is the width as drawn: b.len for an unrotated room, b.w for a quarter-turned one
+    const alongLen = (el.dataset.act==='rx') === !(b.rot%2);
+    const nw = alongLen ? b.w : v;
+    const nl = alongLen ? v : b.len;
     const [fw, fd] = b.rot%2 ? [nw, nl] : [nl, nw];
     if(overlaps(b.cx, b.cz, fw, fd, b.id)){
       toast('No space — the room would overlap a neighbour');

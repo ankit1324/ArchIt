@@ -620,6 +620,7 @@ export default function DesignerPage() {
           plot={{ w: builderSetup.w, d: builderSetup.d }}
           neighbors={[]}
           floors={builderSetup.floors}
+          unit={builderSetup.unit}
           facing={builderSetup.facing}
           existingDesign={current?.design}
           onSave={saveDesign}

@@ -139,12 +139,24 @@ function wallNeighbors(b, wall){
   return hits;
 }
 // the hole a window needs in the wall it sits on (matches the meshes at buildBlockGroup)
-function winDims(w){
-  if(w.kind==='pano'){
-    const gh = C.H - .25;
-    return {w:2.3, y0:.06, y1:.14 + gh};
-  }
-  return {w:1.3, y0:1.02, y1:2.08};
+function winDims(w){ const s = winSpec(w); return {w:s.fw, y0:s.sill, y1:s.sill + s.fh}; }
+// Window kinds and the frame each starts with: outer width, height, sill height (m).
+function winKinds(){
+  return {
+    std:  {name:'Standard',   w:1.3, h:1.06,     sill:1.02},
+    pano: {name:'Panoramic (floor-to-ceiling)', w:2.3, h:C.H-.17, sill:.06},
+    vent: {name:'Ventilator', w:.6,  h:.45,      sill:2.1},
+  };
+}
+// The frame a window is drawn and cut with. w.w / w.h / w.sill (set in the window
+// panel) override the kind's defaults; everything is clamped to fit under the ceiling.
+function winSpec(w){
+  const kinds = winKinds(), kind = kinds[w.kind] ? w.kind : 'std', k = kinds[kind];
+  const pick = (v, d)=>{ v = Number(v); return v > 0 || v === 0 ? v : d; };
+  const fw = Math.min(3, Math.max(.4, pick(w.w ?? undefined, k.w)));
+  const sill = Math.min(C.H-.4, Math.max(0, pick(w.sill ?? undefined, k.sill)));
+  const fh = Math.min(C.H-.08-sill, Math.max(.3, pick(w.h ?? undefined, k.h)));
+  return {kind, fw, fh, sill};
 }
 // Openings to subtract from b's `wall`, merged and clamped. Includes the far
 // room's openings when this is a party wall, so a de-duplicated wall still lets
@@ -328,6 +340,28 @@ const FLH = () => C.H + .12;   // floor-to-floor height
 // assumes it), so the floors under it sit at negative y. The ground has to drop
 // with them, or it hides every floor below the one being edited.
 function groundY(activeFloor){ return (0 - activeFloor) * FLH(); }   // floor 0's y in rebuild3D
+// Orthographic frame for an elevation of one side of the house.
+// side: the face being looked at — 'S' is the +z face (the bottom edge of the 2D
+// plan), 'N' the -z face, 'E' +x, 'W' -x. Heights are in scene space, where
+// rebuild3D keeps the ACTIVE floor at y 0. `aspect` is picture width / height.
+function elevationFrame(bb, side, floors, active, aspect){
+  const span = side==='N' || side==='S' ? bb.w : bb.d;          // width of the face
+  const y0 = groundY(active);                                    // ground
+  const wallTop = (floors-1-active)*FLH() + C.H;                 // top of the top floor's walls
+  const cy = (y0 + wallTop + 1.3)/2;                             // 1.3 m of headroom for a pitched roof
+  // room around the house for the ground line and the two dimension rows
+  let halfW = span/2 + 2.2, halfH = (wallTop + 1.3 - y0)/2 + 1.4;
+  if(halfW/halfH < aspect) halfW = halfH*aspect; else halfH = halfW/aspect;
+  const [dx, dz] = {S:[0,1], N:[0,-1], E:[1,0], W:[-1,0]}[side];
+  // stand just outside the far corner: close enough that the scene fog (30 m+) stays out
+  const R = Math.max(bb.w, bb.d)/2 + 8;
+  return {pos:[bb.cx+dx*R, cy, bb.cz+dz*R], target:[bb.cx, cy, bb.cz], halfW, halfH, span, y0, wallTop};
+}
+// Which side is which, for someone standing outside looking at the front.
+function elevationSides(front){
+  const order = ['N','E','S','W'], i = Math.max(0, order.indexOf(front));
+  return {front:order[i], left:order[(i+1)%4], rear:order[(i+2)%4], right:order[(i+3)%4]};
+}
 // Whole-house totals for the stats bar: every floor, not just the active one.
 function houseTotals(floors){
   let area = 0, rooms = 0;
@@ -421,4 +455,4 @@ function resolveWalk(prevX, prevZ, nextX, nextZ, radius, rects) {
   return { x: rx, z: rz };
 }
 
-export {FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};
+export {elevationFrame, elevationSides, winKinds, winSpec, FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};

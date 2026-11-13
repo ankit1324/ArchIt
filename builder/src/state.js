@@ -17,6 +17,7 @@ function freshState(){
     paint:'white', facade:'white', facadeMat:'paint', roofStyle:'flat', roofCol:'light',
     seq:{block:0, door:0, win:0, part:0, furn:0},
     blocks:[], floors:null, floor:0,
+    unit: state?.unit === 'ft' ? 'ft' : 'm',   // Start over / templates keep the user's units
   };
   s.floors = [{blocks:s.blocks}];   // state.blocks always aliases the active floor's array
   return s;
@@ -45,7 +46,9 @@ function sanitizeState(){
     doors:arr(b.doors).map(d=>({...d, id:int(d.id), wall:clampRot(d.wall), t:num(d.t, .5),
       type:key(C.doors, d.type, 'int_hard'), w:num(d.w, .8), h:num(d.h, 2), color:String(d.color ?? 'blue')})),
     windows:arr(b.windows).map(w=>({...w, id:int(w.id), wall:clampRot(w.wall), t:num(w.t, .5),
-      kind:w.kind === 'pano' ? 'pano' : 'std'})),
+      kind:['pano','vent'].includes(w.kind) ? w.kind : 'std',
+      w:w.w == null ? undefined : num(w.w, undefined), h:w.h == null ? undefined : num(w.h, undefined),
+      sill:w.sill == null ? undefined : num(w.sill, undefined)})),
     partitions:arr(b.partitions).map(p=>({...p, id:int(p.id), t:num(p.t, .5)})),
     furniture:arr(b.furniture).filter(f=>key(C.furniture, f.key)).map(f=>({...f, id:int(f.id),
       lx:num(f.lx), lz:num(f.lz), rot:clampRot(f.rot)})),
@@ -53,6 +56,7 @@ function sanitizeState(){
   const floors = arr(state.floors).length ? arr(state.floors) : [{blocks:state.blocks}];
   state.floors = floors.slice(0, 3).map(fl=>({...fl, blocks:arr(fl.blocks).filter(b=>key(C.rooms, b.type)).map(block)}));
   state.floor = Math.max(0, int(state.floor));
+  state.unit = state.unit === 'ft' ? 'ft' : 'm';
   const seq = state.seq && typeof state.seq === 'object' ? state.seq : {};
   state.seq = {block:int(seq.block), door:int(seq.door), win:int(seq.win), part:int(seq.part), furn:int(seq.furn)};
 }

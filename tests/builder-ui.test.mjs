@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { loadUnits } from './builder-units-lib.mjs';
 
 const src = builderSource();
 const html = readFileSync(new URL('../public/builder/builder.html', import.meta.url), 'utf8');
@@ -29,7 +30,7 @@ const round1 = (n) => Math.round(n * 10) / 10;
 
 test('single-floor summary keeps the plain Rooms / Floors / Area rows', () => {
   const houseTotals = engine(['houseTotals']).houseTotals;
-  const { summaryRows } = engine(['summaryRows'], { houseTotals, round1 });
+  const { summaryRows } = engine(['summaryRows'], { houseTotals, fmtArea: loadUnits('m').fmtArea });
   const rows = Array.from(summaryRows([{ blocks: [r(3, 4), r(2, 2)] }], 0), (x) => Array.from(x));
   assert.deepEqual(rows.map((x) => x[0]), ['Rooms', 'Floors', 'Area']);
   assert.deepEqual(rows.map((x) => x[1]), ['2', '1', '16 m²']);
@@ -37,7 +38,7 @@ test('single-floor summary keeps the plain Rooms / Floors / Area rows', () => {
 
 test('multi-floor summary shows whole-house totals plus a labelled current floor', () => {
   const houseTotals = engine(['houseTotals']).houseTotals;
-  const { summaryRows } = engine(['summaryRows'], { houseTotals, round1 });
+  const { summaryRows } = engine(['summaryRows'], { houseTotals, fmtArea: loadUnits('m').fmtArea });
   const floors = [{ blocks: [r(3, 4), r(2, 2)] }, { blocks: [r(5, 2)] }];
   const rows = Array.from(summaryRows(floors, 1), (x) => Array.from(x));
   const get = (k) => rows.find((x) => x[0] === k)?.[1];
@@ -45,6 +46,13 @@ test('multi-floor summary shows whole-house totals plus a labelled current floor
   assert.equal(get('Area'), '26 m²');
   assert.equal(get('Floors'), '2');
   assert.equal(get('Floor 2'), '1 room · 10 m²');
+});
+
+test('summary area follows the design units', () => {
+  const houseTotals = engine(['houseTotals']).houseTotals;
+  const { summaryRows } = engine(['summaryRows'], { houseTotals, fmtArea: loadUnits('ft').fmtArea });
+  const rows = Array.from(summaryRows([{ blocks: [r(9.144, 12.192)] }], 0), (x) => Array.from(x));
+  assert.equal(rows.find((x) => x[0] === 'Area')[1], '1,200 sq ft');
 });
 
 test('walk chrome hides the stats bar and restores it', () => {

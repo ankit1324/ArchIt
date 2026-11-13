@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {closeToolPop, syncToolCursor} from './tools.js';
 import {C} from './catalog.js';
-import {$, VIEW, chips, round1, setPressed, stage, toast} from './dom.js';
+import {$, VIEW, chips, setPressed, stage, toast} from './dom.js';
 import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, undo, undoStack} from './state.js';
 import {FLH, boundsOf, clampFurn, designIssues, houseTotals, overlaps} from './geometry.js';
+import {fmtArea} from './units.js';
 import {camera, controls, requestRender, requestShadows, selOutline, wallMats} from './scene.js';
 import {partMat} from './materials.js';
 import {blockGroups, rebuild3D, toggleRoofs, updateSelection} from './house3d.js';
@@ -18,7 +19,7 @@ import {newProject} from './main.js';
 function updateChip(){
   // "Total area" and "Rooms" are the whole house; the sidebar has the per-floor figures
   const {area, rooms} = houseTotals(state.floors);
-  document.getElementById('areaV').textContent = round1(area) + ' m²';
+  document.getElementById('areaV').textContent = fmtArea(area);
   document.getElementById('roomsV').textContent = rooms;
   const iss = designIssues();
   const wv = document.getElementById('warnV');

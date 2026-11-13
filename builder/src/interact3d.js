@@ -219,7 +219,7 @@ canvas.addEventListener('pointerup', e=>{
         const nowShared = !!sharedWall(d3.b, d3.d.wall);
         const wasExt = d3.d.type.startsWith('ext');
         if(nowShared && wasExt) d3.d.type = 'int_hard';
-        if(!nowShared && !wasExt) d3.d.type = 'ext_hard';
+        if(!nowShared && !wasExt){ d3.d.type = 'ext_hard'; d3.d.w = Math.min(d3.d.w, 1.2); }
         undoStack.push(d3.snap); redoStack.length = 0; setDirty(true);
       }
       renderAll();
