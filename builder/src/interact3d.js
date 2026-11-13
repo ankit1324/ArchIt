@@ -49,7 +49,7 @@ function renderHotspots(){
   computeHotspots();
   hotspots.forEach(h=>{
     const el = document.createElement('button');
-    el.className = 'hs';
+    el.className = 'hs'; el.setAttribute('aria-label', 'Add a room on this side');
     el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>';
     el.addEventListener('click', e=>{ e.stopPropagation(); addRoomAt(h.blockId, h.sx, h.sz); });
     el._h = h;

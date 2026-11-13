@@ -2,9 +2,19 @@ import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
 import {$, VIEW, escapeMarkup, round1, side, toast} from './dom.js';
 import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui} from './state.js';
-import {boundsOf, freeT, overlaps, refitFurniture, sharedWall} from './geometry.js';
+import {boundsOf, freeT, houseTotals, overlaps, refitFurniture, sharedWall} from './geometry.js';
 import {openToolPop} from './tools.js';
 import {renderSelection} from './ui.js';
+
+// whole-house Rooms/Area (matches the stats bar); multi-floor adds a labelled current-floor line
+function summaryRows(floors, fi){
+  const t = houseTotals(floors), rows = [['Rooms', String(t.rooms)], ['Floors', String(floors.length)], ['Area', round1(t.area)+' m²']];
+  if(floors.length>1){
+    const bl = floors[fi].blocks; let a = 0; bl.forEach(b=>a += b.w*b.len);
+    rows.push(['Floor '+(fi+1), bl.length+(bl.length===1?' room':' rooms')+' · '+round1(a)+' m²']);
+  }
+  return rows;
+}
 
 /* ============================== sidebar ============================== */
 const SEL_H = {};   // select handlers registry
@@ -120,16 +130,14 @@ function renderPanel(){
       return (rows || `<div class="note">Pick a piece in the toolbar catalog, then tap a room to place it.</div>`);
     }],
   ];
-  let area = 0; state.blocks.forEach(bl=>area += bl.w*bl.len);
+  const sumRows = summaryRows(state.floors, state.floor);
   side.innerHTML = `
     <div class="sum">
       <h2>${VIEW ? 'This house' : 'My house <sup>?</sup>'}</h2>
       <p>Floor ${state.floor+1} of ${state.floors.length}</p>
     </div>
     <div class="stats">
-      <div class="row"><span>Rooms</span><b>${state.blocks.length}</b></div>
-      <div class="row"><span>Floors</span><b>${state.floors.length}</b></div>
-      <div class="row"><span>Area</span><b>${round1(area)} m²</b></div>
+      ${sumRows.map(([k,v])=>`<div class="row"><span>${k}</span><b>${v}</b></div>`).join('')}
       <div class="row"><span>Size</span><b>${round1(bb.w)} m × ${round1(bb.d)} m</b></div>
     </div>
     ${ui.view==='2d' && !VIEW ? '<div class="plan-hint"><b>Plan room by room</b><br>Select a room to edit its dimensions. Drag to move; use corner handles to resize. The fit button brings the full plan back into view.</div>' : ''}
@@ -163,7 +171,7 @@ function renderBlockPanel(b){
     <div class="selhead">
       <span class="cube"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M4 6.5 12 11l8-4.5M12 11v9"/></svg></span>
       <div><h2>${escapeMarkup(b.name || spec.name+' '+i)}</h2><div class="pr" style="color:#5d665b">${round1(b.w*b.len)} m²</div></div>
-      <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Name</div>
@@ -215,7 +223,7 @@ function renderDoorPanel(b, d){
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3.5" width="12" height="17" rx="1.2"/><circle cx="14.6" cy="12" r="1" fill="currentColor"/></svg></span>
       <div><h2>Door ${idx}</h2><div class="pr" style="color:#5d665b">${Math.round(d.w*100)} × ${Math.round(d.h*100)} cm</div></div>
-      <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Type</div>
@@ -252,7 +260,7 @@ function renderWinPanel(b, w){
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 4v16M4 12h16"/></svg></span>
       <div><h2>Window</h2><div class="pr" style="color:#5d665b">${cur==='pano'?'2.2 m · full height':'1.3 × 1.06 m'}</div></div>
-      <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="f-label">Type</div>
@@ -273,7 +281,7 @@ function renderFurnPanel(b, f){
     <div class="selhead">
       <span class="cube"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6"/><path d="M4 11V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M6 18v2M18 18v2"/></svg></span>
       <div><h2>${s.name}</h2><div class="pr" style="color:#5d665b">${s.w} × ${s.d} × ${s.h} m</div></div>
-      <button class="x" data-act="close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <button class="x" data-act="close" aria-label="Close panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="hr"></div>
     <div class="note">Drag it in the 3D or 2D view to move it inside the room. Use the chips above it to duplicate, rotate or delete.</div>

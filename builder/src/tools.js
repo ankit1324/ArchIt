@@ -2,13 +2,30 @@ import * as THREE from 'three';
 import './sidebar.js';
 import {C} from './catalog.js';
 import {$, VIEW, chips, escapeMarkup, toast} from './dom.js';
-import {commit, footprint, getBlock, newRoom, sel, selBlock, selFurn, setSel, state, ui} from './state.js';
+import {commit, footprint, getBlock, localToWorld, newRoom, sel, selBlock, selFurn, setSel, state, ui} from './state.js';
 import {clampFurn, freeT, overlaps, sharedWall} from './geometry.js';
 import {canvas} from './scene.js';
 import {FURN_MATS} from './materials.js';
 import {FURN_BUILDERS, legacyBuildFurn} from './furniture.js';
-import {planSvg} from './plan2d.js';
+import {planSvg, roomSizeLabel} from './plan2d.js';
 import {showTemplatePicker} from './templates.js';
+
+// Which wall of b faces the world side (sx,sz) (rotation-aware).
+function wallOnSide(b, sx, sz){
+  for(let w=0; w<4; w++){
+    const [nx,nz] = w===0?[0,1] : w===1?[1,0] : w===2?[0,-1] : [-1,0];
+    const [x,z] = localToWorld(b, nx, nz);
+    if(Math.round(x-b.cx)===sx && Math.round(z-b.cz)===sz) return w;
+  }
+  return -1;
+}
+// First free side, preferring a wall with no window/door so the new room does not
+// bury an opening (a window onto a room is a check failure); else the first free side.
+function pickRoomSide(b, blocked){
+  const free = [[0,1],[1,0],[0,-1],[-1,0]].filter(([sx,sz])=>!blocked(sx,sz));
+  return free.find(([sx,sz])=>{ const w = wallOnSide(b, sx, sz);
+    return !b.windows.some(o=>Number(o.wall)===w) && !b.doors.some(o=>Number(o.wall)===w); }) || free[0];
+}
 
 /* ============================== chips actions ============================== */
 chips.addEventListener('click', e=>{
@@ -130,7 +147,7 @@ function openToolPop(tool){
       <button class="itemrow" data-add-room="${k}">
         <span class="ic">${ICONS.gen}</span>
         <span><span class="nm">${v.name}</span>
-        <span style="display:block;font-size:11.5px;color:#5d665b">${v.w} × ${v.len} m</span></span>
+        <span style="display:block;font-size:11.5px;color:#5d665b">${roomSizeLabel({w:v.w, len:v.len, rot:0})}</span></span>
       </button>`).join('');
   } else if(tool==='doors'){
     const groups = {};
@@ -219,8 +236,8 @@ toolpop.addEventListener('click', e=>{
     const [rw, rd] = footprint(ref);
     const spec = C.rooms[type];
     const [nw, nd] = ref.rot%2 ? [spec.w, spec.len] : [spec.len, spec.w];
-    const spot = [[0,1],[1,0],[0,-1],[-1,0]].find(([sx,sz])=>
-      !overlaps(ref.cx+sx*((rw+nw)/2+.02), ref.cz+sz*((rd+nd)/2+.02), nw, nd));
+    const spot = pickRoomSide(ref, (sx,sz)=>
+      overlaps(ref.cx+sx*((rw+nw)/2+.02), ref.cz+sz*((rd+nd)/2+.02), nw, nd));
     if(!spot){ toast('No free side to add a room'); return; }
     commit(()=>{
       const nb = newRoom(type, ref.cx+spot[0]*((rw+nw)/2+.02), ref.cz+spot[1]*((rd+nd)/2+.02), ref.rot);

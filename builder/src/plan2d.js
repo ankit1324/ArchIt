@@ -60,7 +60,7 @@ function render2D(){
     const b = getBlock(h.blockId); const [w,d]=footprint(b);
     const [px,py] = P(b.cx + h.sx*(w/2+0.62), b.cz + h.sz*(d/2+0.62), ox, oy);
     const el = document.createElement('button');
-    el.className='hs';
+    el.className='hs'; el.setAttribute('aria-label', 'Add a room on this side');
     el.style.left = px+'px'; el.style.top = py+'px';
     el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>';
     el.addEventListener('click', e=>{ e.stopPropagation(); addRoomAt(h.blockId, h.sx, h.sz); });
@@ -135,7 +135,7 @@ function blockSvg(b, ox, oy){
   s += `<g pointer-events="none"><title>${escapeMarkup(fullName)}</title>
     <rect x="${x0+5}" y="${ncy-12}" width="${Math.max(0,W2-10)}" height="${showDims?34:23}" rx="4" fill="#f8f7f2" fill-opacity=".82"/>
     <text x="${ncx}" y="${ncy+3}" text-anchor="middle" style="font-size:${labelSize}px;font-weight:700;fill:#29372c">${escapeMarkup(label)}</text>`;
-  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#5d665b">${round1(b.len)} × ${round1(b.w)} m</text>`;
+  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#5d665b">${roomSizeLabel(b)}</text>`;
   s += '</g>';
   if(seld){
     // side dimension pills + corner handles
@@ -434,6 +434,8 @@ function placeDoorByClick(blockId, e){
   });
 }
 
+// Width-as-drawn x depth-as-drawn, so the label matches the pills and the picture.
+function roomSizeLabel(b){ const [w,d] = footprint(b); return `${round1(w)} × ${round1(d)} m`; }
 export function setPlanScale(v){ return S = v; }
 
-export {S, fitPlan, planOff, planSvg, render2D};
+export {S, fitPlan, planOff, planSvg, render2D, roomSizeLabel};

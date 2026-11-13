@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {updateOverlay3D} from './interact3d.js';
-import {$, stage} from './dom.js';
+import {$, setPressed, stage} from './dom.js';
 import {getBlock, state, ui} from './state.js';
 import {resolveWalk, sharedWall, wallSegWorld} from './geometry.js';
 import {camera, canvas, controls, needsRender, renderer, scene, setNeedsRender} from './scene.js';
@@ -263,16 +263,18 @@ function enterWalk(){
     onLockChange:l=>{ walkOverlay&&walkOverlay.setLocked(l); }});
   if(!walkOverlay){ walkOverlay=createWalkOverlay(); stage.appendChild(walkOverlay.el); }
   walkOverlay.setLocked(false); walkOverlay.show();
-  const bw=$('#btnWalk'); bw&&bw.classList.add('on');
+  setPressed($('#btnWalk'), true); setWalkChrome(true);
   _walkLastT=performance.now();
 }
+// the walk hint pill sits where the stats bar does: hide the bar while walking
+function setWalkChrome(on){ const bb=$('#bottombar'); if(bb) bb.style.display = on ? 'none' : ''; }
 function exitWalk(){
   if(!walkActive) return;
   walkActive=false; ui.walk=false;
   walkCtl&&walkCtl.unlock();
   walkOverlay&&walkOverlay.hide();
   controls.enabled=true;
-  const bw=$('#btnWalk'); bw&&bw.classList.remove('on');
+  setPressed($('#btnWalk'), false); setWalkChrome(false);
   const b=walkRoom||(state.blocks&&state.blocks[0]);
   if(b){ controls.target.set(b.cx,1.1,b.cz); camera.position.set(b.cx+6,5.5,b.cz+7); controls.update(); }
   if(!ui.interior) toggleRoofs(true);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {PAID_TEMPLATES, TEMPLATES, fetchPaidGeometry, loadTemplateCatalog, markTemplateOwned, showTemplatePicker, tRoom, tRoomSpec} from './templates.js';
 import {C} from './catalog.js';
-import {$, EMBED, VIEW, toast} from './dom.js';
+import {$, EMBED, VIEW, setPressed, toast} from './dom.js';
 import {dirty, freshState, linkFloor, sel, setDirty, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
 import {boundsOf, roofComponents, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
 import {blocksRoot, camera, controls, pmrem, renderer, scene, setContext, wallMats} from './scene.js';
@@ -57,7 +57,7 @@ async function newProject(tpl='empty'){
   centreBlocks(state.blocks);
   setUndoStack([]); setRedoStack([]); setSel(null);
   ui.interior = false; ui.focusRoomId = null; ui.tool = null;
-  $('#btnIn').classList.remove('on');
+  setPressed($('#btnIn'), false);
   closeToolPop();
   toggleRoofs(true);
   resetCam();

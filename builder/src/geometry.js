@@ -40,15 +40,33 @@ function windowFacesNeighbour(b, w){
   return null;
 }
 function designIssues(){
-  const iss = [];
-  state.blocks.forEach((b,i)=>{
-    const nm = (b.name || C.rooms[b.type].name) + ' ' + (i+1);
-    if(!C.rooms[b.type].open && !b.doors.length) iss.push(nm + ': no door');
-    b.windows.forEach(w=>{
-      const into = windowFacesNeighbour(b, w);
-      if(into) iss.push(nm + ': window opens into ' + (into.name || C.rooms[into.type].name));
+  const iss = [], multi = state.floors.length > 1, live = state.blocks;
+  // sharedWall/windowFacesNeighbour read state.blocks: aim them at each floor in turn
+  try{
+    state.floors.forEach((fl, fi)=>{
+      state.blocks = fl.blocks;
+      const pre = multi ? 'Floor '+(fi+1)+': ' : '';
+      // the floor above is unreachable without a staircase on this one
+      if(fi < state.floors.length-1 && !fl.blocks.some(b=>b.type==='stairs'))
+        iss.push(pre + 'no stairs to floor ' + (fi+2));
+      fl.blocks.forEach((b,i)=>{
+        const nm = (b.name || C.rooms[b.type].name) + ' ' + (i+1);
+        if(!C.rooms[b.type].open && !b.doors.length) iss.push(pre + nm + ': no door');
+        b.windows.forEach(w=>{
+          const into = windowFacesNeighbour(b, w);
+          if(into) iss.push(pre + nm + ': window opens into ' + (into.name || C.rooms[into.type].name));
+        });
+        // upstairs, an exterior door with nothing (balcony, veranda) outside is a drop
+        if(fi > 0) b.doors.forEach(d=>{
+          if(String(d.type).startsWith('ext_') && !sharedWall(b, Number(d.wall))){
+            iss.push(pre + nm + ': door opens to a drop');
+          }
+        });
+      });
     });
-  });
+  } finally {
+    state.blocks = live;
+  }
   return iss;
 }
 function boundsOf(blocks){

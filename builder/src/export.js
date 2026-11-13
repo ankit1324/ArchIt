@@ -3,7 +3,7 @@ import {hideModal, modal, renderAll, resetCam, showModal} from './ui.js';
 import {C} from './catalog.js';
 import {$, VIEW, escapeMarkup, round1, toast} from './dom.js';
 import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
-import {boundsOf} from './geometry.js';
+import {FLH, boundsOf, houseTotals} from './geometry.js';
 import {camera, controls, renderer, requestShadows, scene, wallMats} from './scene.js';
 import {renderHotspots} from './interact3d.js';
 import {S, planOff, planSvg, render2D} from './plan2d.js';
@@ -96,21 +96,28 @@ function save2D(){
   };
   img.src = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(planSVGDoc(p, `width="${p.w}" height="${p.h}"`));
 }
+// Report data for the whole house: every floor, not just the active one.
+function reportFloors(floors){
+  return floors.map((f,fi)=>({fi, label: fi===0 ? 'Ground floor' : 'Floor '+(fi+1), blocks:f.blocks}));
+}
 function designSheet(){
   const win = window.open('', '_blank');
   if(!win){ toast('Allow pop-ups to open the design sheet'); return; }
-  const bb = boundsOf(state.blocks), R = Math.max(bb.w, bb.d)*1.15 + 5;
+  const bb = boundsOf(state.floors.flatMap(f=>f.blocks)), R = Math.max(bb.w, bb.d)*1.15 + 5;
   const hero  = shoot3D([bb.cx+R*.85, R*.7,  bb.cz+R*.85], [bb.cx, .6, bb.cz], false);
   const front = shoot3D([bb.cx,       R*.45, bb.cz+R*1.15],[bb.cx, 1,  bb.cz], false);
   const back  = shoot3D([bb.cx,       R*.45, bb.cz-R*1.15],[bb.cx, 1,  bb.cz], false);
   const top   = shoot3D([bb.cx+.01,   R*1.5, bb.cz],       [bb.cx, 0,  bb.cz], true);
   const plan  = planSVGDoc(planShot(), 'style="width:100%;height:auto"');
-  let area = 0; state.blocks.forEach(b=>area += b.w*b.len);
+  const tot = houseTotals(state.floors), multi = state.floors.length>1;
   let roomCards = '';
-  state.blocks.forEach((b,i)=>{
+  reportFloors(state.floors).forEach(fl=>{
+   if(multi) roomCards += `<h2 class="flh">${fl.label}</h2>`;
+   fl.blocks.forEach((b,i)=>{
     const spec = C.rooms[b.type], [w,d] = footprint(b);
     const rr = Math.max(w,d)*1.05 + 2.2;
-    const shot = shoot3D([b.cx+rr*.8, rr*.95, b.cz+rr*.8], [b.cx, .5, b.cz], true);
+    const dy = (fl.fi - state.floor)*FLH();   // scene keeps the active floor at y=0
+    const shot = shoot3D([b.cx+rr*.8, dy+rr*.95, b.cz+rr*.8], [b.cx, dy+.5, b.cz], true);
     const wallN = b.paint ? C.paint[b.paint].name : C.paint[state.paint].name+' (house default)';
     const floorN = b.floorCol ? C.floorCol[b.floorCol].name : 'Room default';
     const doors = b.doors.map(x=>C.doors[x.type].name).join(', ') || '—';
@@ -126,6 +133,7 @@ function designSheet(){
         <tr><td>Windows</td><td>${wins}</td></tr>
         <tr><td>Furniture</td><td>${furn}</td></tr>
       </table></div></div>`;
+   });
   });
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>ArchIt — Design Sheet</title><style>
     body{font-family:'Manrope',system-ui,sans-serif;color:#29372c;margin:0;background:#eeeee5}
@@ -140,7 +148,7 @@ function designSheet(){
     .summary td,.room td{padding:5px 10px;border-bottom:1px solid #e4e6dc;vertical-align:top}
     .summary td:first-child,.room td:first-child{color:#5d665b;font-weight:700;width:110px;white-space:nowrap}
     .summary{padding:14px}
-    .rooms{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .flh{grid-column:1/-1;margin:8px 0 0}.rooms{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .room .rb{padding:12px 14px}
     .plan{padding:10px}
     .printbtn{position:fixed;right:18px;top:18px;background:#ad4a31;color:#f8f7f2;border:0;border-radius:5px;padding:10px 20px;font-weight:800;font-size:14px;cursor:pointer}
@@ -149,12 +157,12 @@ function designSheet(){
   <button class="printbtn">Print / PDF</button>
   <div class="wrap">
     <h1>ArchIt — Design Sheet</h1>
-    <div class="meta">${new Date().toLocaleDateString()} — ${state.blocks.length} rooms — ${round1(area)} m² total</div>
+    <div class="meta">${new Date().toLocaleDateString()} — ${tot.rooms} rooms — ${round1(tot.area)} m² total</div>
     <div class="card summary"><table>
       <tr><td>Facade</td><td>${C.facade[state.facade].name}, ${C.facadeMat[state.facadeMat].name}</td></tr>
       <tr><td>Roof</td><td>${C.roofStyle[state.roofStyle].name}, ${C.roofCol[state.roofCol].name}</td></tr>
       <tr><td>Interior</td><td>${C.paint[state.paint].name} walls</td></tr>
-      <tr><td>Total area</td><td>${round1(area)} m² across ${state.blocks.length} rooms</td></tr>
+      <tr><td>Total area</td><td>${round1(tot.area)} m² across ${tot.rooms} rooms${multi ? ' on '+state.floors.length+' floors' : ''}</td></tr>
     </table></div>
     <h2>3D previews</h2>
     <div class="card"><img src="${hero}"><div class="cap">Overview</div></div>
