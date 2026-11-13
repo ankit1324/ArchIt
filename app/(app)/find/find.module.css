@@ -13,8 +13,8 @@
 .filterHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin: 0 2px 14px; padding-bottom: 14px; border-bottom: 1px solid var(--color-line); }
 .eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11px; line-height: 1.6; letter-spacing: .14em; font-weight: 700; text-transform: uppercase; color: var(--color-ink-soft); }
 .eyebrow::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--color-accent); }
-.filterHeading h1 { margin-top: 6px; font-family: var(--font-display); font-size: 25px; font-weight: 450; line-height: 1.1; letter-spacing: -.03em; color: var(--color-ink); }
-.closeFilters, .filterToggle { display: none; }
+.filterHeading h2 { margin-top: 6px; font-family: var(--font-display); font-size: 25px; font-weight: 450; line-height: 1.1; letter-spacing: -.03em; color: var(--color-ink); }
+.closeFilters, .filterToggle, .filterScrim { display: none; }
 .toolbar { pointer-events: auto; position: absolute; top: 14px; left: 280px; right: 14px; display: flex; align-items: center; gap: 10px; }
 .toolbar > button { white-space: nowrap; }
 .mapControls { pointer-events: auto; position: absolute; right: 14px; top: 32%; }
@@ -44,9 +44,10 @@
 .resultsUnderSheet, .mapControlsShifted { right: 328px; }
 @media (max-width: 1023px) {
   .mapControlsShifted { right: 14px; }
+  .filterScrim { display: block; pointer-events: auto; position: absolute; inset: 0; z-index: 35; border: 0; background: rgb(41 55 44 / .22); backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); }
   .filters { display: none; z-index: 40; top: 124px; bottom: 26px; width: min(300px, calc(100% - 28px)); background: var(--color-paper); }
   .filtersOpen { display: flex; }
-  .closeFilters { display: grid; place-items: center; width: 40px; height: 40px; margin: -6px -6px 0 0; border-radius: 5px; color: var(--color-ink); font-size: 14px; transition: background-color .15s; }
+  .closeFilters { display: grid; place-items: center; width: 44px; height: 44px; margin: -6px -6px 0 0; border-radius: 5px; color: var(--color-ink); font-size: 14px; transition: background-color .15s; }
   .closeFilters:hover { background: var(--color-paper-soft); }
   .filterToggle { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--color-line-strong); border-radius: 999px; background: rgb(248 247 242 / .96); color: var(--color-ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: 0 18px 35px -24px rgb(41 55 44 / .45); transition: border-color .15s; }
   .filterToggle:hover, .filterToggle[aria-expanded="true"] { border-color: var(--color-ink); }
@@ -65,16 +66,22 @@
   .pickHint { top: 124px; left: 14px; right: 14px; }
 }
 @media (max-width: 600px) {
-  .resultBar { padding: 9px 10px 9px 12px; gap: 8px; }
-  .resultBar strong { font-size: 17px; }
-  .resultBar > div:first-child > span { max-width: 145px; }
-  .resultActions button { display: none; }
-  .resultActions { gap: 10px; }
+  .resultBar { align-items: stretch; flex-direction: column; gap: 8px; padding: 9px 10px; }
+  .resultBar > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .resultBar strong { flex: none; font-size: 17px; }
+  .resultBar > div:first-child > span { max-width: 160px; text-align: right; font-size: 12px; }
+  .resultActions { display: grid; grid-template-columns: auto auto minmax(0, 1fr); width: 100%; gap: 8px; padding-top: 8px; border-top: 1px solid var(--color-line); }
+  .resultActions button { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; padding: 0 11px; border: 1px solid var(--color-line-strong); border-radius: 999px; text-decoration: none; }
+  .areaToggle { min-height: 36px; }
   .areaLong { display: none; }
   .areaShort { display: inline; }
-  .resultActions select { max-width: 112px; }
+  .resultActions select { min-width: 0; width: 100%; max-width: none; }
   .results > div:last-child > button { height: 165px; width: 215px; }
   .mapControls { top: 140px; }
+}
+@media (max-width: 480px) {
+  .resultActions .showMapButton { width: 36px; padding-inline: 0; }
+  .showMapLabel { display: none; }
 }
 @media (max-height: 650px) and (min-width: 1024px) {
   .results > div:last-child > button { height: 150px; }

@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import {buildFurn} from './furniture.js';
 import {C} from './catalog.js';
 import {footprint, localToWorld, sel, selBlock, selDoor, selFurn, state, ui, wallLen, wallPoint} from './state.js';
-import {FLH, boundsOf, loopArea, pointInLoop, roofComponents, roofRects, sharedWall, tint, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
-import {beam, blocksRoot, fitShadows, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setSelOutline} from './scene.js';
+import {FLH, boundsOf, groundY, loopArea, pointInLoop, roofComponents, roofRects, sharedWall, tint, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
+import {beam, blocksRoot, fitShadows, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setGroundLevel, setSelOutline} from './scene.js';
 import {cachedMat, ceilMatCache, curbMat, doorFrameExtMat, doorFrameIntMat, doorGlassFrameMat, doorGlassMat, doorPanelExtMat, doorPanelIntMat, eavesMat, edgeMat, fasciaMat, fasciaSteelMat, handleMat, makeSurfaceTexture, mkFacadeMat, mkPaintMat, mkRevealMat, mkRoofMat, partMat, plantMat, skyFrameMat, skyGlassMat, slabMatCache, soffitMat, stepMat, trimMat, valleyMat, winFrameMat, winGlassMat} from './materials.js';
 import {markOverlayDirty} from './interact3d.js';
 import {BoxBatch} from './batch.js';
@@ -531,6 +531,7 @@ function rebuild3D(){
   }
   built = next;
   blockGroups = groups;
+  setGroundLevel(groundY(state.floor));
   fitShadows();
   updateSelection();
   requestShadows();

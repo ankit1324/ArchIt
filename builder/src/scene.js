@@ -110,6 +110,15 @@ scene.add(blocksRoot);
 /* plot outline + neighbor context boxes injected by the parent map (embed mode) */
 const contextRoot = new THREE.Group();
 scene.add(contextRoot);
+// Everything that stands for "the ground" moves together. rebuild3D calls this
+// with groundY(state.floor): the active floor stays at y 0, so on an upper floor
+// the ground sinks to the lowest floor instead of burying the ones below.
+function setGroundLevel(y){
+  ground.position.y = y;
+  shadowCatcher.position.y = y + 0.001;
+  grid.position.y = y + 0.002;
+  contextRoot.position.y = y;
+}
 function setContext(plot, neighbors, facing){
   // Every archit:init (each design DesignerOverlay opens in the kept-alive
   // iframe) rebuilds the plot/neighbour context: free the old GPU buffers,
@@ -185,4 +194,4 @@ function beam(sx,sy,sz, x,y,z, mat){
 export function setNeedsRender(v){ return needsRender = v; }
 export function setSelOutline(v){ return selOutline = v; }
 
-export {beam, blocksRoot, camera, canvas, controls, fitShadows, needsRender, pmrem, renderer, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setContext, wallMats};
+export {beam, blocksRoot, camera, canvas, controls, fitShadows, needsRender, pmrem, renderer, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setContext, setGroundLevel, wallMats};

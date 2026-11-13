@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 // maplibre-gl 6 is ESM-only with no default export
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { motionDuration } from "@/lib/motion";
 
 // same worker setup as components/Map3D.tsx: the bundler doesn't emit
 // maplibre's import.meta.url worker, so serve the copy in public/vendor
@@ -174,10 +175,10 @@ export default function PinPickerMap({
           [w, s],
           [e, n],
         ],
-        { padding: 40, maxZoom: 16, duration: 1200 },
+        { padding: 40, maxZoom: 16, duration: motionDuration(1200) },
       );
     } else {
-      map.flyTo({ center: flyTo.center, zoom: 15, duration: 1200 });
+      map.flyTo({ center: flyTo.center, zoom: 15, duration: motionDuration(1200) });
     }
   }, [flyTo]);
 

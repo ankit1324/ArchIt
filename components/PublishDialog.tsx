@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { Design } from "@/lib/types";
 import { reverseGeocode, searchPlace } from "@/lib/geocode";
 import { hasLocation } from "@/lib/showcase";
+import { connectedFocusTarget, wrappedFocusIndex } from "@/lib/focus";
 import type { FlyTarget } from "@/components/PinPickerMap";
 
 const PinPickerMap = dynamic(() => import("@/components/PinPickerMap"), {
@@ -13,6 +14,8 @@ const PinPickerMap = dynamic(() => import("@/components/PinPickerMap"), {
 });
 
 const MAX_PLACE = 120; // same cap as the publish route (lib/showcase.ts)
+const DIALOG_FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const focusRing =
   "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -55,6 +58,8 @@ export default function PublishDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const dialogRef = useRef<HTMLElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const searchCtrl = useRef<AbortController | null>(null);
   const geoCtrl = useRef<AbortController | null>(null);
   const onCancelRef = useRef(onCancel);
@@ -62,16 +67,45 @@ export default function PublishDialog({
     onCancelRef.current = onCancel;
   });
 
-  // Escape closes; abort any in-flight lookups on unmount
+  // Put focus inside the modal, contain keyboard navigation even if a busy
+  // state disables the active button, and return focus to a stable row control.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancelRef.current();
+    const opener =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const fallback =
+      opener
+        ?.closest<HTMLElement>("[data-design-row]")
+        ?.querySelector<HTMLElement>("[data-design-focus]") ?? null;
+    const focusFrame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCancelRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const controls = Array.from(
+        dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE),
+      ).filter(
+        (element) =>
+          !element.hasAttribute("hidden") &&
+          element.getAttribute("aria-hidden") !== "true" &&
+          element.getClientRects().length > 0,
+      );
+      const currentIndex = controls.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = wrappedFocusIndex(controls.length, currentIndex, event.shiftKey);
+      if (nextIndex < 0) return;
+      event.preventDefault();
+      controls[nextIndex].focus();
     };
     window.addEventListener("keydown", onKey);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       window.removeEventListener("keydown", onKey);
       searchCtrl.current?.abort();
       geoCtrl.current?.abort();
+      connectedFocusTarget(opener, fallback)?.focus();
     };
   }, []);
 
@@ -167,6 +201,7 @@ export default function PublishDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-dialog-title"
@@ -193,6 +228,7 @@ export default function PublishDialog({
           }}
         >
           <input
+            ref={searchInputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search a place, e.g. Sector 8, Chandigarh"

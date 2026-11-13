@@ -70,6 +70,7 @@ export default function Navbar({ variant = "site" }: { variant?: "site" | "app" 
   };
 
   return (
+    <>
     <header
       className="relative z-30 shrink-0 border-b border-line bg-paper text-ink"
       onKeyDown={(e) => {
@@ -125,7 +126,7 @@ export default function Navbar({ variant = "site" }: { variant?: "site" | "app" 
             aria-expanded={open}
             aria-controls={menuId}
             onClick={() => setOpen((o) => !o)}
-            className={`inline-flex min-h-10 items-center gap-3 rounded-[5px] border border-line-strong px-3 text-[12px] font-semibold transition-colors hover:border-ink md:hidden ${FOCUS}`}
+            className={`inline-flex min-h-11 items-center gap-3 rounded-[5px] border border-line-strong px-3 text-[12px] font-semibold transition-colors hover:border-ink md:hidden ${FOCUS}`}
           >
             {open ? "Close" : "Menu"}
             <span aria-hidden="true" className="w-2 text-center">
@@ -151,5 +152,15 @@ export default function Navbar({ variant = "site" }: { variant?: "site" | "app" 
         )}
       </nav>
     </header>
+    {open && (
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close menu"
+        onClick={close}
+        className="fixed inset-0 z-20 bg-ink/20 backdrop-blur-[1px] md:hidden"
+      />
+    )}
+    </>
   );
 }

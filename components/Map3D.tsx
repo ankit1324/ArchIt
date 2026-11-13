@@ -11,6 +11,7 @@ import "./map.css";
 import type { Listing, Poi, PublishedDesign } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 import { safeImageUrl, sizedImageUrl } from "@/lib/url";
+import { motionDuration } from "@/lib/motion";
 
 // maplibre-gl 6 finds its worker via import.meta.url, which the Next.js bundler
 // doesn't emit; serve the copy scripts/copy-maplibre-worker.mjs puts in public/.
@@ -703,7 +704,7 @@ export default function Map3D({
           map.easeTo({
             center: (hit.geometry as GeoJSON.Point).coordinates as [number, number],
             zoom: zoom + 0.3,
-            duration: 700,
+            duration: motionDuration(700),
           });
         });
         return;
@@ -830,7 +831,7 @@ export default function Map3D({
         ? designsRef.current.find((d) => d.id === selectedDesignIdRef.current)
         : undefined;
       if (focus?.plotCenter) {
-        map.flyTo({ center: focus.plotCenter, zoom: 16.4, pitch: 58, duration: 2400, essential: false });
+        map.flyTo({ center: focus.plotCenter, zoom: 16.4, pitch: 58, duration: motionDuration(2400), essential: false });
         return;
       }
       // cinematic settle, mirroring the video intro
@@ -839,7 +840,7 @@ export default function Map3D({
         zoom: 15.35,
         pitch: 58,
         bearing: -17,
-        duration: 4200,
+        duration: motionDuration(4200),
         essential: false,
       });
     });

@@ -26,4 +26,7 @@ function escapeMarkup(value){
   return String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-export {$, EMBED, VIEW, chips, escapeMarkup, ov, round1, side, stage, toast};
+// the mode buttons carry their state as class "on"; screen readers need aria-pressed too
+function setPressed(el, on){ if(!el) return; el.classList.toggle('on', !!on); el.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+
+export {$, EMBED, VIEW, chips, escapeMarkup, ov, round1, setPressed, side, stage, toast};

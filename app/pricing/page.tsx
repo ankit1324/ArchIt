@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { FEES, type FeePurpose } from "@/lib/fees";
@@ -156,6 +157,45 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
+        </section>
+
+        <section
+          aria-labelledby="pricing-next-step"
+          className="mt-14 rounded-[5px] bg-forest px-6 py-8 text-paper md:mt-20 md:px-10 md:py-10"
+        >
+          <div className="grid items-end gap-8 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.6fr)] md:gap-14">
+            <div className="max-w-2xl">
+              <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-paper/70">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-clay" />
+                Next step
+              </p>
+              <h2
+                id="pricing-next-step"
+                className="mt-4 font-display text-[clamp(32px,4vw,50px)] font-normal leading-[1.08] tracking-[-0.035em]"
+              >
+                Turn an idea into a place.
+              </h2>
+              <p className="mt-4 max-w-[54ch] text-[15px] leading-[1.75] text-paper/75">
+                {PAYWALL_ENABLED
+                  ? "Choose the tool you need, then unlock paid features only when you decide to use them."
+                  : "Everything is open right now. Start a design from scratch or explore properties on the living map."}
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
+              <Link
+                href="/designer"
+                className="inline-flex min-h-11 items-center justify-between gap-6 rounded-[5px] bg-highlight px-5 py-3 text-[13px] font-semibold text-ink transition-colors hover:bg-paper focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-paper"
+              >
+                Start designing <span aria-hidden="true">→</span>
+              </Link>
+              <Link
+                href="/find"
+                className="inline-flex min-h-11 items-center justify-between gap-6 rounded-[5px] border border-paper/45 px-5 py-3 text-[13px] font-semibold text-paper transition-colors hover:border-paper focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-paper"
+              >
+                Explore properties <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </div>
         </section>
 
         {PAYWALL_ENABLED && (

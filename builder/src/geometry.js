@@ -40,15 +40,33 @@ function windowFacesNeighbour(b, w){
   return null;
 }
 function designIssues(){
-  const iss = [];
-  state.blocks.forEach((b,i)=>{
-    const nm = (b.name || C.rooms[b.type].name) + ' ' + (i+1);
-    if(!C.rooms[b.type].open && !b.doors.length) iss.push(nm + ': no door');
-    b.windows.forEach(w=>{
-      const into = windowFacesNeighbour(b, w);
-      if(into) iss.push(nm + ': window opens into ' + (into.name || C.rooms[into.type].name));
+  const iss = [], multi = state.floors.length > 1, live = state.blocks;
+  // sharedWall/windowFacesNeighbour read state.blocks: aim them at each floor in turn
+  try{
+    state.floors.forEach((fl, fi)=>{
+      state.blocks = fl.blocks;
+      const pre = multi ? 'Floor '+(fi+1)+': ' : '';
+      // the floor above is unreachable without a staircase on this one
+      if(fi < state.floors.length-1 && !fl.blocks.some(b=>b.type==='stairs'))
+        iss.push(pre + 'no stairs to floor ' + (fi+2));
+      fl.blocks.forEach((b,i)=>{
+        const nm = (b.name || C.rooms[b.type].name) + ' ' + (i+1);
+        if(!C.rooms[b.type].open && !b.doors.length) iss.push(pre + nm + ': no door');
+        b.windows.forEach(w=>{
+          const into = windowFacesNeighbour(b, w);
+          if(into) iss.push(pre + nm + ': window opens into ' + (into.name || C.rooms[into.type].name));
+        });
+        // upstairs, an exterior door with nothing (balcony, veranda) outside is a drop
+        if(fi > 0) b.doors.forEach(d=>{
+          if(String(d.type).startsWith('ext_') && !sharedWall(b, Number(d.wall))){
+            iss.push(pre + nm + ': door opens to a drop');
+          }
+        });
+      });
     });
-  });
+  } finally {
+    state.blocks = live;
+  }
   return iss;
 }
 function boundsOf(blocks){
@@ -306,6 +324,16 @@ function pointInLoop(pt, loop){
   return inside;
 }
 const FLH = () => C.H + .12;   // floor-to-floor height
+// rebuild3D keeps the ACTIVE floor at y 0 (every drag, hotspot and camera path
+// assumes it), so the floors under it sit at negative y. The ground has to drop
+// with them, or it hides every floor below the one being edited.
+function groundY(activeFloor){ return (0 - activeFloor) * FLH(); }   // floor 0's y in rebuild3D
+// Whole-house totals for the stats bar: every floor, not just the active one.
+function houseTotals(floors){
+  let area = 0, rooms = 0;
+  floors.forEach(f=>f.blocks.forEach(b=>{ area += b.w*b.len; rooms++; }));
+  return {area, rooms};
+}
 
 /* -------- snapping -------- */
 function snapBlock(b, cx, cz){
@@ -393,4 +421,4 @@ function resolveWalk(prevX, prevZ, nextX, nextZ, radius, rects) {
   return { x: rx, z: rz };
 }
 
-export {FLH, boundsOf, clampFurn, designIssues, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};
+export {FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};

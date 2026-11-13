@@ -60,7 +60,7 @@ function render2D(){
     const b = getBlock(h.blockId); const [w,d]=footprint(b);
     const [px,py] = P(b.cx + h.sx*(w/2+0.62), b.cz + h.sz*(d/2+0.62), ox, oy);
     const el = document.createElement('button');
-    el.className='hs';
+    el.className='hs'; el.setAttribute('aria-label', 'Add a room on this side');
     el.style.left = px+'px'; el.style.top = py+'px';
     el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>';
     el.addEventListener('click', e=>{ e.stopPropagation(); addRoomAt(h.blockId, h.sx, h.sz); });
@@ -135,12 +135,13 @@ function blockSvg(b, ox, oy){
   s += `<g pointer-events="none"><title>${escapeMarkup(fullName)}</title>
     <rect x="${x0+5}" y="${ncy-12}" width="${Math.max(0,W2-10)}" height="${showDims?34:23}" rx="4" fill="#f8f7f2" fill-opacity=".82"/>
     <text x="${ncx}" y="${ncy+3}" text-anchor="middle" style="font-size:${labelSize}px;font-weight:700;fill:#29372c">${escapeMarkup(label)}</text>`;
-  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#5d665b">${round1(b.len)} × ${round1(b.w)} m</text>`;
+  if(showDims) s += `<text x="${ncx}" y="${ncy+17}" text-anchor="middle" style="font-size:10px;fill:#5d665b">${roomSizeLabel(b)}</text>`;
   s += '</g>';
   if(seld){
     // side dimension pills + corner handles
-    s += chip2D(x0+W2/2-24, y0-9, `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
-    s += chip2D(x0-14, y0+D2/2-9, `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
+    const [topPill, leftPill] = dimPillCentres(x0, y0, W2, D2);
+    s += chip2D(topPill[0], topPill[1], `${round1(b.rot%2? b.w : b.len)} m`, '#ad4a31');
+    s += chip2D(leftPill[0], leftPill[1], `${round1(b.rot%2? b.len : b.w)} m`, '#ad4a31', true);
     [[x0,y0,-1,-1],[x0+W2,y0,1,-1],[x0,y0+D2,-1,1],[x0+W2,y0+D2,1,1],
      [x0+W2/2,y0,0,-1],[x0+W2/2,y0+D2,0,1],[x0,y0+D2/2,-1,0],[x0+W2,y0+D2/2,1,0]].forEach(([hx,hy,sx,sz])=>{
       const cur = sx&&sz ? (sx*sz>0?'nwse-resize':'nesw-resize') : (sx?'ew-resize':'ns-resize');
@@ -308,11 +309,21 @@ planSvg.addEventListener('pointerup', ()=>{
     renderAll();
   }
 });
-function chip2D(x,y,label,color,vert){
+// Where a selected room's two dimension pills go: just INSIDE the top and left
+// edges, centred on them. On the edge itself they sat under the mid-edge resize
+// handle ("3.6 m" read "3 ■ m"); outside it they collide with the action chips
+// and the "+" hotspots.
+function dimPillCentres(x0, y0, W2, D2){
+  const inset = 17;   // half the 18px pill + 8px clear of the handle
+  return [[x0+W2/2, y0+inset], [x0+inset, y0+D2/2]];
+}
+// A dimension pill centred on (cx, cy); `vert` turns it to read along a vertical
+// edge. Never a pointer target: it sits over the room, which must stay draggable.
+function chip2D(cx,cy,label,color,vert){
   const w = label.length*6.4+18;
-  const t = vert ? ` transform="rotate(-90 ${x} ${y})"` : '';
-  return `<g${t}><rect x="${x-(vert?w/2:0)}" y="${y}" width="${w}" height="18" rx="9" fill="${color}"/>
-    <text class="dimchip" x="${x-(vert?w/2:0)+w/2}" y="${y+12.5}" text-anchor="middle">${label}</text></g>`;
+  const t = vert ? ` transform="rotate(-90 ${cx} ${cy})"` : '';
+  return `<g${t} pointer-events="none"><rect x="${cx-w/2}" y="${cy-9}" width="${w}" height="18" rx="9" fill="${color}"/>
+    <text class="dimchip" x="${cx}" y="${cy+3.5}" text-anchor="middle">${label}</text></g>`;
 }
 function openSeg2D(b, wall, t, len, ox, oy){
   const L = wallLen(b,wall), dir = wallDir(wall);
@@ -423,6 +434,8 @@ function placeDoorByClick(blockId, e){
   });
 }
 
+// Width-as-drawn x depth-as-drawn, so the label matches the pills and the picture.
+function roomSizeLabel(b){ const [w,d] = footprint(b); return `${round1(w)} × ${round1(d)} m`; }
 export function setPlanScale(v){ return S = v; }
 
-export {S, fitPlan, planOff, planSvg, render2D};
+export {S, fitPlan, planOff, planSvg, render2D, roomSizeLabel};

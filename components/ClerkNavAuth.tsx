@@ -6,7 +6,7 @@ import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 const SIGN_UP =
   "hidden min-h-6 items-center rounded-[3px] text-[12.5px] font-semibold text-ink transition-colors hover:text-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent sm:inline-flex";
 const SIGN_IN =
-  "inline-flex min-h-10 items-center gap-3 rounded-[5px] border border-line-strong px-4 text-[12.5px] font-semibold text-ink transition-colors hover:border-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-flex min-h-11 items-center gap-3 rounded-[5px] border border-line-strong px-4 text-[12.5px] font-semibold text-ink transition-colors hover:border-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /** Navbar auth slot inside the app, where ClerkProvider is mounted. */
 export default function ClerkNavAuth() {
