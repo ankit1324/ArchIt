@@ -139,12 +139,24 @@ function wallNeighbors(b, wall){
   return hits;
 }
 // the hole a window needs in the wall it sits on (matches the meshes at buildBlockGroup)
-function winDims(w){
-  if(w.kind==='pano'){
-    const gh = C.H - .25;
-    return {w:2.3, y0:.06, y1:.14 + gh};
-  }
-  return {w:1.3, y0:1.02, y1:2.08};
+function winDims(w){ const s = winSpec(w); return {w:s.fw, y0:s.sill, y1:s.sill + s.fh}; }
+// Window kinds and the frame each starts with: outer width, height, sill height (m).
+function winKinds(){
+  return {
+    std:  {name:'Standard',   w:1.3, h:1.06,     sill:1.02},
+    pano: {name:'Panoramic (floor-to-ceiling)', w:2.3, h:C.H-.17, sill:.06},
+    vent: {name:'Ventilator', w:.6,  h:.45,      sill:2.1},
+  };
+}
+// The frame a window is drawn and cut with. w.w / w.h / w.sill (set in the window
+// panel) override the kind's defaults; everything is clamped to fit under the ceiling.
+function winSpec(w){
+  const kinds = winKinds(), kind = kinds[w.kind] ? w.kind : 'std', k = kinds[kind];
+  const pick = (v, d)=>{ v = Number(v); return v > 0 || v === 0 ? v : d; };
+  const fw = Math.min(3, Math.max(.4, pick(w.w ?? undefined, k.w)));
+  const sill = Math.min(C.H-.4, Math.max(0, pick(w.sill ?? undefined, k.sill)));
+  const fh = Math.min(C.H-.08-sill, Math.max(.3, pick(w.h ?? undefined, k.h)));
+  return {kind, fw, fh, sill};
 }
 // Openings to subtract from b's `wall`, merged and clamped. Includes the far
 // room's openings when this is a party wall, so a de-duplicated wall still lets
@@ -421,4 +433,4 @@ function resolveWalk(prevX, prevZ, nextX, nextZ, radius, rects) {
   return { x: rx, z: rz };
 }
 
-export {FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};
+export {winKinds, winSpec, FLH, boundsOf, clampFurn, designIssues, groundY, houseTotals, refitFurniture, freeT, loopArea, nearestWallT, overlaps, pointInLoop, resolveWalk, roofComponents, roofRects, sharedWall, snapBlock, tint, unionLoops, wallNeighbors, wallOpenings, wallSegWorld, worldToLocal};

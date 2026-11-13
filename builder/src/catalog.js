@@ -154,6 +154,7 @@ const C = {
     int_mdf:{name:'MDF door',        grp:'INTERIOR DOORS'},
     int_pvc:{name:'PVC door',        grp:'INTERIOR DOORS'},
     int_panel:{name:'Paneled door',  grp:'INTERIOR DOORS'},
+    int_open:{name:'Open doorway (no door)', grp:'INTERIOR DOORS'},
   },
   W:2.45, H:2.75,
 };

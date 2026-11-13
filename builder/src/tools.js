@@ -259,7 +259,7 @@ toolpop.addEventListener('click', e=>{
       const wall = 0;
       const t = freeT([...b.doors.filter(d=>d.wall===wall), ...b.windows.filter(w=>w.wall===wall)], b.len, 1.2);
       const finalType = sharedWall(b, wall) ? (type.startsWith('ext') ? 'int_hard' : type) : type;
-      const d = {id:++state.seq.door, wall, t, type:finalType, w: finalType==='ext_glass' ? 1.6 : 0.8, h:2.0, color:'blue'};
+      const d = {id:++state.seq.door, wall, t, type:finalType, w: finalType==='ext_glass' ? 1.6 : finalType==='int_open' ? 1.2 : 0.8, h:2.0, color:'blue'};
       b.doors.push(d); setSel({kind:'door', blockId:b.id, doorId:d.id});
     });
     closeToolPop();

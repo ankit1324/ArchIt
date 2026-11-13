@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {buildFurn} from './furniture.js';
 import {C, roomShell, shellWalls} from './catalog.js';
 import {footprint, localToWorld, sel, selBlock, selDoor, selFurn, state, ui, wallLen, wallPoint} from './state.js';
-import {FLH, boundsOf, groundY, loopArea, pointInLoop, roofComponents, roofRects, sharedWall, tint, unionLoops, wallNeighbors, wallOpenings} from './geometry.js';
+import {FLH, boundsOf, groundY, loopArea, pointInLoop, roofComponents, roofRects, sharedWall, tint, unionLoops, wallNeighbors, wallOpenings, winSpec} from './geometry.js';
 import {beam, blocksRoot, fitShadows, requestRender, requestShadows, scene, selHandleMat, selLineMat, selOutline, setGroundLevel, setSelOutline} from './scene.js';
 import {cachedMat, ceilMatCache, curbMat, doorFrameExtMat, doorFrameIntMat, doorGlassFrameMat, doorGlassMat, doorPanelExtMat, doorPanelIntMat, eavesMat, edgeMat, fasciaMat, fasciaSteelMat, handleMat, makeSurfaceTexture, mkFacadeMat, mkPaintMat, mkRevealMat, mkRoofMat, partMat, plantMat, skyFrameMat, skyGlassMat, slabMatCache, soffitMat, stepMat, trimMat, valleyMat, winFrameMat, winGlassMat} from './materials.js';
 import {markOverlayDirty} from './interact3d.js';
@@ -162,24 +162,18 @@ function buildBlockGroup(b, ctx = blockContext(b)){
     const [x,z] = wallPoint(b, w.wall, w.t);
     const grp = new THREE.Group();
     const frameMat = winFrameMat, glassMat = winGlassMat;
-    if(w.kind==='pano'){
-      const gw = 2.2, gh = C.H - .25;
-      const fr = new THREE.Mesh(new THREE.BoxGeometry(gw+.1, gh+.08, .1), frameMat);
-      const gl = new THREE.Mesh(new THREE.BoxGeometry(gw-.06, gh-.08, .04), glassMat);
-      gl.position.z = .02;
-      const mull = new THREE.Mesh(new THREE.BoxGeometry(.05, gh-.08, .06), frameMat);
-      mull.position.set(0,0,.05);
-      grp.add(fr, gl, mull);
-      grp.position.set(x, .1 + gh/2, z);
-    } else {
-      const fr = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.06,.1), frameMat);
-      const gl = new THREE.Mesh(new THREE.BoxGeometry(1.16,.92,.04), glassMat);
-      gl.position.z = .02;
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(.05,.92,.06), frameMat);
-      bar.position.set(.12,0,.05);
-      grp.add(fr, gl, bar);
-      grp.position.set(x,1.55,z);
+    // one frame for every kind and size: the hole wallOpenings cuts is this box
+    const sp = winSpec(w);
+    const fr = new THREE.Mesh(new THREE.BoxGeometry(sp.fw, sp.fh, .1), frameMat);
+    const gl = new THREE.Mesh(new THREE.BoxGeometry(sp.fw-.14, sp.fh-.14, .04), glassMat);
+    gl.position.z = .02;
+    grp.add(fr, gl);
+    if(sp.fw >= .9){   // a ventilator is a single pane
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(.05, sp.fh-.14, .06), frameMat);
+      bar.position.set(sp.kind==='std' ? .12 : 0, 0, .05);
+      grp.add(bar);
     }
+    grp.position.set(x, sp.sill + sp.fh/2, z);
     grp.rotation.y = (w.wall===0||w.wall===2) ? 0 : Math.PI/2;
     grp.traverse(o=>{o.castShadow = true; o.userData.pick = {kind:'window', blockId:b.id, winId:w.id};});
     g.add(grp);
@@ -188,7 +182,12 @@ function buildBlockGroup(b, ctx = blockContext(b)){
     const pl = doorPlacement(b, d);
     const grp = new THREE.Group();
     const interior = ctx.interior[i];
-    if(d.type==='ext_glass'){
+    if(d.type==='int_open'){
+      // a cased opening: only the head trim, so there is something to click in 3D
+      const head = new THREE.Mesh(new THREE.BoxGeometry(d.w+.14, .06, .13), doorFrameIntMat);
+      head.position.y = d.h+.03;
+      grp.add(head);
+    } else if(d.type==='ext_glass'){
       const fr = new THREE.Mesh(new THREE.BoxGeometry(d.w+.1, d.h+.06, .1), doorGlassFrameMat);
       fr.position.y = (d.h+.06)/2;
       const p1 = new THREE.Mesh(new THREE.BoxGeometry(d.w/2-.04, d.h-.1, .03), doorGlassMat);

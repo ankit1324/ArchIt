@@ -3,12 +3,12 @@ import {hideModal, modal, renderAll, resetCam, showModal} from './ui.js';
 import {C} from './catalog.js';
 import {$, VIEW, escapeMarkup, toast} from './dom.js';
 import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
-import {FLH, boundsOf, houseTotals} from './geometry.js';
+import {FLH, boundsOf, houseTotals, winKinds, winSpec} from './geometry.js';
 import {camera, controls, renderer, requestShadows, scene, wallMats} from './scene.js';
 import {renderHotspots} from './interact3d.js';
 import {S, dimOffsets, planOff, planSvg, render2D} from './plan2d.js';
 import {shareLink} from './persistence.js';
-import {fmtArea, fmtSize} from './units.js';
+import {fmtArea, fmtOpening, fmtSize} from './units.js';
 
 /* -------- export: 3D image, 2D plan, full design sheet -------- */
 // Pose the camera, render synchronously and read the pixels in the same task
@@ -124,8 +124,8 @@ function designSheet(){
     const shot = shoot3D([b.cx+rr*.8, dy+rr*.95, b.cz+rr*.8], [b.cx, dy+.5, b.cz], true);
     const wallN = b.paint ? C.paint[b.paint].name : C.paint[state.paint].name+' (house default)';
     const floorN = b.floorCol ? C.floorCol[b.floorCol].name : 'Room default';
-    const doors = b.doors.map(x=>C.doors[x.type].name).join(', ') || '—';
-    const wins = b.windows.length ? b.windows.map(x=>x.kind==='pano'?'Panoramic':'Standard').join(', ') : '—';
+    const doors = b.doors.map(x=>C.doors[x.type].name+' '+fmtOpening(x.w, x.h)).join(', ') || '—';
+    const wins = b.windows.length ? b.windows.map(x=>{ const sp = winSpec(x); return winKinds()[sp.kind].name.split(' (')[0]+' '+fmtOpening(sp.fw, sp.fh); }).join(', ') : '—';
     const furn = b.furniture.map(f=>C.furniture[f.key].name).join(', ') || '—';
     roomCards += `<div class="card room">
       <img src="${shot}" alt="">

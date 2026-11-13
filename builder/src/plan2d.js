@@ -2,7 +2,7 @@ import './walk.js';
 import {C} from './catalog.js';
 import {$, VIEW, chips, escapeMarkup, ov, stage, toast} from './dom.js';
 import {commit, footprint, getBlock, localToWorld, redoStack, sel, selBlock, setDirty, setSel, snapshot, state, ui, undoStack, wallDir, wallLen, wallPoint} from './state.js';
-import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, worldToLocal} from './geometry.js';
+import {boundsOf, clampFurn, nearestWallT, overlaps, refitFurniture, sharedWall, snapBlock, tint, winSpec, worldToLocal} from './geometry.js';
 import {addRoomAt, computeHotspots, hotspots} from './interact3d.js';
 import {fmtLen, fmtSize, isFt, snapLen} from './units.js';
 import {renderAll, renderSelection} from './ui.js';
@@ -101,7 +101,7 @@ function blockSvg(b, ox, oy){
   s += wallLines2D(b, ox, oy, col);
   // windows
   b.windows.forEach(wd=>{
-    const seg = openSeg2D(b, wd.wall, wd.t, wd.kind==='pano' ? 2.2 : 1.2, ox, oy);
+    const seg = openSeg2D(b, wd.wall, wd.t, winSpec(wd).fw-.1, ox, oy);
     s += `<g data-win="${wd.id}" data-blk="${b.id}" style="cursor:grab">
           <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#b8c6c4" stroke-width="7" stroke-linecap="butt"/>
           <line x1="${seg[0]}" y1="${seg[1]}" x2="${seg[2]}" y2="${seg[3]}" stroke="#f8f7f2" stroke-width="2.5"/>
@@ -259,7 +259,7 @@ planSvg.addEventListener('pointermove', e=>{
   } else {
     const b = drag2.b, o = drag2.o;
     const [lx,lz] = worldToLocal(b, wx, wz);
-    const cand = nearestWallT(b, lx, lz, drag2.kind==='door' ? o.w : 1.2);
+    const cand = nearestWallT(b, lx, lz, drag2.kind==='door' ? o.w : winSpec(o).fw);
     o.wall = cand.wall; o.t = cand.t;
   }
   redrawBlock2D(drag2.b);
@@ -312,7 +312,7 @@ planSvg.addEventListener('pointerup', ()=>{
       const nowShared = !!sharedWall(d2.b, d2.o.wall);
       const wasExt = d2.o.type.startsWith('ext');
       if(nowShared && wasExt) d2.o.type = 'int_hard';
-      if(!nowShared && !wasExt) d2.o.type = 'ext_hard';
+      if(!nowShared && !wasExt){ d2.o.type = 'ext_hard'; d2.o.w = Math.min(d2.o.w, 1.2); }   // an open doorway may be wider than a door
     }
     if(changed){ undoStack.push(d2.snap); redoStack.length = 0; setDirty(true); }
     renderAll();
@@ -378,6 +378,11 @@ function door2D(b, d, ox, oy, col){
   const [t1x,t1z] = localToWorld(b, tip[0], tip[1]);
   const [e1x,e1z] = localToWorld(b, cx-dir[0]*hw*hs, cz-dir[1]*hw*hs);
   const [px1,py1] = P(h1x,h1z,ox,oy), [px2,py2] = P(t1x,t1z,ox,oy), [px3,py3] = P(e1x,e1z,ox,oy);
+  // open doorway: no leaf, no swing — a dashed threshold across the gap
+  if(d.type==='int_open') return `<g data-door="${d.id}" data-blk="${b.id}" style="cursor:grab">
+    <line x1="${px1}" y1="${py1}" x2="${px3}" y2="${py3}" stroke="${col}" stroke-width="1.4" stroke-dasharray="3 4"/>
+    <line x1="${px1}" y1="${py1}" x2="${px3}" y2="${py3}" stroke="transparent" stroke-width="18"/>
+  </g>`;
   return `<g data-door="${d.id}" data-blk="${b.id}" style="cursor:grab">
     <line x1="${px1}" y1="${py1}" x2="${px2}" y2="${py2}" stroke="${col}" stroke-width="2.5"/>
     <path d="M ${px2} ${py2} A ${d.w*S} ${d.w*S} 0 0 ${arcSweep(px1,py1,px2,py2,px3,py3)} ${px3} ${py3}" fill="none" stroke="${col}" stroke-width="1.4" stroke-dasharray="1 4"/>
@@ -434,9 +439,12 @@ function placeDoorByClick(blockId, e){
   ].sort((p,q)=>p.dist-q.dist)[0];
   const t = Math.min(.88, Math.max(.12, cand.t));
   commit(()=>{
-    const type = sharedWall(b, cand.wall) ? 'int_hard' : (ui.pendingDoorType||'ext_hard');
+    // keep the type picked in the Doors panel when it suits the wall (an interior
+    // pick used to be dropped for a hardboard door)
+    const want = ui.pendingDoorType || '', shared = !!sharedWall(b, cand.wall);
+    const type = shared ? (want.startsWith('int') ? want : 'int_hard') : (want.startsWith('ext') ? want : 'ext_hard');
     const d = {id:++state.seq.door, wall:cand.wall, t, type,
-      w: type==='ext_glass' ? 1.6 : 0.8, h:2.0, color:'blue'};
+      w: type==='ext_glass' ? 1.6 : type==='int_open' ? 1.2 : 0.8, h:2.0, color:'blue'};
     b.doors.push(d);
     setSel({kind:'door', blockId:b.id, doorId:d.id});
     ui.tool = null;
