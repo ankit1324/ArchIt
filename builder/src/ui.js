@@ -5,6 +5,7 @@ import {$, VIEW, chips, setPressed, stage, toast} from './dom.js';
 import {commit, ensureExteriorState, firstRoom, footprint, getBlock, localToWorld, nudge, nudgeBegin, nudgeEnd, redo, redoStack, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, undo, undoStack} from './state.js';
 import {FLH, boundsOf, clampFurn, designIssues, houseTotals, overlaps} from './geometry.js';
 import {fmtArea} from './units.js';
+import {plotIssues, syncPlot} from './plot.js';
 import {camera, controls, requestRender, requestShadows, selOutline, wallMats} from './scene.js';
 import {partMat} from './materials.js';
 import {blockGroups, rebuild3D, toggleRoofs, updateSelection} from './house3d.js';
@@ -21,7 +22,7 @@ function updateChip(){
   const {area, rooms} = houseTotals(state.floors);
   document.getElementById('areaV').textContent = fmtArea(area);
   document.getElementById('roomsV').textContent = rooms;
-  const iss = designIssues();
+  const iss = [...designIssues(), ...plotIssues()];
   const wv = document.getElementById('warnV');
   wv.textContent = iss.length ? iss.length + ' issue' + (iss.length>1?'s':'') : 'OK';
   wv.style.color = iss.length ? '#ad4a31' : '#547548';
@@ -302,6 +303,7 @@ document.addEventListener('keyup', e=>{ if(nudge && e.key.startsWith('Arrow')) n
 function renderAll(){
   if(!state) return;
   ensureExteriorState();
+  syncPlot();
   rebuild3D();
   if(ui.view==='2d') render2D(); else renderHotspots();
   renderSidebar();

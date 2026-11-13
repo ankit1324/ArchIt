@@ -10,7 +10,8 @@ import {resize} from './interact3d.js';
 import {exitWalk, walkActive} from './walk.js';
 import {closeToolPop, releaseThumbRenderer} from './tools.js';
 import {hideModal, renderAll, resetCam, setView} from './ui.js';
-import {setFrontSide, snapshotBlob} from './export.js';
+import {snapshotBlob} from './export.js';
+import {setEmbedPlot} from './plot.js';
 import {loadProject, tryHashLoad} from './persistence.js';
 import {startTutorial} from './tutorial.js';
 
@@ -144,7 +145,7 @@ addEventListener('pagehide', e=>{
         if(p.floors > 1) while(state.floors.length < Math.min(p.floors, 3)) state.floors.push({blocks:[]});
       }
       setContext(p.plot, p.neighbors, p.facing);
-      setFrontSide(p.facing);
+      setEmbedPlot(p.plot, p.facing);
       setUndoStack([]); setRedoStack([]); setSel(null); setDirty(false);
       resetCam(); renderAll();
       // a viewer wants the house, not the editing plan newProject() opened

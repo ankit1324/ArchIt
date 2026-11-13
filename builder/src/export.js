@@ -7,9 +7,10 @@ import {FLH, boundsOf, elevationFrame, elevationSides, houseTotals, winKinds, wi
 import {camera, controls, renderer, requestShadows, scene, setContextVisible, wallMats} from './scene.js';
 import {rebuild3D, setSolidAll, toggleRoofs} from './house3d.js';
 import {renderHotspots} from './interact3d.js';
-import {S, dimOffsets, planOff, planSvg, render2D} from './plan2d.js';
+import {S, dimOffsets, planOff, planSvg, render2D, viewBounds} from './plan2d.js';
 import {shareLink} from './persistence.js';
 import {fmtArea, fmtLen, fmtOpening, fmtSize} from './units.js';
+import {frontSide} from './plot.js';
 
 /* -------- export: 3D image, 2D plan, full design sheet -------- */
 // Pose the camera, render synchronously and read the pixels in the same task
@@ -60,7 +61,7 @@ function planShot(){
   if(prevView==='3d'){ planSvg.innerHTML = ''; renderHotspots(); }
   else render2D();
   // the dimension rows sit under and right of the plan: keep them in the crop
-  const bb = boundsOf(state.blocks), pad = 46, far = dimOffsets(S)[1] + 26;
+  const bb = viewBounds(state.blocks), pad = 46, far = dimOffsets(S)[1] + 26;   // rooms plus the plot outline
   const x = off.ox + bb.x0*S - pad, y = off.oy + bb.z0*S - pad;
   const w = bb.w*S + pad + far, h = bb.d*S + pad + far;
   // replace full-viewport background rects with ones covering the cropped viewBox
@@ -73,6 +74,7 @@ function planSVGDoc(p, sizeAttrs){
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${p.x} ${p.y} ${p.w} ${p.h}" ${sizeAttrs}>
     <style>text{font-family:'Manrope',system-ui,sans-serif}
     .dimchip{font-size:10px;font-weight:800;fill:#fff}
+    .plottxt{font-size:10px;font-weight:800;letter-spacing:.06em;fill:#ad4a31}
     .dims line{stroke:#5d665b;stroke-width:1}.dims line.ext{stroke:#a1a99b;stroke-dasharray:2 3}
     .dimtxt{font-size:10.5px;font-weight:700;fill:#29372c;paint-order:stroke;stroke:#f8f7f2;stroke-width:3px;stroke-linejoin:round}
     .blk-num{font-size:26px;font-weight:800;fill:#c6cbbf}
@@ -102,10 +104,6 @@ function save2D(){
   img.src = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(planSVGDoc(p, `width="${p.w}" height="${p.h}"`));
 }
 /* -------- elevations: straight-on views of each side -------- */
-// Which side of the plan is the front: the bottom edge (+z) unless the plot's
-// facing, sent by the designer, says otherwise.
-let frontSide = 'S';
-export function setFrontSide(f){ frontSide = ['N','E','S','W'].includes(f) ? f : 'S'; }
 const ELEV_NAMES = {front:'Front', rear:'Rear', left:'Left side', right:'Right side'};
 // Put the scene in "drawing" state for any number of shots, then put it back:
 // every floor solid, roofs on, walls opaque, no selection outline, no plot context.
@@ -170,7 +168,7 @@ function drawElevationDims(g, fr, W, H, title){
 }
 function showElevations(which = 'front'){
   if(!ELEV_NAMES[which]) which = 'front';
-  const sides = elevationSides(frontSide);
+  const sides = elevationSides(frontSide());
   const url = withElevationScene(()=>shootElevation(sides[which], ELEV_NAMES[which]+' elevation'));
   showModal(`<h3>Elevations</h3>
     <p class="hint">Straight-on views of each side with the overall width and wall height. The front is the side ${EMBED ? 'your plot faces' : 'along the bottom of the 2D plan'}.</p>
@@ -193,7 +191,7 @@ function designSheet(){
   const back  = shoot3D([bb.cx,       R*.45, bb.cz-R*1.15],[bb.cx, 1,  bb.cz], false);
   const top   = shoot3D([bb.cx+.01,   R*1.5, bb.cz],       [bb.cx, 0,  bb.cz], true);
   const plan  = planSVGDoc(planShot(), 'style="width:100%;height:auto"');
-  const sides = elevationSides(frontSide);
+  const sides = elevationSides(frontSide());
   const elevs = withElevationScene(()=>Object.entries(ELEV_NAMES).map(([k,n])=>[n, shootElevation(sides[k], n+' elevation')]));
   const tot = houseTotals(state.floors), multi = state.floors.length>1;
   let roomCards = '';

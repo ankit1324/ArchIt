@@ -1,6 +1,7 @@
 import './plan2d.js';
 import {C, MODERN_PRESETS} from './catalog.js';
-import {$, VIEW, escapeMarkup, side, toast} from './dom.js';
+import {$, EMBED, VIEW, escapeMarkup, side, toast} from './dom.js';
+import {currentPlot, frontSide, plotReport, suggestPlot} from './plot.js';
 import {commit, ensureExteriorState, getBlock, sel, selBlock, selDoor, selFurn, selWin, setSel, state, ui, wallLen} from './state.js';
 import {boundsOf, freeT, houseTotals, overlaps, refitFurniture, sharedWall, winKinds, winSpec} from './geometry.js';
 import {openToolPop} from './tools.js';
@@ -15,6 +16,42 @@ function summaryRows(floors, fi){
     rows.push(['Floor '+(fi+1), bl.length+(bl.length===1?' room':' rooms')+' · '+fmtArea(a)]);
   }
   return rows;
+}
+
+/* -------- plot: size, setbacks, ground coverage, FAR -------- */
+const COMPASS = {N:'North', E:'East', S:'South', W:'West'};
+function plotSection(){
+  const p = currentPlot();
+  if(!p) return EMBED ? '<div class="note">This design has no plot size.</div>'
+    : `<div class="note">Add your plot to see setbacks, ground coverage and FAR, and to catch rooms that cross the plot line.</div>
+       <button class="addbtn" data-act="addplot">+ Add plot size</button>`;
+  const field = (act, lbl, v)=>`<div><div class="f-label" style="margin-top:0">${lbl}, ${isFt()?'ft':'m'}</div>
+    ${isFt()
+      ? `<input class="inp" data-act="${act}" type="text" inputmode="decimal" autocomplete="off" value="${escapeMarkup(lenInputValue(v))}" aria-label="Plot ${lbl.toLowerCase()} in feet and inches">`
+      : `<input class="inp" data-act="${act}" type="number" step="0.5" min="3" max="200" value="${lenInputValue(v)}">`}</div>`;
+  let h = EMBED
+    ? `<div class="dimrow"><span>Plot</span><b>${fmtSize(p.w, p.d)}</b></div>
+       <div class="dimrow"><span>Front faces</span><b>${p.facing ? COMPASS[p.facing] : 'Not set'}</b></div>`
+    : `<div class="grid2">${field('pw', 'Width', p.w)}${field('pd', 'Depth', p.d)}</div>
+       <div class="f-label">Front faces</div>
+       <span class="unitseg" role="group" aria-label="Side the plot faces">${Object.entries(COMPASS).map(([k,n])=>
+         `<button type="button" data-act="pface" data-f="${k}" aria-pressed="${p.facing===k}" title="${n}">${k}</button>`).join('')}</span>`;
+  const r = plotReport(p, state.floors, frontSide());
+  if(r){
+    const gapRow = (lbl, side, v)=>`<div class="dimrow"><span>${lbl} <span style="color:#8a9186">(${COMPASS[side].toLowerCase()})</span></span>
+      <b${v < -0.011 ? ' style="color:#ad4a31"' : ''}>${v < -0.011 ? 'over by '+fmtLen(-v) : fmtLen(Math.max(0, v))}</b></div>`;
+    h += `<div class="hr" style="margin:12px 0 4px"></div>
+      <div class="dimrow"><span>Plot area</span><b>${fmtArea(r.plotArea)}</b></div>
+      <div class="dimrow"><span>Ground coverage</span><b>${Math.round(r.coverage*100)}%</b></div>
+      <div class="dimrow"><span>FAR / FSI</span><b>${r.far.toFixed(2)}</b></div>
+      <div class="f-label">Setbacks — space left to the plot line</div>
+      ${gapRow('Front', r.sides.front, r.setbacks.front)}${gapRow('Rear', r.sides.rear, r.setbacks.rear)}
+      ${gapRow('Left', r.sides.left, r.setbacks.left)}${gapRow('Right', r.sides.right, r.setbacks.right)}
+      ${r.notes.map(n=>`<div class="note" style="color:${n.level==='bad' ? '#ad4a31' : '#7a5a12'};font-weight:700">${n.text}</div>`).join('')}
+      <div class="note">Bye-laws differ by city and plot size. Check these figures against your local rules.</div>`;
+  }
+  if(!EMBED) h += '<button class="collapse" data-act="delplot" style="color:#ad4a31;border-color:#dcb3a6">Remove plot</button>';
+  return h;
 }
 
 /* ============================== sidebar ============================== */
@@ -130,6 +167,7 @@ function renderPanel(){
       }));
       return (rows || `<div class="note">Pick a piece in the toolbar catalog, then tap a room to place it.</div>`);
     }],
+    ['plot','Plot &amp; setbacks', plotSection],
   ];
   const sumRows = summaryRows(state.floors, state.floor);
   side.innerHTML = `
@@ -343,6 +381,13 @@ side.addEventListener('click', e=>{
   if(!act) return;
   const a = act.dataset.act;
   if(a==='close'){ setSel(null); renderSelection(); }
+  if(a==='addplot'){
+    const all = state.floors.flatMap(f=>f.blocks); if(!all.length) return;
+    commit(()=>{ state.plot = suggestPlot(boundsOf(all)); });
+    toast('Plot added — type your real plot size');
+  }
+  if(a==='delplot') commit(()=>{ state.plot = undefined; });
+  if(a==='pface' && state.plot) commit(()=>{ state.plot.facing = act.dataset.f; });
   if(a==='unit'){
     const u = act.dataset.u === 'ft' ? 'ft' : 'm';
     if(u !== state.unit) commit(()=>{ state.unit = u; });
@@ -386,6 +431,14 @@ side.addEventListener('change', e=>{
     const d = selDoor(); if(!d) return;
     const v = Math.max(+el.min, Math.min(+el.max, +el.value||0));
     commit(()=>{ d[el.dataset.act==='dw'?'w':'h'] = fromOpening(v); });
+  }
+  if(el.dataset.act==='pw'||el.dataset.act==='pd'){
+    if(!state.plot) return;
+    const raw = parseLen(el.value);
+    if(raw == null){ toast(isFt() ? "Type feet and inches, like 30' or 30' 6\"" : 'Type a size in metres'); renderSidebar(); return; }
+    const v = Math.max(3, Math.min(200, raw));
+    commit(()=>{ state.plot[el.dataset.act==='pw' ? 'w' : 'd'] = Math.round(v*1000)/1000; });
+    return;
   }
   if(['ww','wh','ws'].includes(el.dataset.act)){
     const b = selBlock(), w = selWin(); if(!b||!w) return;
