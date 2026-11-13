@@ -14,6 +14,7 @@ import { payFee } from "@/lib/checkout";
 import { celebrate } from "@/components/Celebration";
 import { feeLabel } from "@/lib/fees";
 import { PAYWALL_ENABLED } from "@/lib/paywall";
+import { FT_PER_M, plotSideMeters, sqFt, toMeters } from "@/lib/plot-units";
 
 interface Setup {
   name: string;
@@ -26,8 +27,6 @@ interface Setup {
   notes?: string;
 }
 
-const FT_PER_M = 3.28084;
-const toM = (v: number, unit: "m" | "ft") => (unit === "ft" ? v / FT_PER_M : v);
 
 const SNAPSHOT_EXT: Record<string, string> = {
   "image/webp": "webp",
@@ -118,8 +117,8 @@ function SetupDialog({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
-  const wM = toM(Number(w) || 0, unit);
-  const dM = toM(Number(d) || 0, unit);
+  const wM = toMeters(Number(w) || 0, unit);
+  const dM = toMeters(Number(d) || 0, unit);
   const sizeValid = wM >= 6 && dM >= 6 && wM <= 120 && dM <= 120;
 
   const switchUnit = (u: "m" | "ft") => {
@@ -149,8 +148,8 @@ function SetupDialog({
     const budgetN = Number(budget);
     onStart({
       name: name.trim(),
-      w: Math.round(wM * 100) / 100,
-      d: Math.round(dM * 100) / 100,
+      w: plotSideMeters(Number(w) || 0, unit),
+      d: plotSideMeters(Number(d) || 0, unit),
       unit,
       floors,
       facing,
@@ -236,7 +235,7 @@ function SetupDialog({
             {sizeValid
               ? `${Math.round(wM * dM)} m²${
                   unit === "ft"
-                    ? ` (${Math.round(wM * dM * FT_PER_M * FT_PER_M)} ft²)`
+                    ? ` (${Math.round(sqFt(wM * dM))} ft²)`
                     : ""
                 }`
               : "—"}
