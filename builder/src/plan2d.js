@@ -11,10 +11,12 @@ import {placeFurniture} from './tools.js';
 /* ============================== 2D plan ============================== */
 const planSvg = $('#plan');
 let S = 54;                 // px per metre (2D zoom changes it)
+const DIM_ROOM = 112;       // px the two dimension rows need beyond the plan edge
 function fitPlan(){
   if(!state?.blocks.length) return;
   const bb = boundsOf(state.blocks), r = stage.getBoundingClientRect();
-  S = Math.max(8, Math.min(70, (r.width-150)/Math.max(bb.w,1), (r.height-180)/Math.max(bb.d,1)));
+  // leave room under and right of the plan for the dimension rows
+  S = Math.max(8, Math.min(70, (r.width-150-DIM_ROOM)/Math.max(bb.w,1), (r.height-180-DIM_ROOM)/Math.max(bb.d,1)));
   if(ui.view==='2d') render2D();
 }
 $('#fitPlan').addEventListener('click', fitPlan);
@@ -26,7 +28,10 @@ function render2D(){
   const focus = ui.interior ? getBlock(ui.focusRoomId) : null;   // interior mode: single-room plan
   const blks = focus ? [focus] : state.blocks;
   const bb = blks.length ? boundsOf(blks) : {cx:0,cz:0};
-  let ox = r.width/2 - bb.cx*S, oy = r.height/2 - bb.cz*S;
+  // whole-floor view: nudge the plan up-left by half the dimension rows' depth so
+  // plan + rows sit centred together
+  const nudge = focus ? 0 : DIM_ROOM/2;
+  let ox = r.width/2 - bb.cx*S - nudge, oy = r.height/2 - bb.cz*S - nudge;
   if(drag2){ ox = drag2.ox; oy = drag2.oy; }        // freeze origin while dragging
   planOff = {ox, oy};
   let s = `<defs>
@@ -51,6 +56,7 @@ function render2D(){
   }
 
   blks.forEach(b=>{ s += blockSvg(b, ox, oy); });
+  if(!focus && blks.length) s += dimLinesSvg(blks, ox, oy);
   planSvg.innerHTML = s;
   syncScaleBar();
 
@@ -216,6 +222,7 @@ planSvg.addEventListener('pointermove', e=>{
   if(!drag2.moved){
     // hotspots and chips are placed for the old layout: hide them until drop
     ov.style.visibility = 'hidden'; chips.style.display = 'none';
+    planSvg.querySelector('.dims')?.setAttribute('visibility', 'hidden');
     drag2.el = planSvg.querySelector(`.blk[data-id="${drag2.b.id}"]`);
     drag2.el?.querySelector('rect')?.removeAttribute('filter');
   }
@@ -436,6 +443,58 @@ function placeDoorByClick(blockId, e){
   });
 }
 
+/* -------- dimension lines -------- */
+// Every distinct room edge along one axis, merged within 2 cm, low to high.
+// The gaps between them are the room-by-room chain a builder measures off.
+function edgeStops(blocks, axis){
+  const vals = [];
+  blocks.forEach(b=>{
+    const [w,d] = footprint(b), [c, h] = axis==='x' ? [b.cx, w/2] : [b.cz, d/2];
+    vals.push(c-h, c+h);
+  });
+  vals.sort((a,b)=>a-b);
+  return vals.reduce((out,v)=>{ if(!out.length || v-out[out.length-1] > 0.02) out.push(v); return out; }, []);
+}
+// How far outside the plan the two dimension rows sit, in px: clear of the "+"
+// add-room buttons (0.62 m out, up to 40 px wide), which grow with the zoom.
+function dimOffsets(scale){ const a = Math.max(64, 0.62*scale + 30); return [a, a + 28]; }
+// Room-by-room chain plus the overall size, under the plan and down its right
+// side (the top and left belong to the action chips and the size pills).
+function dimLinesSvg(blocks, ox, oy){
+  const bb = boundsOf(blocks), [o1, o2] = dimOffsets(S);
+  const [x1,y1] = P(bb.x1, bb.z1, ox, oy);   // rows hang off the bottom-right corner
+  const label = (x, y, txt, vert)=>`<text class="dimtxt" x="${x}" y="${y}" text-anchor="middle"${vert ? ` transform="rotate(-90 ${x} ${y})"` : ''}>${txt}</text>`;
+  const tick = (x, y)=>`<line x1="${x-5}" y1="${y+5}" x2="${x+5}" y2="${y-5}"/>`;   // architect's 45° slash
+  let s = '<g class="dims" pointer-events="none">';
+  const row = (stops, axis, off, segLabels)=>{
+    const horiz = axis==='x';
+    const at = v=>horiz ? P(v, 0, ox, oy)[0] : P(0, v, ox, oy)[1];
+    const a = at(stops[0]), b = at(stops[stops.length-1]);
+    if(horiz){
+      const y = y1 + off;
+      s += `<line x1="${a}" y1="${y}" x2="${b}" y2="${y}"/>`;
+      stops.forEach(v=>{ const x = at(v); s += `<line x1="${x}" y1="${y1+8}" x2="${x}" y2="${y+4}" class="ext"/>` + tick(x, y); });
+      if(segLabels) for(let i=1;i<stops.length;i++){
+        const p = at(stops[i-1]), q = at(stops[i]);
+        if(q-p >= 34) s += label((p+q)/2, y-5, fmtLen(stops[i]-stops[i-1]));
+      } else s += label((a+b)/2, y-5, fmtLen(stops[stops.length-1]-stops[0]));
+    } else {
+      const x = x1 + off;
+      s += `<line x1="${x}" y1="${a}" x2="${x}" y2="${b}"/>`;
+      stops.forEach(v=>{ const y = at(v); s += `<line x1="${x1+8}" y1="${y}" x2="${x+4}" y2="${y}" class="ext"/>` + tick(x, y); });
+      if(segLabels) for(let i=1;i<stops.length;i++){
+        const p = at(stops[i-1]), q = at(stops[i]);
+        if(q-p >= 34) s += label(x-5, (p+q)/2, fmtLen(stops[i]-stops[i-1]), true);
+      } else s += label(x-5, (a+b)/2, fmtLen(stops[stops.length-1]-stops[0]), true);
+    }
+  };
+  ['x','z'].forEach(axis=>{
+    const stops = edgeStops(blocks, axis);
+    if(stops.length > 2){ row(stops, axis, o1, true); row([stops[0], stops[stops.length-1]], axis, o2, false); }
+    else row(stops, axis, o1, false);
+  });
+  return s + '</g>';
+}
 // The corner scale bar: 1 m, or 3 ft, at the current zoom (it was a fixed "1 m").
 function syncScaleBar(){
   const sb = $('#scalebar'); if(!sb) return;
@@ -447,4 +506,4 @@ function syncScaleBar(){
 function roomSizeLabel(b){ const [w,d] = footprint(b); return fmtSize(w, d); }
 export function setPlanScale(v){ return S = v; }
 
-export {S, fitPlan, planOff, planSvg, render2D, roomSizeLabel};
+export {S, dimOffsets, fitPlan, planOff, planSvg, render2D, roomSizeLabel};

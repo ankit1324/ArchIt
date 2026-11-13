@@ -6,7 +6,7 @@ import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack,
 import {FLH, boundsOf, houseTotals} from './geometry.js';
 import {camera, controls, renderer, requestShadows, scene, wallMats} from './scene.js';
 import {renderHotspots} from './interact3d.js';
-import {S, planOff, planSvg, render2D} from './plan2d.js';
+import {S, dimOffsets, planOff, planSvg, render2D} from './plan2d.js';
 import {shareLink} from './persistence.js';
 import {fmtArea, fmtSize} from './units.js';
 
@@ -58,9 +58,10 @@ function planShot(){
   setSel(prevSel); ui.view = prevView; ui.interior = prevInt;
   if(prevView==='3d'){ planSvg.innerHTML = ''; renderHotspots(); }
   else render2D();
-  const bb = boundsOf(state.blocks), pad = 46;
+  // the dimension rows sit under and right of the plan: keep them in the crop
+  const bb = boundsOf(state.blocks), pad = 46, far = dimOffsets(S)[1] + 26;
   const x = off.ox + bb.x0*S - pad, y = off.oy + bb.z0*S - pad;
-  const w = bb.w*S + pad*2, h = bb.d*S + pad*2;
+  const w = bb.w*S + pad + far, h = bb.d*S + pad + far;
   // replace full-viewport background rects with ones covering the cropped viewBox
   xml = xml.replace(/<rect width="100%" height="100%"[^>]*\/>/g, '');
   xml = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f8f7f2"/>
@@ -71,6 +72,8 @@ function planSVGDoc(p, sizeAttrs){
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${p.x} ${p.y} ${p.w} ${p.h}" ${sizeAttrs}>
     <style>text{font-family:'Manrope',system-ui,sans-serif}
     .dimchip{font-size:10px;font-weight:800;fill:#fff}
+    .dims line{stroke:#5d665b;stroke-width:1}.dims line.ext{stroke:#a1a99b;stroke-dasharray:2 3}
+    .dimtxt{font-size:10.5px;font-weight:700;fill:#29372c;paint-order:stroke;stroke:#f8f7f2;stroke-width:3px;stroke-linejoin:round}
     .blk-num{font-size:26px;font-weight:800;fill:#c6cbbf}
     .blk-name{font-size:13px;font-weight:700;fill:#5d665b}</style>${p.xml}</svg>`;
 }
