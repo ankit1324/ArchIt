@@ -479,6 +479,7 @@ export default function DesignerPage() {
   const openDesign = (d: Design) => {
     currentIdRef.current = d.id;
     setCurrentId(d.id);
+    setListOpen(false); // get the list off the canvas once a design is picked
     openBuilder({
       name: d.name,
       w: d.plotW,
