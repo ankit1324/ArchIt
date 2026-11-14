@@ -38,6 +38,10 @@ export default function AiPhotoTools({ id, prompt, done }: { id: string; prompt:
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`/api/admin/ai-photos/${id}`, { method: "POST", body: form });
+      if (res.status === 401) {
+        setError("Your sign-in expired. Reload the page and try again.");
+        return;
+      }
       if (!res.ok) {
         const msg = await res.json().then((j: { error?: string }) => j.error).catch(() => null);
         setError(msg || `Failed (${res.status})`);
