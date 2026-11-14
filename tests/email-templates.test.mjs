@@ -53,7 +53,7 @@ test("rejection email includes the reason only when given", () => {
 test("AI photo ready email links to the designer", () => {
   const m = aiPhotoDecisionEmail({ designName: "Villa", done: true, siteUrl: "https://e.test" });
   assert.equal(m.subject, "Your AI photo is ready");
-  assert.ok(m.text.includes("https://e.test/designer"));
+  assert.match(m.text, /^Open the designer: https:\/\/e\.test\/designer$/m);
   assert.ok(m.html.includes('href="https://e.test/designer"'));
   assert.ok(m.text.includes('"Villa"'));
 });
@@ -62,7 +62,7 @@ test("AI photo rejection email carries the note only when given", () => {
   const withNote = aiPhotoDecisionEmail({ designName: "Villa", done: false, note: "Too dark", siteUrl: "https://e.test" });
   assert.match(withNote.subject, /could not make/);
   assert.match(withNote.text, /Note: Too dark/);
-  assert.ok(withNote.text.includes("https://e.test/designer"));
+  assert.match(withNote.text, /^Open the designer: https:\/\/e\.test\/designer$/m);
   const without = aiPhotoDecisionEmail({ designName: "Villa", done: false, note: null, siteUrl: "https://e.test" });
   assert.doesNotMatch(without.text, /Note:/);
 });

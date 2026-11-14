@@ -173,10 +173,18 @@ test('a key with no image quota (billing off) is a setup fault, not "busy"', asy
 });
 
 test('a hung model is cut off and reported as a timeout', async () => {
+  // AbortSignal.timeout uses an unref'd timer: with nothing else pending, Node
+  // would end this file before it fires (CI did). A real request keeps the
+  // server alive; here a plain timer does, cleared once the abort lands.
+  const keepAlive = setTimeout(() => {}, 10_000);
   const hang = (_url, init) => new Promise((_, reject) => {
     init.signal.addEventListener('abort', () => reject(init.signal.reason ?? new DOMException('aborted', 'TimeoutError')));
   });
-  assert.equal(await kindOf(renderImage(input, { ...deps(hang), timeoutMs: 20 })), 'timeout');
+  try {
+    assert.equal(await kindOf(renderImage(input, { ...deps(hang), timeoutMs: 20 })), 'timeout');
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test('errors never carry the API key', async () => {
