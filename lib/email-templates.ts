@@ -115,3 +115,40 @@ export function listingDecisionEmail(input: {
     { href: `${input.siteUrl}/find`, label: "Edit your listing" },
   );
 }
+
+/** The design's name in a sentence; requests can arrive without one. */
+const designLabel = (name: string | null | undefined) => (name ? `"${name}"` : "your home");
+
+/** An admin finished (done) or turned down an AI photo request. */
+export function aiPhotoDecisionEmail(input: {
+  designName?: string | null;
+  done: boolean;
+  note?: string | null;
+  siteUrl: string;
+}): EmailMessage {
+  if (input.done) {
+    return render(
+      `Your AI photo is ready`,
+      [`The AI photo of ${designLabel(input.designName)} is ready. Find it on your dashboard under "My AI photos", or in the designer under Save & export, then "AI photo of your home".`],
+      { href: `${input.siteUrl}/designer`, label: "Open the designer" },
+    );
+  }
+  return render(
+    `We could not make your AI photo`,
+    [
+      `Sorry, we could not make the AI photo of ${designLabel(input.designName)}.`,
+      ...(input.note ? [`Note: ${input.note}`] : []),
+      `You can change the view and ask again from the designer.`,
+    ],
+    { href: `${input.siteUrl}/designer`, label: "Open the designer" },
+  );
+}
+
+/** Tells the admins a new AI photo request is waiting, so the queue is not left unseen. */
+export function aiPhotoRequestedEmail(input: { designName?: string | null; siteUrl: string }): EmailMessage {
+  return render(
+    `New AI photo request`,
+    [`Someone asked for an AI photo of ${designLabel(input.designName)}. It is waiting in the queue.`],
+    { href: `${input.siteUrl}/admin/ai-photos`, label: "Open the queue" },
+  );
+}

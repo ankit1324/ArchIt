@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  aiPhotoDecisionEmail,
+  aiPhotoRequestedEmail,
   contactUnlockedEmail,
   escapeHtml,
   listingDecisionEmail,
@@ -46,4 +48,46 @@ test("rejection email includes the reason only when given", () => {
   assert.doesNotMatch(without.text, /Reason:/);
   const approved = listingDecisionEmail({ listingName: "Flat", approved: true, siteUrl: "https://e.test" });
   assert.match(approved.subject, /live/);
+});
+
+test("AI photo ready email links to the designer", () => {
+  const m = aiPhotoDecisionEmail({ designName: "Villa", done: true, siteUrl: "https://e.test" });
+  assert.equal(m.subject, "Your AI photo is ready");
+  assert.match(m.text, /^Open the designer: https:\/\/e\.test\/designer$/m);
+  assert.ok(m.html.includes('href="https://e.test/designer"'));
+  assert.ok(m.text.includes('"Villa"'));
+});
+
+test("AI photo rejection email carries the note only when given", () => {
+  const withNote = aiPhotoDecisionEmail({ designName: "Villa", done: false, note: "Too dark", siteUrl: "https://e.test" });
+  assert.match(withNote.subject, /could not make/);
+  assert.match(withNote.text, /Note: Too dark/);
+  assert.match(withNote.text, /^Open the designer: https:\/\/e\.test\/designer$/m);
+  const without = aiPhotoDecisionEmail({ designName: "Villa", done: false, note: null, siteUrl: "https://e.test" });
+  assert.doesNotMatch(without.text, /Note:/);
+});
+
+test("AI photo emails read fine without a design name", () => {
+  const m = aiPhotoDecisionEmail({ designName: "", done: true, siteUrl: "https://e.test" });
+  assert.match(m.text, /your home/);
+  assert.doesNotMatch(m.text, /""/);
+});
+
+test("new AI photo request email points admins at the queue", () => {
+  const m = aiPhotoRequestedEmail({ designName: "Villa", siteUrl: "https://e.test" });
+  assert.equal(m.subject, "New AI photo request");
+  assert.ok(m.text.includes("Villa"));
+  assert.ok(m.html.includes('href="https://e.test/admin/ai-photos"'));
+});
+
+test("AI photo emails escape design names and notes in HTML", () => {
+  const evil = `<img src=x onerror="alert(1)">`;
+  for (const m of [
+    aiPhotoDecisionEmail({ designName: evil, done: false, note: evil, siteUrl: "https://e.test" }),
+    aiPhotoRequestedEmail({ designName: evil, siteUrl: "https://e.test" }),
+  ]) {
+    assert.ok(!m.html.includes("<img"));
+    assert.ok(m.html.includes(escapeHtml(evil)));
+    assert.ok(m.text.includes(evil));
+  }
 });

@@ -3,7 +3,7 @@ import {hideModal, modal, renderAll, resetCam, showModal} from './ui.js';
 import {C} from './catalog.js';
 import {$, EMBED, VIEW, escapeMarkup, toast} from './dom.js';
 import {footprint, linkFloor, sel, setRedoStack, setSel, setState, setUndoStack, state, ui} from './state.js';
-import {FLH, boundsOf, elevationFrame, elevationSides, houseTotals, winKinds, winSpec} from './geometry.js';
+import {FLH, boundsOf, elevationFrame, elevationSides, groundY, houseTotals, winKinds, winSpec} from './geometry.js';
 import {camera, controls, renderer, requestShadows, scene, setContextVisible, wallMats} from './scene.js';
 import {rebuild3D, setSolidAll, toggleRoofs} from './house3d.js';
 import {renderHotspots} from './interact3d.js';
@@ -180,6 +180,135 @@ function showElevations(which = 'front'){
     <button class="mbtn" data-elev-save="${which}">Save this elevation</button>
     <button class="mbtn ghost" data-close>Close</button>`);
 }
+/* -------- AI photo: ask for a photograph of the design -------- */
+// Inside the designer only. Nothing is generated here: the builder sends a clean
+// 3D view and the exterior choices to the parent page, which files a request.
+// A person makes the photograph; it then shows up under "Your AI photos".
+let aiView = 'corner', aiTime = 'day', aiBusy = false, aiTimer = null;
+let aiShot = null;      // the view that will be sent, as shown in the dialog
+let aiItems = null;     // my requests, from the parent page (null = not loaded yet)
+let aiNote = null;      // {ok, text} — the outcome of the last request
+let aiListFailed = false;
+// Where to stand for the picture that gets painted: outside the front, at about
+// eye level, far enough to hold the whole house. `side` swings the camera round
+// the corner (0 = straight on). Pure, so it is tested without a renderer.
+function photoCamera(bb, front, floors, active, side, fovDeg, aspect){
+  const [dx, dz] = {S:[0,1], N:[0,-1], E:[1,0], W:[-1,0]}[front] || [0,1];
+  const rx = dz, rz = -dx;                                  // the viewer's right-hand side
+  const y0 = groundY(active), h = (floors-1-active)*FLH() + C.H + 1 - y0;
+  const vHalf = fovDeg*Math.PI/360, hHalf = Math.atan(Math.tan(vHalf)*aspect);
+  const radius = Math.hypot(bb.w, bb.d)/2;
+  const dist = Math.max(radius*1.2/Math.tan(hHalf), (h/2 + 1)/Math.tan(vHalf)) + radius*.35;
+  const len = Math.hypot(1, side), vx = (dx + rx*side)/len, vz = (dz + rz*side)/len;
+  return {pos:[bb.cx + vx*dist, y0 + 1.7 + h*.12, bb.cz + vz*dist], target:[bb.cx, y0 + h*.42, bb.cz]};
+}
+function shootPhotoBase(view){
+  const W = 1280, H = 720;
+  return withElevationScene(()=>{
+    const cam = photoCamera(boundsOf(state.floors.flatMap(f=>f.blocks)), frontSide(), state.floors.length, state.floor,
+      view==='front' ? .16 : .8, camera.fov, W/H);
+    const aspect = camera.aspect, fog = scene.fog, near = fog?.near, far = fog?.far;
+    if(fog){ fog.near = 500; fog.far = 1000; }             // a big house must not fade into the haze
+    renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+    camera.aspect = W/H; camera.updateProjectionMatrix();
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    try{ shoot3D(cam.pos, cam.target, false, src=>c.getContext('2d').drawImage(src, 0, 0, W, H)); }
+    finally{
+      camera.aspect = aspect; camera.updateProjectionMatrix();
+      if(fog){ fog.near = near; fog.far = far; }
+    }
+    return c.toDataURL('image/jpeg', .9);
+  });
+}
+const aiSeg = (name, cur, opts)=>`<span class="unitseg" role="group" aria-label="${name}">${opts.map(([k,n])=>
+  `<button type="button" data-ai-${name}="${k}" aria-pressed="${k===cur}" style="min-width:76px">${n}</button>`).join('')}</span>`;
+const AI_STATUS = {pending:'Being made', done:'Ready', rejected:'Could not be made'};
+const AI_IMAGE_URL = /^\/api\/ai-photos\/[0-9a-f-]{36}\/image(\?v=[0-9a-f]{1,32})?$/;
+// Only what the dialog needs, and only in the shapes it expects: this list comes
+// over postMessage and its text goes into innerHTML (escaped below).
+function cleanAiItems(items){
+  if(!Array.isArray(items)) return [];
+  return items.filter(it=>it && typeof it === 'object' && AI_STATUS[it.status]).slice(0, 20).map(it=>({
+    status: it.status,
+    designName: typeof it.designName === 'string' ? it.designName.slice(0, 80) : '',
+    createdAt: typeof it.createdAt === 'string' ? it.createdAt : '',
+    note: typeof it.note === 'string' ? it.note.slice(0, 300) : '',
+    image: typeof it.image === 'string' && AI_IMAGE_URL.test(it.image) ? it.image : null,
+  }));
+}
+function aiListHTML(){
+  if(aiListFailed) return '<p class="hint">Could not load your photos right now. Close this and open it again in a minute.</p>';
+  if(aiItems === null) return '<p class="hint">Loading your photos…</p>';
+  if(!aiItems.length) return '<p class="hint">You have not asked for a photo yet.</p>';
+  return aiItems.map(it=>{
+    const day = it.createdAt ? new Date(it.createdAt) : null;
+    const asked = day && !isNaN(day) ? ' · asked ' + day.toLocaleDateString() : '';
+    const name = escapeMarkup(it.designName || 'Your design');
+    return `<div class="airesult">
+      ${it.image ? `<a href="${it.image}" target="_blank" rel="noopener"><img src="${it.image}" alt="AI photo of ${name}" loading="lazy"></a>`
+                 : `<span class="aiwait${it.status==='rejected' ? ' aino' : ''}" aria-hidden="true"></span>`}
+      <span><span class="nm">${name}</span>
+        <span class="sb">${AI_STATUS[it.status]}${asked}${it.note ? '. ' + escapeMarkup(it.note) : ''}</span>
+        ${it.image ? `<a class="ailink" href="${it.image}${it.image.includes('?') ? '&' : '?'}download=1" download>Save photo</a>` : ''}</span>
+    </div>`;
+  }).join('');
+}
+const aiDialogOpen = ()=>$('#dim').classList.contains('show') && !!modal.querySelector('[data-ai-go]');
+function showAiPhoto(reshoot = true){
+  if(reshoot || !aiShot) aiShot = shootPhotoBase(aiView);
+  showModal(`<h3>AI photo of your home</h3>
+    <p class="hint">Ask for a photograph of this design with your wall and roof choices. If the design is pinned on the map, the photo is set in that area. Our team makes each photo by hand, so it arrives here later, usually within a day.</p>
+    <div class="airow"><span>View</span>${aiSeg('view', aiView, [['corner','Corner'],['front','Front']])}</div>
+    <div class="airow"><span>Light</span>${aiSeg('time', aiTime, [['day','Day'],['evening','Evening']])}</div>
+    <img class="elev-img" src="${aiShot}" alt="The view of the house that will be painted">
+    ${aiNote ? `<p class="hint" role="${aiNote.ok ? 'status' : 'alert'}" style="color:${aiNote.ok ? '#547548' : '#ad4a31'};font-weight:700">${escapeMarkup(aiNote.text)}</p>` : ''}
+    <button class="mbtn" data-ai-go${aiBusy ? ' disabled' : ''}>${aiBusy ? 'Sending…' : 'Request this photo'}</button>
+    <h3 style="margin-top:22px;font-size:15px">Your AI photos</h3>
+    <div id="aiList">${aiListHTML()}</div>
+    <button class="mbtn ghost" data-close>Close</button>
+    <p class="hint" style="margin-top:12px">An AI impression. It follows your design, but small details can differ. Not a construction drawing.</p>`);
+}
+function openAiPhoto(){
+  aiNote = null; aiListFailed = false;
+  showAiPhoto(true);
+  parent.postMessage({type:'archit:ai-list'}, location.origin);
+}
+function requestAiPhoto(){
+  if(aiBusy || !aiShot) return;
+  aiBusy = true; aiNote = null;
+  showAiPhoto(false);
+  parent.postMessage({type:'archit:ai-request', payload:{image:aiShot, time:aiTime, floors:state.floors.length,
+    style:{facade:state.facade, facadeMat:state.facadeMat, roofStyle:state.roofStyle, roofCol:state.roofCol}}}, location.origin);
+  // never leave the button stuck if the page never answers
+  clearTimeout(aiTimer);
+  aiTimer = setTimeout(()=>{
+    // it may still go through: say so, and look for it rather than inviting a duplicate
+    aiRequested({ok:false, error:'This is taking long. If it went through, it will appear under Your AI photos.'});
+    parent.postMessage({type:'archit:ai-list'}, location.origin);
+  }, 45000);
+}
+function aiRequested(r){
+  // a success that lands after the timeout gave up: just show it in the list
+  if(!aiBusy){ if(r?.ok) parent.postMessage({type:'archit:ai-list'}, location.origin); return; }
+  aiBusy = false; clearTimeout(aiTimer);
+  aiNote = r?.ok ? {ok:true, text:'Request sent. Your photo will appear below when it is ready.'}
+                 : {ok:false, text: typeof r?.error === 'string' && r.error ? r.error.slice(0, 200) : 'Could not send your request. Try again.'};
+  // a dialog the user already closed stays closed
+  if(aiDialogOpen()) showAiPhoto(false);
+  else toast(r?.ok ? 'AI photo requested' : aiNote.text);
+  if(r?.ok) parent.postMessage({type:'archit:ai-list'}, location.origin);
+}
+function aiListed(items, failed){
+  aiListFailed = failed === true;
+  aiItems = aiListFailed ? aiItems : cleanAiItems(items);
+  const el = modal.querySelector('#aiList');
+  if(el) el.innerHTML = aiListHTML();
+}
+window.addEventListener('message', e=>{
+  if(e.origin !== location.origin || e.source !== parent) return;
+  if(e.data?.type === 'archit:ai-requested') aiRequested(e.data.payload);
+  else if(e.data?.type === 'archit:ai-photos') aiListed(e.data.payload?.items, e.data.payload?.error);
+});
 // Report data for the whole house: every floor, not just the active one.
 function reportFloors(floors){
   return floors.map((f,fi)=>({fi, label: fi===0 ? 'Ground floor' : 'Floor '+(fi+1), blocks:f.blocks}));
@@ -312,6 +441,7 @@ $('#shotB').addEventListener('click', ()=>{
     <h3>Save &amp; export</h3>
     <p class="hint">Save images, a full design sheet, or the project file to continue later on any device.</p>
     <button class="mbtn" data-export="sheet">Design sheet — all previews</button>
+    ${EMBED ? '<button class="mbtn" data-export="aiphoto" style="background:#7a5a12">AI photo of your home</button>' : ''}
     <button class="mbtn" data-export="elev" style="background:#3f5a47">Front elevation &amp; side views</button>
     <button class="mbtn" data-export="3d" style="background:#ad4a31">Save 3D image</button>
     <button class="mbtn" data-export="2d" style="background:#293c31">Save 2D plan</button>
@@ -322,6 +452,17 @@ $('#shotB').addEventListener('click', ()=>{
 });
 modal.addEventListener('click', e=>{
   if(VIEW) return;
+  const aiPick = e.target.closest('[data-ai-view], [data-ai-time]');
+  if(aiPick){
+    if(aiBusy) return;
+    const view = aiPick.dataset.aiView;
+    if(view) aiView = view; else aiTime = aiPick.dataset.aiTime;
+    showAiPhoto(!!view);            // a new view needs a new picture; the light does not
+    // the dialog was rebuilt: put keyboard focus back on the choice just made
+    modal.querySelector(view ? `[data-ai-view="${aiView}"]` : `[data-ai-time="${aiTime}"]`)?.focus();
+    return;
+  }
+  if(e.target.closest('[data-ai-go]')){ requestAiPhoto(); modal.querySelector('[data-ai-go]')?.focus(); return; }
   const tab = e.target.closest('[data-elev]');
   if(tab){ showElevations(tab.dataset.elev); return; }
   const sv = e.target.closest('[data-elev-save]');
@@ -333,7 +474,8 @@ modal.addEventListener('click', e=>{
   const ex = e.target.closest('[data-export]');
   if(!ex) return;
   hideModal();
-  if(ex.dataset.export==='elev') showElevations('front');
+  if(ex.dataset.export==='aiphoto') openAiPhoto();
+  else if(ex.dataset.export==='elev') showElevations('front');
   else if(ex.dataset.export==='3d') save3D();
   else if(ex.dataset.export==='2d') save2D();
   else if(ex.dataset.export==='savep') saveProjectFile();

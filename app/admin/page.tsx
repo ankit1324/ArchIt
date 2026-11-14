@@ -83,7 +83,19 @@ async function count(q: PromiseLike<{ count: number | null; error: unknown }>) {
   return error ? null : (count ?? 0);
 }
 
-function Stat({ label, value, hint, href }: { label: string; value: string; hint?: string; href?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  href,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  href?: string;
+  className?: string;
+}) {
   const body = (
     <>
       <div className={eyebrow}>{label}</div>
@@ -93,7 +105,7 @@ function Stat({ label, value, hint, href }: { label: string; value: string; hint
       {hint && <div className="mt-2 text-[13px] tabular-nums text-ink-soft">{hint}</div>}
     </>
   );
-  const cls = "block h-full bg-paper p-4";
+  const cls = `block h-full bg-paper p-4 ${className}`;
   return href ? (
     <Link href={href} className={`${cls} transition-colors hover:bg-paper-soft ${focus} focus-visible:-outline-offset-3`}>
       {body}
@@ -141,24 +153,46 @@ export default async function AdminPage() {
 
   const weekAgo = new Date(daysAgo(7)).toISOString();
   const monthAgo = daysAgo(30);
-  const [live, pendingCount, rejected, newThisWeek, allPurchases, oldestPending, userCount] =
-    await Promise.all([
-      count(listings().eq("status", "live")),
-      count(listings().eq("status", "pending")),
-      count(listings().eq("status", "rejected")),
-      count(listings().gte("created_at", weekAgo)),
-      allPurchaseAmounts(),
-      db
-        .from("properties")
-        .select("created_at")
-        .eq("status", "pending")
-        .order("created_at")
-        .limit(1)
-        .maybeSingle<{ created_at: string }>(),
-      clerkClient()
-        .then((c) => c.users.getCount())
-        .catch(() => null),
-    ]);
+  const [
+    live,
+    pendingCount,
+    rejected,
+    newThisWeek,
+    allPurchases,
+    oldestPending,
+    userCount,
+    aiWaiting,
+    oldestAiWaiting,
+  ] = await Promise.all([
+    count(listings().eq("status", "live")),
+    count(listings().eq("status", "pending")),
+    count(listings().eq("status", "rejected")),
+    count(listings().gte("created_at", weekAgo)),
+    allPurchaseAmounts(),
+    db
+      .from("properties")
+      .select("created_at")
+      .eq("status", "pending")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle<{ created_at: string }>(),
+    clerkClient()
+      .then((c) => c.users.getCount())
+      .catch(() => null),
+    // Raw results (not count()): until the ai_photo_requests migration is
+    // applied these fail, and LoadError below should say so.
+    db.from("ai_photo_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    db
+      .from("ai_photo_requests")
+      .select("created_at")
+      .eq("status", "pending")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle<{ created_at: string }>(),
+  ]);
+  // a HEAD count on a missing table comes back with no error and count null:
+  // treat that as a failure, never as "0 waiting"
+  const aiWaitingCount = aiWaiting.error || aiWaiting.count === null ? null : aiWaiting.count;
   const paid = allPurchases.data;
   const paid30 = paid.filter((p) => Date.parse(p.created_at) >= monthAgo);
 
@@ -193,7 +227,8 @@ export default async function AdminPage() {
       .limit(50)
       .returns<PurchaseRow[]>(),
   ]);
-  const failed = [pending, reports, refunds, purchases, allPurchases].filter((r) => r.error);
+  const failed = [pending, reports, refunds, purchases, allPurchases, oldestAiWaiting].filter((r) => r.error);
+  if (aiWaitingCount === null && !oldestAiWaiting.error) failed.push({ error: { message: "AI photo requests could not be counted" } } as unknown as typeof pending);
   for (const r of failed) console.error("admin page query failed:", r.error?.message);
 
   return (
@@ -201,8 +236,9 @@ export default async function AdminPage() {
       <LoadError errors={failed.map((r) => r.error?.message)} />
       <PageHeader title="Overview" />
 
-      {/* hairline grid: the 1px gap over a line-coloured backdrop draws the rules */}
-      <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3 lg:grid-cols-6">
+      {/* hairline grid: the 1px gap over a line-coloured backdrop draws the rules.
+          Seven tiles: Revenue spans two cells below xl so no row ends in an empty (grey) cell. */}
+      <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-4 xl:grid-cols-7">
         <Stat label="Live listings" value={fmt(live)} href="/admin/listings?status=live" />
         <Stat
           label="Awaiting review"
@@ -210,11 +246,18 @@ export default async function AdminPage() {
           hint={pendingCount ? `oldest ${ageLabel(oldestPending.data?.created_at ?? null)}` : undefined}
           href="/admin/listings?status=pending"
         />
+        <Stat
+          label="AI photos waiting"
+          value={fmt(aiWaitingCount)}
+          hint={aiWaitingCount ? `oldest ${ageLabel(oldestAiWaiting.data?.created_at ?? null)}` : undefined}
+          href="/admin/ai-photos"
+        />
         <Stat label="Hidden / rejected" value={fmt(rejected)} href="/admin/listings?status=rejected" />
         <Stat label="New this week" value={fmt(newThisWeek)} href="/admin/listings" />
         <Stat label="Users" value={fmt(userCount)} href="/admin/users" />
         <Stat
           label="Revenue"
+          className="col-span-2 xl:col-span-1"
           value={rupees(sumPaise(paid))}
           hint={`${paid.length} purchases · ${rupees(sumPaise(paid30))} last 30 days`}
         />
