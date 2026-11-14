@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { ClerkProvider } from "@clerk/nextjs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
@@ -17,9 +19,15 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
   if (!(await isAdmin(userId))) notFound();
+  // Clerk's browser script keeps the session token fresh. Without it the token
+  // in the cookie expires about a minute after the page loads, and every admin
+  // button (approve, ban, refund, upload) then gets 401 from proxy.ts. The
+  // nonce lets Clerk's scripts pass the per-request CSP set for /admin.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   // The document scrolls (no inner h-full scroller): each page supplies its
   // own h1 via PageHeader, so the brand here is a link, not a heading.
   return (
+    <ClerkProvider nonce={nonce}>
     <div className="min-h-full bg-paper text-ink">
       <header className="border-b border-line">
         <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-3 sm:px-6">
@@ -46,5 +54,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </header>
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">{children}</main>
     </div>
+    </ClerkProvider>
   );
 }

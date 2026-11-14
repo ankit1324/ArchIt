@@ -66,6 +66,10 @@ export default function AdminAction({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ action: spec.action, note }),
             });
+      if (res.status === 401) {
+        setError("Your sign-in expired. Reload the page and try again.");
+        return;
+      }
       if (!res.ok) {
         const msg = await res
           .json()
