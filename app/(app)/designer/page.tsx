@@ -646,6 +646,7 @@ export default function DesignerPage() {
           floors={builderSetup.floors}
           unit={builderSetup.unit}
           budget={builderSetup.budget}
+          place={current?.place}
           facing={builderSetup.facing}
           existingDesign={current?.design}
           onSave={saveDesign}

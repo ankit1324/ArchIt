@@ -11,7 +11,7 @@ import {exitWalk, walkActive} from './walk.js';
 import {closeToolPop, releaseThumbRenderer} from './tools.js';
 import {hideModal, renderAll, resetCam, setView, syncModeButtons} from './ui.js';
 import {fitPlan} from './plan2d.js';
-import {snapshotBlob} from './export.js';
+import {setAiPhoto, snapshotBlob} from './export.js';
 import {setEmbedPlot} from './plot.js';
 import {loadProject, tryHashLoad} from './persistence.js';
 import {startTutorial} from './tutorial.js';
@@ -126,6 +126,7 @@ addEventListener('pagehide', e=>{
         if(await newProject(key)) toast('Template unlocked');
         return;
       }
+      if(m?.type === 'archit:ai-photo'){ setAiPhoto(m.payload?.enabled === true); return; }
       if(m?.type !== 'archit:init') return;
       const p = m.payload || {};
       // DesignerOverlay keeps this iframe (and its WebGL context) alive and sends
@@ -147,6 +148,7 @@ addEventListener('pagehide', e=>{
       }
       setContext(p.plot, p.neighbors, p.facing);
       setEmbedPlot(p.plot, p.facing);
+      setAiPhoto(p.aiPhoto === true);
       if(p.budget > 0 && !state.cost?.budget) state.cost = {...state.cost, budget:Number(p.budget)};
       setUndoStack([]); setRedoStack([]); setSel(null); setDirty(false);
       resetCam(); renderAll();
