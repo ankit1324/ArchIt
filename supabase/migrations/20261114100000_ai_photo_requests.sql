@@ -32,6 +32,39 @@ CREATE INDEX IF NOT EXISTS ai_photo_requests_user_created_idx
 -- Server routes use the secret key (bypasses RLS); block anon access.
 ALTER TABLE ai_photo_requests ENABLE ROW LEVEL SECURITY;
 
+-- Per-user caps, enforced at insert. The route checks them first for a friendly
+-- message, but count-then-insert can be raced by parallel requests; here a
+-- per-user advisory lock (held until commit) serialises one user's inserts, so
+-- each count sees every earlier request. Keep the numbers equal to
+-- MAX_PENDING_REQUESTS and MAX_REQUESTS_PER_DAY in lib/ai-photos.ts (a test
+-- checks). The route maps these messages to 429.
+CREATE OR REPLACE FUNCTION public.ai_photo_requests_enforce_caps()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext('ai_photo_requests:' || NEW.user_id));
+  IF (SELECT count(*) FROM public.ai_photo_requests
+      WHERE user_id = NEW.user_id AND status = 'pending') >= 3 THEN
+    RAISE EXCEPTION 'ai_photo_pending_cap' USING ERRCODE = 'P0001';
+  END IF;
+  IF (SELECT count(*) FROM public.ai_photo_requests
+      WHERE user_id = NEW.user_id AND created_at > now() - interval '1 day') >= 5 THEN
+    RAISE EXCEPTION 'ai_photo_daily_cap' USING ERRCODE = 'P0001';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ai_photo_requests_enforce_caps ON public.ai_photo_requests;
+CREATE TRIGGER ai_photo_requests_enforce_caps
+  BEFORE INSERT ON public.ai_photo_requests
+  FOR EACH ROW EXECUTE FUNCTION public.ai_photo_requests_enforce_caps();
+
+REVOKE ALL ON FUNCTION public.ai_photo_requests_enforce_caps() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ai_photo_requests_enforce_caps() TO service_role;
+
 -- New tables get no automatic grants (see 20261028120000).
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.ai_photo_requests TO service_role;
 

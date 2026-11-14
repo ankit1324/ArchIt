@@ -96,6 +96,18 @@ test('the pictures live in a private bucket and the table is service-role only',
   assert.doesNotMatch(sql, /TO (anon|authenticated)/);
 });
 
+test('the caps are enforced in the database too, with the same numbers', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/20261114100000_ai_photo_requests.sql', import.meta.url), 'utf8');
+  assert.match(sql, /BEFORE INSERT ON public\.ai_photo_requests/);
+  assert.match(sql, /pg_advisory_xact_lock\(/);                       // serialises one user's inserts
+  assert.match(sql, new RegExp(`status = 'pending'\\) >= ${MAX_PENDING_REQUESTS} THEN`));
+  assert.match(sql, new RegExp(`interval '1 day'\\) >= ${MAX_REQUESTS_PER_DAY} THEN`));
+  const route = readFileSync(new URL('../app/api/ai-photos/route.ts', import.meta.url), 'utf8');
+  for (const tag of ['ai_photo_pending_cap', 'ai_photo_daily_cap']) {
+    assert.ok(sql.includes(tag) && route.includes(tag), `${tag} must be raised by the trigger and handled by the route`);
+  }
+});
+
 test('no route generates a picture for an ordinary user', () => {
   // the image model is reachable only from the admin route
   const userRoute = readFileSync(new URL('../app/api/ai-photos/route.ts', import.meta.url), 'utf8');

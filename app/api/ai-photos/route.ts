@@ -130,9 +130,18 @@ export async function POST(request: Request) {
     .select("id")
     .single<{ id: string }>();
   if (error || !data) {
-    console.error("POST /api/ai-photos insert failed:", error?.message);
     // don't leave a picture nobody will ever look at
     await db.storage.from(AI_PHOTOS_BUCKET).remove([inputPath]);
+    // the database enforces the caps too (a parallel request can pass the
+    // checks above): same answers, from the trigger in the migration
+    const msg = error?.message ?? "";
+    if (msg.includes("ai_photo_pending_cap")) {
+      return fail(429, "queue_full", `You already have ${MAX_PENDING_REQUESTS} photos being made. Wait for one to arrive, then ask again.`);
+    }
+    if (msg.includes("ai_photo_daily_cap")) {
+      return fail(429, "rate_limited", `You can ask for ${MAX_REQUESTS_PER_DAY} AI photos a day. Try again tomorrow.`);
+    }
+    console.error("POST /api/ai-photos insert failed:", msg);
     return fail(500, "internal", "Could not send your request. Try again.");
   }
   // after the response: a slow or failed email must not hold up or fail the request
