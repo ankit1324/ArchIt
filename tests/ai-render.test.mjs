@@ -162,6 +162,16 @@ test('failures are sorted into kinds the route can explain', async () => {
   assert.equal(await kindOf(renderImage(input, deps(fakeFetch(200, 'not json')))), 'upstream');
 });
 
+test('a key with no image quota (billing off) is a setup fault, not "busy"', async () => {
+  // Google's real answer for a free-tier key: 429, quota metric with limit 0
+  const noBilling = { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message:
+    'You exceeded your current quota, please check your plan and billing details.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-nano-banana-2.1' } };
+  assert.equal(await kindOf(renderImage(input, deps(fakeFetch(429, noBilling)))), 'config');
+  // an ordinary per-minute limit still reads as busy: waiting does help
+  const perMinute = { error: { code: 429, message: 'Quota exceeded for metric: generate_requests_per_minute, limit: 10, model: gemini-nano-banana-2.1' } };
+  assert.equal(await kindOf(renderImage(input, deps(fakeFetch(429, perMinute)))), 'busy');
+});
+
 test('a hung model is cut off and reported as a timeout', async () => {
   const hang = (_url, init) => new Promise((_, reject) => {
     init.signal.addEventListener('abort', () => reject(init.signal.reason ?? new DOMException('aborted', 'TimeoutError')));

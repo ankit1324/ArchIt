@@ -86,7 +86,14 @@ export async function renderImage(
   const raw = await res.text();
   if (!res.ok) {
     const detail = scrub(raw);
-    if (res.status === 429) throw new AiRenderError("busy", "the image model is rate-limited", detail);
+    if (res.status === 429) {
+      // "limit: 0" means the key has no image quota at all (Google gives image
+      // models no free tier: the project needs billing). Waiting never fixes
+      // that, so it is ours to fix, not "busy".
+      if (/\blimit:\s*0\b/.test(raw))
+        throw new AiRenderError("config", "the image model key has no quota (enable billing on its Google project)", detail);
+      throw new AiRenderError("busy", "the image model is rate-limited", detail);
+    }
     if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404)
       throw new AiRenderError("config", `the image model rejected the request (${res.status})`, detail);
     throw new AiRenderError("upstream", `the image model failed (${res.status})`, detail);
