@@ -8,6 +8,7 @@ import {
   type RenderFacing,
   type RenderTime,
 } from "./prompt.ts";
+import { sniffImage } from "../ai-photos.ts";
 
 /** Largest picture accepted from the builder, decoded. Its own shots are ~200-400 KB. */
 export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
@@ -19,14 +20,6 @@ export interface RenderRequest extends RenderBrief {
 }
 
 type Parsed = { ok: true; value: RenderRequest } | { ok: false; error: string };
-
-/** Trust the bytes, not the label on the data URL. */
-function sniff(buf: Buffer): RenderRequest["mime"] | null {
-  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
-  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
-  if (buf.length >= 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
-  return null;
-}
 
 const pick = (table: Record<string, string>, value: unknown, fallback: string) =>
   typeof value === "string" && Object.hasOwn(table, value) ? value : fallback;
@@ -48,7 +41,7 @@ export function parseRenderRequest(body: unknown): Parsed {
   if (m[1].length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4) return { ok: false, error: "image too large" };
   const buf = Buffer.from(m[1], "base64");
   if (buf.length > MAX_IMAGE_BYTES) return { ok: false, error: "image too large" };
-  const mime = sniff(buf);
+  const mime = sniffImage(buf);   // trust the bytes, not the label on the data URL
   if (!mime) return { ok: false, error: "image must be a JPEG, PNG or WebP" };
 
   const s = (b.style && typeof b.style === "object" ? b.style : {}) as Record<string, unknown>;

@@ -17,7 +17,7 @@ const isProtected = createRouteMatcher([
   "/api/purchases(.*)",
   "/api/upload(.*)",
   "/api/reports(.*)",
-  "/api/ai-render(.*)",
+  "/api/ai-photos(.*)",
   // admin role is checked in the pages/routes (lib/admin.ts); this just
   // keeps signed-out visitors out before any handler runs
   "/admin(.*)",

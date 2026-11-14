@@ -25,6 +25,8 @@ interface DesignerOverlayProps {
   budget?: number;
   /** label of the spot pinned on the map ("Sector 8, Chandigarh"); sets the scene of an AI photo */
   place?: string;
+  /** the design's name, so an admin knows which AI photo request is which */
+  designName?: string;
   facing?: DesignMeta["facing"];
   /** present when reopening a saved design */
   existingDesign?: DesignStateV3;
@@ -54,14 +56,14 @@ type BuilderMessage =
   | { type: "archit:close"; dirty: boolean }
   | { type: "archit:buy-template"; payload: { key: string; name: string } }
   | {
-      type: "archit:ai-render";
+      type: "archit:ai-request";
       payload: { image: string; time: string; floors: number; style: Record<string, string> };
-    };
+    }
+  | { type: "archit:ai-list" };
 
 function sendInit(
   frame: HTMLIFrameElement | null,
   p: Pick<DesignerOverlayProps, "plot" | "neighbors" | "floors" | "unit" | "budget" | "facing" | "existingDesign">,
-  aiPhoto: boolean,
 ) {
   frame?.contentWindow?.postMessage(
     {
@@ -72,7 +74,6 @@ function sendInit(
         floors: p.floors,
         unit: p.unit,
         budget: p.budget,
-        aiPhoto,
         facing: p.facing,
         design: p.existingDesign,
       },
@@ -90,6 +91,7 @@ export default function DesignerOverlay({
   unit,
   budget,
   place,
+  designName,
   facing,
   existingDesign,
   onSave,
@@ -98,9 +100,7 @@ export default function DesignerOverlay({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const buyingRef = useRef(false);
   const readyRef = useRef(false); // the builder has said archit:ready
-  // AI photos: offered only when the server has an image model configured
-  const aiPhotoRef = useRef(false);
-  const renderingRef = useRef(false);
+  const requestingRef = useRef(false); // an AI photo request is on its way
   const propsRef = useRef({
     plot,
     neighbors,
@@ -108,6 +108,7 @@ export default function DesignerOverlay({
     unit,
     budget,
     place,
+    designName,
     facing,
     existingDesign,
     onSave,
@@ -123,6 +124,7 @@ export default function DesignerOverlay({
       unit,
       budget,
       place,
+      designName,
       facing,
       existingDesign,
       onSave,
@@ -130,30 +132,10 @@ export default function DesignerOverlay({
     };
   });
 
-  // Ask once whether AI photos are switched on. If the builder is already up
-  // when the answer lands, tell it again so its export menu gains the button.
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/ai-render")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: { enabled?: boolean } | null) => {
-        if (!alive || !j?.enabled) return;
-        aiPhotoRef.current = true;
-        iframeRef.current?.contentWindow?.postMessage(
-          { type: "archit:ai-photo", payload: { enabled: true } },
-          location.origin,
-        );
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   // Opening another design: hand it to the already-loaded builder. Before the
   // first archit:ready there is nothing to tell yet; that handshake sends it.
   useEffect(() => {
-    if (readyRef.current) sendInit(iframeRef.current, propsRef.current, aiPhotoRef.current);
+    if (readyRef.current) sendInit(iframeRef.current, propsRef.current);
   }, [session]);
 
   useEffect(() => {
@@ -170,7 +152,7 @@ export default function DesignerOverlay({
       if (m.type === "archit:ready") {
         // handshake, not iframe onLoad — the module script boots async
         readyRef.current = true;
-        sendInit(frame, p, aiPhotoRef.current);
+        sendInit(frame, p);
       } else if (m.type === "archit:save") {
         // Reply only after the save settles — the builder keeps "dirty" and
         // shows "Saving…" until it hears back.
@@ -213,32 +195,51 @@ export default function DesignerOverlay({
           .finally(() => {
             buyingRef.current = false;
           });
-      } else if (m.type === "archit:ai-render") {
-        // The builder sends its own 3D picture and exterior choices; the place
-        // and facing come from the design's details here. The server validates
-        // all of it — this is a relay, not a gate.
-        if (renderingRef.current) return;
-        renderingRef.current = true;
-        type Reply = { ok: boolean; image?: string; error?: string };
-        void fetch("/api/ai-render", {
+      } else if (m.type === "archit:ai-request") {
+        // The builder sends its own 3D picture and exterior choices; the place,
+        // facing and name come from the design's details here. Nothing is
+        // generated: the server files a request for an admin and validates all
+        // of this — the page is a relay, not a gate.
+        if (requestingRef.current) {
+          frame.contentWindow?.postMessage(
+            { type: "archit:ai-requested", payload: { ok: false, error: "Still sending your last request. It will appear under Your AI photos." } },
+            location.origin,
+          );
+          return;
+        }
+        requestingRef.current = true;
+        type Reply = { ok: boolean; error?: string };
+        void fetch("/api/ai-photos", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...m.payload, facing: p.facing, place: p.place }),
+          body: JSON.stringify({ ...m.payload, facing: p.facing, place: p.place, designName: p.designName }),
         })
           .then(
             async (r): Promise<Reply> => {
-              const j = (await r.json().catch(() => null)) as { image?: string; message?: string } | null;
-              return r.ok && j?.image
-                ? { ok: true, image: j.image }
-                : { ok: false, error: j?.message || "Could not make the photo. Try again." };
+              if (r.ok) return { ok: true };
+              const j = (await r.json().catch(() => null)) as { message?: string } | null;
+              return { ok: false, error: j?.message || "Could not send your request. Try again." };
             },
             (): Reply => ({ ok: false, error: "No connection. Try again." }),
           )
           .then((payload) => {
-            frame.contentWindow?.postMessage({ type: "archit:ai-rendered", payload }, location.origin);
+            frame.contentWindow?.postMessage({ type: "archit:ai-requested", payload }, location.origin);
           })
           .finally(() => {
-            renderingRef.current = false;
+            requestingRef.current = false;
+          });
+      } else if (m.type === "archit:ai-list") {
+        // "Your AI photos" in the builder's dialog: what was asked for, and
+        // the finished ones (served same-origin by /api/ai-photos/[id]/image).
+        // A failed load says so: the builder must not show "none yet" then.
+        void fetch("/api/ai-photos")
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+          .then(
+            (j: { items?: unknown }) => ({ items: Array.isArray(j.items) ? j.items : [], error: false }),
+            () => ({ items: [], error: true }),
+          )
+          .then((payload) => {
+            frame.contentWindow?.postMessage({ type: "archit:ai-photos", payload }, location.origin);
           });
       }
     };

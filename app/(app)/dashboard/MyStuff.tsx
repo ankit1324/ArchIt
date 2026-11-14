@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { MeSummary, MyListing } from "@/lib/me";
 import {
+  aiPhotoAlt,
+  aiPhotosView,
   designsSummary,
   listingMapHref,
   listingPriceLabel,
@@ -106,7 +108,75 @@ function EmptyState({ children, href, cta }: { children: React.ReactNode; href: 
   );
 }
 
-/** "My listings" + "My designs": what the user has made and where it stands. */
+/**
+ * "My AI photos": finished photos as thumbnails, a count of the ones still being
+ * made, and any turned down with the admin's note. Image URLs are same-origin
+ * (/api/ai-photos/[id]/image checks the owner), so a plain <img> is enough.
+ */
+function AiPhotosCard({ me }: { me: MeSummary }) {
+  const { done, pendingLabel, rejected } = aiPhotosView(me.aiPhotos);
+  const empty = me.aiPhotos.length === 0;
+  return (
+    <article className="flex min-w-0 flex-col gap-5 rounded-[5px] border border-line bg-paper-soft p-6 sm:p-7">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line-strong/50 pb-4">
+        <h3 className={CARD_TITLE}>My AI photos</h3>
+        {pendingLabel && <p className="text-[14px] font-semibold tabular-nums text-ink-soft">{pendingLabel}</p>}
+      </header>
+      {me.aiPhotosError ? (
+        <LoadError />
+      ) : empty ? (
+        <EmptyState href="/designer" cta="Open the designer">
+          No AI photos yet. Open the designer, then Save &amp; export → AI photo of your home.
+        </EmptyState>
+      ) : (
+        <>
+          {done.length > 0 && (
+            <ul className="grid grid-cols-3 gap-2">
+              {done.map((p) => (
+                <li key={p.id}>
+                  <a
+                    href={p.image!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`block overflow-hidden rounded-[3px] border border-line ${FOCUS}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- private, owner-checked route; next/image would cache it */}
+                    <img
+                      src={p.image!}
+                      alt={aiPhotoAlt(p.designName)}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover"
+                    />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {pendingLabel && !done.length && !rejected.length && (
+            <p className="text-[14px] leading-[1.7] text-ink-soft">
+              {pendingLabel}. You&apos;ll see each photo here once it&apos;s ready.
+            </p>
+          )}
+          {rejected.map((p) => (
+            <p
+              key={p.id}
+              className="border-l-2 border-accent bg-[#eee5d9] px-3.5 py-2.5 text-[14px] leading-[1.7] text-ink"
+            >
+              <span className="font-bold">{p.designName || "Your design"} wasn&apos;t made</span>
+              {p.note ? `: ${p.note}` : "."}
+            </p>
+          ))}
+          <Link href="/designer" className={`${TEXT_LINK} mt-auto self-start`}>
+            Ask for another in the designer
+            <span aria-hidden="true">→</span>
+          </Link>
+        </>
+      )}
+    </article>
+  );
+}
+
+/** "My listings" + "My designs" + "My AI photos": what the user has made and where it stands. */
 export default function MyStuff({ me }: { me: MeSummary }) {
   const { listings, listingsTotal, designsTotal, listingsError, designsError } = me;
   const hasListings = listings.length > 0;
@@ -125,7 +195,8 @@ export default function MyStuff({ me }: { me: MeSummary }) {
         </h2>
 
         <div className="mt-8 grid gap-[18px] lg:grid-cols-3">
-          <article className="flex min-w-0 flex-col gap-5 rounded-[5px] border border-line bg-paper-soft p-6 sm:p-7 lg:col-span-2">
+          {/* row-span-2: the designs and AI photo cards stack beside the listings */}
+          <article className="flex min-w-0 flex-col gap-5 rounded-[5px] border border-line bg-paper-soft p-6 sm:p-7 lg:col-span-2 lg:row-span-2">
             <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line-strong/50 pb-4">
               <h3 className={CARD_TITLE}>My listings</h3>
               {hasListings && (
@@ -188,6 +259,8 @@ export default function MyStuff({ me }: { me: MeSummary }) {
               </EmptyState>
             )}
           </article>
+
+          <AiPhotosCard me={me} />
         </div>
       </div>
     </section>

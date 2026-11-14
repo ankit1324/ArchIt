@@ -5,11 +5,14 @@ import { db } from "./db";
 import { SITE_URL as CANONICAL_SITE_URL } from "./site";
 import { sendEmail } from "./email";
 import {
+  aiPhotoDecisionEmail,
+  aiPhotoRequestedEmail,
   contactUnlockedEmail,
   listingDecisionEmail,
   receiptEmail,
   type EmailMessage,
 } from "./email-templates";
+import { parseAdminEmails } from "./moderation";
 import type { LedgerRow } from "./record-purchase";
 import { whatsapp, type WhatsAppMessage } from "./whatsapp";
 
@@ -40,11 +43,16 @@ async function contactFor(userId: string): Promise<Contact> {
   }
 }
 
-async function deliver(userId: string, email: EmailMessage, wa: WhatsAppMessage) {
+/**
+ * `wa: null` means email only: WhatsApp business messages must use a template
+ * approved in advance, so an event with no approved template sends nothing
+ * there rather than something that would be rejected or read wrong.
+ */
+async function deliver(userId: string, email: EmailMessage, wa: WhatsAppMessage | null) {
   const contact = await contactFor(userId);
   if (contact.email) await sendEmail(contact.email, email);
   else console.info(`notify: no email on file for ${userId}, skipped "${email.subject}"`);
-  if (contact.phone) await whatsapp.send(contact.phone, wa);
+  if (wa && contact.phone) await whatsapp.send(contact.phone, wa);
 }
 
 async function listingInfo(id: string) {
@@ -122,4 +130,32 @@ export async function notifyListingDecision(input: {
       params: [input.listingName, ...(input.note ? [input.note] : [])],
     },
   );
+}
+
+/**
+ * An admin finished an AI photo request (done) or turned it down. Email only:
+ * there is no approved WhatsApp template for it yet.
+ */
+export async function notifyAiPhotoDecision(input: {
+  userId: string;
+  designName?: string | null;
+  done: boolean;
+  note?: string | null;
+}): Promise<void> {
+  await deliver(input.userId, aiPhotoDecisionEmail({ ...input, siteUrl: SITE_URL }), null);
+}
+
+/**
+ * A user asked for an AI photo: tell every ADMIN_EMAILS address so the queue
+ * does not sit unseen. Admins added by user id or Clerk role are not emailed;
+ * the env list is the one place an address is written down.
+ */
+export async function notifyAiPhotoRequested(input: { designName?: string | null }): Promise<void> {
+  const to = [...parseAdminEmails(process.env.ADMIN_EMAILS)];
+  if (!to.length) {
+    console.info("notify: ADMIN_EMAILS unset, skipped new AI photo request email");
+    return;
+  }
+  const message = aiPhotoRequestedEmail({ ...input, siteUrl: SITE_URL });
+  for (const email of to) await sendEmail(email, message);
 }

@@ -1,5 +1,6 @@
 /**
- * Presentation rules for the dashboard's "My listings" / "My designs" panel.
+ * Presentation rules for the dashboard's "My listings" / "My designs" /
+ * "My AI photos" panel.
  * Pure (no imports, no env, no "server-only") so `node --test` can load it
  * directly — see tests/me.test.mjs. lib/me.ts does the I/O.
  *
@@ -98,4 +99,41 @@ export function listingsSummary(statuses: ReadonlyArray<string | null | undefine
 export function designsSummary(count: number): string {
   if (!(count > 0)) return "No designs yet";
   return `${count} saved design${count === 1 ? "" : "s"}`;
+}
+
+/** The fields of lib/ai-photos.ts AiPhotoItem this panel reads (kept structural: no imports). */
+export interface AiPhotoLike {
+  id: string;
+  status: string;
+  designName: string;
+  note: string | null;
+  image: string | null;
+}
+
+export interface AiPhotosView<T extends AiPhotoLike> {
+  /** finished, with a picture to show */
+  done: T[];
+  /** still waiting for an admin */
+  pending: number;
+  /** "2 being made", or null when none are */
+  pendingLabel: string | null;
+  /** turned down; the note says why */
+  rejected: T[];
+}
+
+/**
+ * Split the user's newest requests for the "My AI photos" card. A "done" row
+ * with no picture (lost result) is left out rather than shown as a broken image.
+ */
+export function aiPhotosView<T extends AiPhotoLike>(items: ReadonlyArray<T>): AiPhotosView<T> {
+  const done = items.filter((p) => p.status === "done" && p.image);
+  const pending = items.filter((p) => p.status === "pending").length;
+  const rejected = items.filter((p) => p.status === "rejected");
+  return { done, pending, pendingLabel: pending > 0 ? `${pending} being made` : null, rejected };
+}
+
+/** Alt text for a finished photo: names the design so a list of them is distinguishable. */
+export function aiPhotoAlt(designName: string | null | undefined): string {
+  const name = designName?.trim();
+  return name ? `AI photo of ${name}` : "AI photo of your design";
 }

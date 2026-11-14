@@ -246,6 +246,18 @@ textarea.cmt:focus{border-color:var(--ink)}
 #dim{position:fixed;inset:0;background:rgb(41 55 44/.42);display:none;place-items:center;z-index:100;backdrop-filter:blur(2px)}
 #dim.show{display:grid}
 .modal:has(.elev-img){width:820px}
+.airesult{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line2)}
+.airesult img,.airesult .aiwait{flex:none;width:112px;height:63px;border-radius:5px;border:1px solid var(--line2);background:var(--canvas);object-fit:cover;display:block}
+.airesult .aiwait{background:repeating-linear-gradient(135deg,var(--canvas),var(--canvas) 8px,var(--line2) 8px,var(--line2) 16px)}
+/* turned down: a plain tile, so it never reads as still being made */
+.airesult .aiwait.aino{background:var(--canvas);border-style:dashed}
+.airesult .nm{display:block;font-size:13px;font-weight:700;color:var(--ink)}
+.airesult .sb{display:block;font-size:11.5px;color:var(--ink2);line-height:1.4}
+.airesult .ailink{display:inline-flex;align-items:center;min-height:40px;font-size:12.5px;font-weight:700;color:var(--pink);text-decoration:underline}
+/* a photo that fails to load shows its alt text: keep it inside the thumbnail */
+.airesult img{overflow:hidden;font-size:11px;line-height:1.3;color:var(--ink2)}
+/* the dialog's choices are tapped on phones: full-size targets there */
+.airow .unitseg button{min-height:40px}
 .airow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:13px;font-weight:700;color:var(--ink2)}
 .elev-img{display:block;width:100%;height:auto;border:1px solid var(--line2);border-radius:6px;background:var(--canvas)}
 .modal{width:400px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh);padding:26px;max-height:86vh;overflow:auto}
